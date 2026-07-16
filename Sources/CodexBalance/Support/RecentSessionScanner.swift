@@ -9,7 +9,7 @@ struct RecentSessionChip {
   var modified: Date
 }
 
-/// 扫描 Claude / Codex 的本地会话日志，取最近会话的标题（只读，不写任何文件）。
+/// 扫描 Codex 本地会话日志，取最近会话的标题（只读，不写任何文件）。
 /// 标题取首条用户消息的前若干字；取不到时退回项目目录名。结果缓存 20 秒。
 final class RecentSessionScanner: @unchecked Sendable {
   static let shared = RecentSessionScanner()
@@ -29,9 +29,7 @@ final class RecentSessionScanner: @unchecked Sendable {
     }
     lock.unlock()
 
-    var sessions: [RecentSessionChip] = []
-    sessions += scanClaudeSessions()
-    sessions += scanCodexSessions()
+    var sessions = scanCodexSessions()
     sessions.sort { $0.modified > $1.modified }
 
     lock.lock()
@@ -40,37 +38,6 @@ final class RecentSessionScanner: @unchecked Sendable {
     let result = Array(sessions.prefix(limit))
     lock.unlock()
     return result
-  }
-
-  // MARK: - Claude：~/.claude/projects/<项目>/<会话>.jsonl
-
-  private func scanClaudeSessions() -> [RecentSessionChip] {
-    let root = fileManager.homeDirectoryForCurrentUser.appendingPathComponent(".claude/projects")
-    guard let enumerator = fileManager.enumerator(
-      at: root,
-      includingPropertiesForKeys: [.contentModificationDateKey],
-      options: [.skipsHiddenFiles]
-    ) else { return [] }
-
-    var chips: [RecentSessionChip] = []
-    for case let url as URL in enumerator where url.pathExtension == "jsonl" {
-      guard let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
-      else { continue }
-      let title = sessionTitle(for: url, modified: modified) ?? claudeProjectName(url)
-      chips.append(RecentSessionChip(
-        title: title,
-        tool: .claude,
-        isActive: Date().timeIntervalSince(modified) < 120,
-        modified: modified
-      ))
-    }
-    return chips
-  }
-
-  private func claudeProjectName(_ url: URL) -> String {
-    // 项目目录名形如 "-Users-name-Downloads"，取最后一段
-    let dir = url.deletingLastPathComponent().lastPathComponent
-    return dir.split(separator: "-").last.map(String.init) ?? "Claude 会话".l10n
   }
 
   /// 首条用户消息的截断文本（读文件头部，按 mtime 缓存）
@@ -163,16 +130,7 @@ final class RecentSessionScanner: @unchecked Sendable {
 @MainActor
 enum SessionAppLauncher {
   static func open(tool: ToolID) {
-    let bundleIDs: [String]
-    switch tool {
-    case .claude: bundleIDs = ["com.anthropic.claudefordesktop"]
-    case .codex: bundleIDs = ["com.openai.codex"]
-    }
-    for bundleID in bundleIDs {
-      if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
-        NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
-        return
-      }
-    }
+    guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.openai.codex") else { return }
+    NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
   }
 }

@@ -2,11 +2,11 @@ import Foundation
 import Darwin
 
 enum CodexWatcherManager {
-  private static let label = "dev.codex.balance-dashboard.watch-codex"
+  private static let label = "dev.codex.balance-dashboard.codex.watch-codex"
 
   private static var applicationSupportURL: URL {
     FileManager.default.homeDirectoryForCurrentUser
-      .appendingPathComponent("Library/Application Support/CodexBalanceDashboard", isDirectory: true)
+      .appendingPathComponent("Library/Application Support/CodexSuanliMeter", isDirectory: true)
   }
 
   private static var scriptURL: URL {
@@ -31,11 +31,28 @@ enum CodexWatcherManager {
   }
 
   static func refreshIfEnabled(appURL: URL) throws {
-    guard isEnabled() else { return }
+    guard isEnabled(), isInstalledAppLocation(appURL) else { return }
     if isCurrentInstallation(appURL: appURL) {
       return
     }
     try install(appURL: appURL)
+  }
+
+  /// Automatic launch-agent repair must only trust a real installation.
+  /// Development, dist and UI-validation bundles can share the same watcher
+  /// code but must never redirect automatic startup into a project directory.
+  private static func isInstalledAppLocation(_ appURL: URL) -> Bool {
+    let path = appURL.standardizedFileURL.path
+    let homeApplicationsPath = FileManager.default.homeDirectoryForCurrentUser
+      .appendingPathComponent("Applications/Codex 脉动.app", isDirectory: true)
+      .standardizedFileURL.path
+    let legacyHomeApplicationsPath = FileManager.default.homeDirectoryForCurrentUser
+      .appendingPathComponent("Applications/Codex算力码表.app", isDirectory: true)
+      .standardizedFileURL.path
+    return path == "/Applications/Codex 脉动.app"
+      || path == homeApplicationsPath
+      || path == "/Applications/Codex算力码表.app"
+      || path == legacyHomeApplicationsPath
   }
 
   private static func install(appURL: URL) throws {
@@ -71,9 +88,9 @@ enum CodexWatcherManager {
     set -u
 
     APP_PATH=\(shellQuote(appPath))
-    BUILD_LOCK="$HOME/Library/Application Support/CodexBalanceDashboard/build.lock"
-    WATCH_LOCK_DIR="$HOME/Library/Application Support/CodexBalanceDashboard/watch.lock"
-    BUNDLE_ID="dev.codex.balance-dashboard"
+    BUILD_LOCK="$HOME/Library/Application Support/CodexSuanliMeter/build.lock"
+    WATCH_LOCK_DIR="$HOME/Library/Application Support/CodexSuanliMeter/watch.lock"
+    BUNDLE_ID="dev.codex.balance-dashboard.codex"
 
     if ! /bin/mkdir "$WATCH_LOCK_DIR" 2>/dev/null; then
       exit 0
@@ -83,18 +100,12 @@ enum CodexWatcherManager {
     resolve_dashboard_app() {
       local candidates=(
         "$APP_PATH"
-        "$HOME/Desktop/算力码表.app"
-        "$HOME/Applications/算力码表.app"
-        "/Applications/算力码表.app"
-        "$HOME/Desktop/Codex算力宝.app"
-        "$HOME/Applications/Codex算力宝.app"
-        "/Applications/Codex算力宝.app"
-        "$HOME/Desktop/算力余额宝.app"
-        "$HOME/Applications/算力余额宝.app"
-        "/Applications/算力余额宝.app"
-        "$HOME/Desktop/Codex 算力浮窗.app"
-        "$HOME/Applications/Codex 算力浮窗.app"
-        "/Applications/Codex 算力浮窗.app"
+        "$HOME/Desktop/Codex 脉动.app"
+        "$HOME/Applications/Codex 脉动.app"
+        "/Applications/Codex 脉动.app"
+        "$HOME/Desktop/Codex算力码表.app"
+        "$HOME/Applications/Codex算力码表.app"
+        "/Applications/Codex算力码表.app"
       )
 
       local candidate
@@ -114,13 +125,8 @@ enum CodexWatcherManager {
         /usr/bin/pgrep -f "Contents/Resources/codex app-server" >/dev/null 2>&1
     }
 
-    is_claude_running() {
-      # 只认 Claude Code CLI（精确进程名），不把 Claude Desktop 当触发条件
-      /usr/bin/pgrep -x "claude" >/dev/null 2>&1
-    }
-
     while true; do
-      if is_codex_running || is_claude_running; then
+      if is_codex_running; then
         if [[ -e "$BUILD_LOCK" ]]; then
           NOW=$(/bin/date +%s)
           MODIFIED=$(/usr/bin/stat -f %m "$BUILD_LOCK" 2>/dev/null || echo 0)
@@ -129,10 +135,10 @@ enum CodexWatcherManager {
             continue
           fi
           /bin/rm -f "$BUILD_LOCK"
-        elif ! /usr/bin/pgrep -x "CodexBalance" >/dev/null 2>&1; then
+        elif ! /usr/bin/pgrep -x "CodexSuanliMeter" >/dev/null 2>&1; then
           DASHBOARD_APP="$(resolve_dashboard_app)"
           if [[ -n "$DASHBOARD_APP" ]]; then
-            /usr/bin/open "$DASHBOARD_APP"
+            /usr/bin/open -g "$DASHBOARD_APP" --args --background
           fi
         fi
       fi
@@ -192,8 +198,8 @@ enum CodexWatcherManager {
     return script.contains("APP_PATH=\(shellQuote(appPath))") &&
       script.contains("resolve_dashboard_app()") &&
       script.contains("is_codex_running()") &&
-      script.contains("is_claude_running()") &&
-      script.contains("WATCH_LOCK_DIR=")
+      script.contains("WATCH_LOCK_DIR=") &&
+      script.contains("--background")
   }
 
   private static func shellQuote(_ value: String) -> String {

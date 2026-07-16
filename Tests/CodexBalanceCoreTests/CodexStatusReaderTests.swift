@@ -278,6 +278,93 @@ struct CodexStatusReaderTests {
   }
 
   @Test
+  func laterTokenUpdatesKeepTheLastExplicitWorkType() throws {
+    let root = try makeTemporaryCodexHome()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let sessions = root.appendingPathComponent("sessions")
+    try FileManager.default.createDirectory(at: sessions, withIntermediateDirectories: true)
+
+    let now = try #require(makeDate("2026-05-19T10:00:00Z"))
+    let file = sessions.appendingPathComponent("sticky-category.jsonl")
+    let lines = [
+      #"{"timestamp":"2026-05-19T09:50:00Z","payload":{"type":"user_message","text":"帮我做一份 PPT 幻灯片演示文稿"}}"#,
+      tokenEventLine(
+        timestamp: "2026-05-19T09:51:00Z",
+        limitID: "codex",
+        primaryUsed: 10,
+        secondaryUsed: 20,
+        primaryReset: now.addingTimeInterval(60 * 60),
+        secondaryReset: now.addingTimeInterval(24 * 60 * 60),
+        totalTokens: 100,
+        lastTokens: 100
+      ),
+      #"{"timestamp":"2026-05-19T09:52:00Z","payload":{"type":"message","role":"assistant","text":"继续处理"}}"#,
+      tokenEventLine(
+        timestamp: "2026-05-19T09:53:00Z",
+        limitID: "codex",
+        primaryUsed: 11,
+        secondaryUsed: 21,
+        primaryReset: now.addingTimeInterval(60 * 60),
+        secondaryReset: now.addingTimeInterval(24 * 60 * 60),
+        totalTokens: 300,
+        lastTokens: 200
+      )
+    ].joined(separator: "\n")
+    try lines.write(to: file, atomically: true, encoding: .utf8)
+
+    let status = try CodexStatusReader(codexHome: root).read(now: now)
+    let categories = Dictionary(uniqueKeysWithValues: status.tokenStats.categoryBreakdown.map { ($0.category, $0.totalTokens) })
+
+    #expect(categories[.presentation] == 300)
+    #expect(categories[.other] == 0)
+  }
+
+  @Test
+  func commonProjectPathsProvideDetailedFallbackCategories() throws {
+    let root = try makeTemporaryCodexHome()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let sessions = root.appendingPathComponent("sessions")
+    try FileManager.default.createDirectory(at: sessions, withIntermediateDirectories: true)
+
+    let now = try #require(makeDate("2026-05-19T10:00:00Z"))
+    let file = sessions.appendingPathComponent("project-fallback.jsonl")
+    let projects: [(path: String, total: Int)] = [
+      ("/Users/example/APP 开发", 100),
+      ("/Users/example/组学分析", 200),
+      ("/Users/example/群晖", 300),
+      ("/Users/example/投稿中论文/MTF综述", 400),
+      ("/Users/example/网站构建", 500),
+      ("/Volumes/FAFU/课题汇报PPT/学生", 600)
+    ]
+    var lines: [String] = []
+    for (index, project) in projects.enumerated() {
+      lines.append(turnContextLine(cwd: project.path))
+      lines.append(tokenEventLine(
+        timestamp: String(format: "2026-05-19T09:%02d:00Z", index + 1),
+        limitID: "codex",
+        primaryUsed: Double(10 + index),
+        secondaryUsed: Double(20 + index),
+        primaryReset: now.addingTimeInterval(60 * 60),
+        secondaryReset: now.addingTimeInterval(24 * 60 * 60),
+        totalTokens: project.total,
+        lastTokens: 100
+      ))
+    }
+    try lines.joined(separator: "\n").write(to: file, atomically: true, encoding: .utf8)
+
+    let status = try CodexStatusReader(codexHome: root).read(now: now)
+    let categories = Dictionary(uniqueKeysWithValues: status.tokenStats.categoryBreakdown.map { ($0.category, $0.totalTokens) })
+
+    #expect(categories[.coding] == 100)
+    #expect(categories[.dataAnalysis] == 100)
+    #expect(categories[.systemOperations] == 100)
+    #expect(categories[.manuscript] == 100)
+    #expect(categories[.webDevelopment] == 100)
+    #expect(categories[.presentation] == 100)
+    #expect(categories[.other] == 0)
+  }
+
+  @Test
   func tokenUsageCanBeGroupedByProjectTopThree() throws {
     let root = try makeTemporaryCodexHome()
     defer { try? FileManager.default.removeItem(at: root) }
@@ -459,7 +546,7 @@ struct CodexStatusReaderTests {
   }
 
   @Test
-  func activeSessionReparsesWholeFileWhenAppendCompletesTokenLine() throws {
+  func activeSessionCompletesAppendedTokenLineIncrementally() throws {
     let root = try makeTemporaryCodexHome()
     defer { try? FileManager.default.removeItem(at: root) }
     let sessions = root.appendingPathComponent("sessions")
@@ -493,6 +580,61 @@ struct CodexStatusReaderTests {
     let status = try reader.read(now: now.addingTimeInterval(1))
     #expect(status.tokenStats.sampleCount == 1)
     #expect(status.tokenStats.todayTokens == 600)
+  }
+
+  @Test
+  func persistentCacheRestoresHistoryAndOnlyParsesAppendedBytes() throws {
+    let root = try makeTemporaryCodexHome()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let sessions = root.appendingPathComponent("sessions")
+    try FileManager.default.createDirectory(at: sessions, withIntermediateDirectories: true)
+
+    let now = try #require(makeDate("2026-05-19T10:00:00Z"))
+    let file = sessions.appendingPathComponent("persistent-session.jsonl")
+    let cacheURL = root.appendingPathComponent("cache/session-events.plist")
+    let firstLine = tokenEventLine(
+      timestamp: "2026-05-19T09:50:00Z",
+      limitID: "codex",
+      primaryUsed: 10,
+      secondaryUsed: 20,
+      primaryReset: now.addingTimeInterval(60 * 60),
+      secondaryReset: now.addingTimeInterval(24 * 60 * 60),
+      totalTokens: 100,
+      lastTokens: 100
+    )
+    try firstLine.write(to: file, atomically: true, encoding: .utf8)
+    try FileManager.default.setAttributes([.modificationDate: now], ofItemAtPath: file.path)
+
+    let firstReader = CodexStatusReader(codexHome: root, persistentEventCacheURL: cacheURL)
+    #expect(try firstReader.read(now: now).tokenStats.todayTokens == 100)
+    #expect(FileManager.default.fileExists(atPath: cacheURL.path))
+
+    // Replace the already parsed prefix with invalid bytes of the same length.
+    // A new reader can only preserve the first event by restoring the disk cache.
+    try Data(repeating: 0x20, count: Data(firstLine.utf8).count).write(to: file)
+    try FileManager.default.setAttributes([.modificationDate: now], ofItemAtPath: file.path)
+    let secondReader = CodexStatusReader(codexHome: root, persistentEventCacheURL: cacheURL)
+    #expect(try secondReader.read(now: now).tokenStats.todayTokens == 100)
+
+    let secondLine = tokenEventLine(
+      timestamp: "2026-05-19T09:56:00Z",
+      limitID: "codex",
+      primaryUsed: 11,
+      secondaryUsed: 21,
+      primaryReset: now.addingTimeInterval(60 * 60),
+      secondaryReset: now.addingTimeInterval(24 * 60 * 60),
+      totalTokens: 300,
+      lastTokens: 200
+    )
+    let handle = try FileHandle(forWritingTo: file)
+    defer { try? handle.close() }
+    try handle.seekToEnd()
+    try handle.write(contentsOf: Data(("\n" + secondLine).utf8))
+    try FileManager.default.setAttributes([.modificationDate: now.addingTimeInterval(1)], ofItemAtPath: file.path)
+
+    let updated = try secondReader.read(now: now.addingTimeInterval(1))
+    #expect(updated.tokenStats.sampleCount == 2)
+    #expect(updated.tokenStats.todayTokens == 300)
   }
 
   @Test

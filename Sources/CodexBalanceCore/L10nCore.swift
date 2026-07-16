@@ -3,7 +3,7 @@ import Foundation
 /// CodexBalanceCore 模块内的本地化取词（中文原文为 key，回退中文）
 public extension String {
   var coreL10n: String {
-    NSLocalizedString(self, bundle: .module, comment: "")
+    NSLocalizedString(self, bundle: .main, comment: "")
   }
 }
 

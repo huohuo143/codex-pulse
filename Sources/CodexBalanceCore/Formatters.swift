@@ -1,5 +1,17 @@
 import Foundation
 
+public struct CompactNumberParts: Equatable, Sendable {
+  public var value: String
+  public var unit: String
+
+  public init(value: String, unit: String = "") {
+    self.value = value
+    self.unit = unit
+  }
+
+  public var combined: String { value + unit }
+}
+
 public enum BalanceFormatters {
   public static func percent(_ value: Double?) -> String {
     guard let value, value.isFinite else { return "--" }
@@ -13,33 +25,43 @@ public enum BalanceFormatters {
   }
 
   public static func compactNumber(_ value: Int?) -> String {
-    guard let value else { return "--" }
+    compactNumberParts(value).combined
+  }
+
+  public static func compactNumberParts(_ value: Int?) -> CompactNumberParts {
+    compactNumberParts(value, usesMyriadUnits: usesMyriadUnits)
+  }
+
+  static func compactNumberParts(_ value: Int?, usesMyriadUnits: Bool) -> CompactNumberParts {
+    guard let value else { return CompactNumberParts(value: "--") }
     if usesMyriadUnits {
       if value >= 100_000_000 {
-        return compactUnit(Double(value) / 100_000_000, unit: "亿".coreL10n)
+        return compactUnitParts(Double(value) / 100_000_000, unit: "亿".coreL10n)
       }
       if value >= 10_000 {
-        return compactUnit(Double(value) / 10_000, unit: "万".coreL10n)
+        return compactUnitParts(Double(value) / 10_000, unit: "万".coreL10n)
       }
     } else {
       if value >= 1_000_000_000 {
-        return compactUnit(Double(value) / 1_000_000_000, unit: "B")
+        return compactUnitParts(Double(value) / 1_000_000_000, unit: "B")
       }
       if value >= 1_000_000 {
-        return compactUnit(Double(value) / 1_000_000, unit: "M")
+        return compactUnitParts(Double(value) / 1_000_000, unit: "M")
       }
       if value >= 10_000 {
-        return compactUnit(Double(value) / 1_000, unit: "K")
+        return compactUnitParts(Double(value) / 1_000, unit: "K")
       }
     }
-    return NumberFormatter.localizedString(from: NSNumber(value: value), number: .decimal)
+    return CompactNumberParts(
+      value: NumberFormatter.localizedString(from: NSNumber(value: value), number: .decimal)
+    )
   }
 
-  private static func compactUnit(_ value: Double, unit: String) -> String {
+  private static func compactUnitParts(_ value: Double, unit: String) -> CompactNumberParts {
     if value >= 100 || value.rounded(.down) == value {
-      return "\(Int(value.rounded()))\(unit)"
+      return CompactNumberParts(value: "\(Int(value.rounded()))", unit: unit)
     }
-    return String(format: "%.1f%@", value, unit)
+    return CompactNumberParts(value: String(format: "%.1f", value), unit: unit)
   }
 
   public static func exactNumber(_ value: Int?) -> String {
@@ -134,6 +156,22 @@ public enum BalanceFormatters {
     guard let date else { return "--" }
     let formatter = DateFormatter()
     formatter.dateFormat = "MM/dd HH:mm"
+    return formatter.string(from: date)
+  }
+
+  public static func resetExpiryDate(_ date: Date?, timeZone: TimeZone = .current) -> String {
+    guard let date else { return "无到期时间".coreL10n }
+    let formatter = DateFormatter()
+    formatter.timeZone = timeZone
+    formatter.dateFormat = "M/d"
+    return formatter.string(from: date)
+  }
+
+  public static func resetExpiryDateTime(_ date: Date?, timeZone: TimeZone = .current) -> String {
+    guard let date else { return "无到期时间".coreL10n }
+    let formatter = DateFormatter()
+    formatter.timeZone = timeZone
+    formatter.dateFormat = "yyyy/M/d HH:mm"
     return formatter.string(from: date)
   }
 }

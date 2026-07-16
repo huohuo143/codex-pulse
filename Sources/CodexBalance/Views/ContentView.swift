@@ -5,7 +5,6 @@ struct ContentView: View {
   @EnvironmentObject private var store: DashboardStore
   @State private var configuredWindow: NSWindow?
   @State private var lastManualMove: Date?
-  @State private var isAutoMoving = false
   private let dodgeTimer = Timer.publish(every: 45, on: .main, in: .common).autoconnect()
 
   var body: some View {
@@ -13,12 +12,8 @@ struct ContentView: View {
       if store.isCompact {
         CompactDashboardView()
           .frame(
-            width: WindowConfigurator.compactSize(
-              for: store.compactSizeMode, style: store.compactStyle, toolCount: store.enabledToolCount
-            ).width,
-            height: WindowConfigurator.compactSize(
-              for: store.compactSizeMode, style: store.compactStyle, toolCount: store.enabledToolCount
-            ).height
+            width: compactWindowSize.width,
+            height: compactWindowSize.height
           )
       } else {
         ExpandedDashboardView()
@@ -34,14 +29,22 @@ struct ContentView: View {
         compactSizeMode: store.compactSizeMode,
         compactStyle: store.compactStyle,
         toolCount: store.enabledToolCount,
+        ringOrientation: store.compactRingOrientation,
+        metrics: store.floatingPanelMetrics,
         keepPosition: false
       )
+      store.syncWindowPresentation()
       autoDodgeIfNeeded(force: true)
     })
+    .preferredColorScheme(store.themeMode.preferredColorScheme)
+    .opacity(store.isWindowVisible ? 1 : 0)
+    .environment(\.dashboardAppearance, store.appearance)
+    .tint(store.palette.weekly)
     .onAppear {
       store.startAutoRefresh()
     }
     .onDisappear {
+      store.endWindowDrag()
       store.stopAutoRefresh()
     }
     .onChange(of: store.isCompact) { _, isCompact in
@@ -52,6 +55,8 @@ struct ContentView: View {
           compactSizeMode: store.compactSizeMode,
           compactStyle: store.compactStyle,
           toolCount: store.enabledToolCount,
+          ringOrientation: store.compactRingOrientation,
+          metrics: store.floatingPanelMetrics,
           keepPosition: false
         )
         autoDodgeIfNeeded(force: true)
@@ -65,6 +70,8 @@ struct ContentView: View {
           compactSizeMode: compactSizeMode,
           compactStyle: store.compactStyle,
           toolCount: store.enabledToolCount,
+          ringOrientation: store.compactRingOrientation,
+          metrics: store.floatingPanelMetrics,
           keepPosition: false
         )
       }
@@ -77,6 +84,8 @@ struct ContentView: View {
           compactSizeMode: store.compactSizeMode,
           compactStyle: compactStyle,
           toolCount: store.enabledToolCount,
+          ringOrientation: store.compactRingOrientation,
+          metrics: store.floatingPanelMetrics,
           keepPosition: true
         )
       }
@@ -89,6 +98,36 @@ struct ContentView: View {
           compactSizeMode: store.compactSizeMode,
           compactStyle: store.compactStyle,
           toolCount: store.enabledToolCount,
+          ringOrientation: store.compactRingOrientation,
+          metrics: store.floatingPanelMetrics,
+          keepPosition: true
+        )
+      }
+    }
+    .onChange(of: store.compactRingOrientation) { _, ringOrientation in
+      if let configuredWindow, store.isCompact, store.compactStyle == .rings {
+        WindowConfigurator.configure(
+          configuredWindow,
+          compact: true,
+          compactSizeMode: store.compactSizeMode,
+          compactStyle: store.compactStyle,
+          toolCount: store.enabledToolCount,
+          ringOrientation: ringOrientation,
+          metrics: store.floatingPanelMetrics,
+          keepPosition: false
+        )
+      }
+    }
+    .onChange(of: store.floatingPanelMetrics) { _, metrics in
+      if let configuredWindow, store.isCompact {
+        WindowConfigurator.configure(
+          configuredWindow,
+          compact: true,
+          compactSizeMode: store.compactSizeMode,
+          compactStyle: store.compactStyle,
+          toolCount: store.enabledToolCount,
+          ringOrientation: store.compactRingOrientation,
+          metrics: metrics,
           keepPosition: true
         )
       }
@@ -96,11 +135,17 @@ struct ContentView: View {
     .onChange(of: store.autoDodgeEnabled) { _, enabled in
       if enabled { autoDodgeIfNeeded(force: true) }
     }
-    .onReceive(NotificationCenter.default.publisher(for: NSWindow.didMoveNotification)) { notification in
+    .onReceive(NotificationCenter.default.publisher(for: .codexWindowManualDragBegan)) { notification in
       guard let window = notification.object as? NSWindow,
-            window === configuredWindow,
-            !isAutoMoving
+            window === configuredWindow
       else { return }
+      store.beginWindowDrag()
+    }
+    .onReceive(NotificationCenter.default.publisher(for: .codexWindowManualDragEnded)) { notification in
+      guard let window = notification.object as? NSWindow,
+            window === configuredWindow
+      else { return }
+      store.endWindowDrag()
       lastManualMove = Date()
     }
     .onReceive(dodgeTimer) { _ in
@@ -112,6 +157,7 @@ struct ContentView: View {
   /// force=true（启动/开关切换/收起时）立即执行；定时触发则尊重用户手动拖动（10 分钟内不打扰）。
   private func autoDodgeIfNeeded(force: Bool) {
     guard store.autoDodgeEnabled,
+          store.isWindowVisible,
           store.isCompact,
           let window = configuredWindow
     else { return }
@@ -121,17 +167,28 @@ struct ContentView: View {
       return
     }
     let size = WindowConfigurator.compactSize(
-      for: store.compactSizeMode, style: store.compactStyle, toolCount: store.enabledToolCount
+      for: store.compactSizeMode,
+      style: store.compactStyle,
+      toolCount: store.enabledToolCount,
+      ringOrientation: store.compactRingOrientation,
+      metrics: store.floatingPanelMetrics
     )
     guard let origin = WindowAutoPlacer.bestCornerOrigin(for: size, window: window) else { return }
     let current = window.frame.origin
     guard abs(current.x - origin.x) > 2 || abs(current.y - origin.y) > 2 else { return }
-    isAutoMoving = true
     NSAnimationContext.runAnimationGroup({ context in
       context.duration = 0.28
       window.animator().setFrameOrigin(origin)
-    }, completionHandler: {
-      Task { @MainActor in isAutoMoving = false }
     })
+  }
+
+  private var compactWindowSize: NSSize {
+    WindowConfigurator.compactSize(
+      for: store.compactSizeMode,
+      style: store.compactStyle,
+      toolCount: store.enabledToolCount,
+      ringOrientation: store.compactRingOrientation,
+      metrics: store.floatingPanelMetrics
+    )
   }
 }

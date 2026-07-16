@@ -1,6 +1,11 @@
 .build/
 dist/
 release/
+result/
+.codex/
+*.app/
+*.dmg
+*.dmg.sha256
 *.xcodeproj/xcuserdata/
 .DS_Store
 

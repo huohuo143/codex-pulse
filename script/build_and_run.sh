@@ -1,57 +1,98 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+MODE="${1:-run}"
+APP_NAME="Codex 脉动"
+EXECUTABLE_NAME="CodexSuanliMeter"
+WIDGET_EXECUTABLE_NAME="CodexSuanliWidgets"
+BUNDLE_ID="dev.codex.balance-dashboard.codex"
+WIDGET_BUNDLE_ID="$BUNDLE_ID.widgets"
+VERSION="2.5.2"
+BUILD_NUMBER="252"
+MIN_SYSTEM_VERSION="14.0"
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP_NAME="算力码表"
-OLD_APP_NAMES=("Codex算力宝" "算力余额宝" "Codex 算力浮窗")
-EXECUTABLE_NAME="CodexBalance"
-BUNDLE_ID="dev.codex.balance-dashboard"
-DIST_DIR="$ROOT_DIR/dist"
-APP_PATH="$DIST_DIR/$APP_NAME.app"
-OPEN_APP="${OPEN_APP:-1}"
-WATCHER_DIR="$HOME/Library/Application Support/CodexBalanceDashboard"
-BUILD_LOCK="$WATCHER_DIR/build.lock"
+DIST_DIR="${CODEX_PULSE_DIST_DIR:-$ROOT_DIR/dist}"
+APP_OUTPUT_DIR="${APP_OUTPUT_DIR:-$DIST_DIR}"
+APP_BUNDLE="$APP_OUTPUT_DIR/$APP_NAME.app"
+APP_CONTENTS="$APP_BUNDLE/Contents"
+APP_MACOS="$APP_CONTENTS/MacOS"
+APP_BINARY="$APP_MACOS/$EXECUTABLE_NAME"
+INFO_PLIST="$APP_CONTENTS/Info.plist"
+SUPPORT_DIR="${CODEX_PULSE_SUPPORT_DIR:-$HOME/Library/Application Support/CodexSuanliMeter}"
+BUILD_LOCK="$SUPPORT_DIR/build.lock"
+ICON_PATH="$ROOT_DIR/assets/AppIcon.icns"
+WIDGET_ENTITLEMENTS="$ROOT_DIR/config/CodexSuanliWidgets.entitlements"
+WIDGET_XCODE_PROJECT="$ROOT_DIR/xcode/CodexPulseWidgets.xcodeproj"
+WIDGET_DERIVED_DATA="$ROOT_DIR/.build/xcode-widget"
+CONFIGURATION="release"
 
-cd "$ROOT_DIR"
+case "$MODE" in
+  run|--logs|logs|--telemetry|telemetry|--verify|verify) ;;
+  --debug|debug) CONFIGURATION="debug" ;;
+  *)
+    echo "usage: $0 [run|--debug|--logs|--telemetry|--verify]" >&2
+    exit 2
+    ;;
+esac
 
-mkdir -p "$WATCHER_DIR"
+mkdir -p "$DIST_DIR" "$APP_OUTPUT_DIR" "$SUPPORT_DIR"
 touch "$BUILD_LOCK"
 trap 'rm -f "$BUILD_LOCK"' EXIT
 
-APP_PIDS="$(pgrep -x "$EXECUTABLE_NAME" 2>/dev/null || true)"
-if [[ -n "$APP_PIDS" ]]; then
-  while IFS= read -r pid; do
-    [[ -z "$pid" ]] && continue
-    pkill -P "$pid" -f 'codex app-server --listen stdio://' >/dev/null 2>&1 || true
-  done <<< "$APP_PIDS"
+# 交付打包时不干扰用户已安装的实例；只有“构建并运行”才重启 v2。
+# 无论哪种模式都不会触碰旧版 CodexBalance/算力码表 0.1.0。
+if [[ "${OPEN_APP:-1}" != "0" ]]; then
+  pkill -x "$EXECUTABLE_NAME" >/dev/null 2>&1 || true
 fi
-pkill -x "$EXECUTABLE_NAME" >/dev/null 2>&1 || true
 
-swift build -c release --product "$EXECUTABLE_NAME"
-BUILD_DIR="$(swift build -c release --show-bin-path)"
-BIN_PATH="$BUILD_DIR/$EXECUTABLE_NAME"
+cd "$ROOT_DIR"
+swift build -c "$CONFIGURATION" --product "$EXECUTABLE_NAME"
+BUILD_DIR="$(swift build -c "$CONFIGURATION" --show-bin-path)"
+BUILD_BINARY="$BUILD_DIR/$EXECUTABLE_NAME"
+if [[ "$CONFIGURATION" == "debug" ]]; then
+  WIDGET_XCODE_CONFIGURATION="Debug"
+else
+  WIDGET_XCODE_CONFIGURATION="Release"
+fi
+/usr/bin/xcodebuild \
+  -project "$WIDGET_XCODE_PROJECT" \
+  -scheme "$WIDGET_EXECUTABLE_NAME" \
+  -configuration "$WIDGET_XCODE_CONFIGURATION" \
+  -derivedDataPath "$WIDGET_DERIVED_DATA" \
+  CODE_SIGNING_ALLOWED=NO \
+  MARKETING_VERSION="$VERSION" \
+  CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+  PRODUCT_BUNDLE_IDENTIFIER="$WIDGET_BUNDLE_ID" \
+  build >/dev/null
+WIDGET_XCODE_BUNDLE="$WIDGET_DERIVED_DATA/Build/Products/$WIDGET_XCODE_CONFIGURATION/$WIDGET_EXECUTABLE_NAME.appex"
 
-rm -rf "$APP_PATH"
-for OLD_APP_NAME in "${OLD_APP_NAMES[@]}"; do
-  rm -rf "$DIST_DIR/$OLD_APP_NAME.app"
-done
-mkdir -p "$APP_PATH/Contents/MacOS" "$APP_PATH/Contents/Resources"
-cp "$BIN_PATH" "$APP_PATH/Contents/MacOS/$EXECUTABLE_NAME"
-chmod +x "$APP_PATH/Contents/MacOS/$EXECUTABLE_NAME"
+rm -rf "$APP_BUNDLE"
+mkdir -p "$APP_MACOS" "$APP_CONTENTS/Resources"
+cp "$BUILD_BINARY" "$APP_BINARY"
+chmod +x "$APP_BINARY"
 
-# SwiftPM 资源包（本地化 .strings 等）：可执行文件在 MacOS/ 下用 Bundle.module 查找，
-# 资源包必须与可执行文件同目录
-for RESOURCE_BUNDLE in "$BUILD_DIR"/CodexBalanceDashboard_*.bundle; do
-  [ -d "$RESOURCE_BUNDLE" ] && cp -R "$RESOURCE_BUNDLE" "$APP_PATH/Contents/MacOS/"
-done
+if [[ ! -f "$ICON_PATH" || ! -f "$WIDGET_ENTITLEMENTS" || ! -d "$WIDGET_XCODE_BUNDLE" ]]; then
+  echo "Missing AppIcon.icns, widget entitlements or Xcode widget build." >&2
+  exit 1
+fi
+cp "$ICON_PATH" "$APP_CONTENTS/Resources/AppIcon.icns"
 
-cat > "$APP_PATH/Contents/Info.plist" <<PLIST
+WIDGET_BUNDLE="$APP_CONTENTS/PlugIns/$WIDGET_EXECUTABLE_NAME.appex"
+WIDGET_CONTENTS="$WIDGET_BUNDLE/Contents"
+WIDGET_MACOS="$WIDGET_CONTENTS/MacOS"
+mkdir -p "$APP_CONTENTS/PlugIns"
+/usr/bin/ditto --noextattr --norsrc "$WIDGET_XCODE_BUNDLE" "$WIDGET_BUNDLE"
+mkdir -p "$WIDGET_CONTENTS/Resources"
+cp "$ICON_PATH" "$WIDGET_CONTENTS/Resources/AppIcon.icns"
+
+cat >"$INFO_PLIST" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
   <key>CFBundleDevelopmentRegion</key>
-  <string>zh_CN</string>
+  <string>zh-Hans</string>
   <key>CFBundleExecutable</key>
   <string>$EXECUTABLE_NAME</string>
   <key>CFBundleIdentifier</key>
@@ -60,29 +101,18 @@ cat > "$APP_PATH/Contents/Info.plist" <<PLIST
   <string>$APP_NAME</string>
   <key>CFBundleDisplayName</key>
   <string>$APP_NAME</string>
+  <key>CFBundleIconFile</key>
+  <string>AppIcon</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
-  <key>CFBundleDevelopmentRegion</key>
-  <string>zh-Hans</string>
-  <key>CFBundleLocalizations</key>
-  <array>
-    <string>zh-Hans</string>
-    <string>zh-Hant</string>
-    <string>en</string>
-    <string>ja</string>
-    <string>ko</string>
-    <string>es</string>
-    <string>fr</string>
-    <string>de</string>
-    <string>ru</string>
-    <string>pt-BR</string>
-  </array>
   <key>CFBundleShortVersionString</key>
-  <string>0.1.0</string>
+  <string>$VERSION</string>
   <key>CFBundleVersion</key>
-  <string>1</string>
+  <string>$BUILD_NUMBER</string>
   <key>LSMinimumSystemVersion</key>
-  <string>14.0</string>
+  <string>$MIN_SYSTEM_VERSION</string>
+  <key>LSApplicationCategoryType</key>
+  <string>public.app-category.developer-tools</string>
   <key>NSHighResolutionCapable</key>
   <true/>
   <key>NSPrincipalClass</key>
@@ -91,46 +121,63 @@ cat > "$APP_PATH/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-/usr/bin/codesign --force --deep --sign - "$APP_PATH" >/dev/null
-
-DESKTOP_LINK="$HOME/Desktop/$APP_NAME.app"
-for OLD_APP_NAME in "${OLD_APP_NAMES[@]}"; do
-  OLD_DESKTOP_LINK="$HOME/Desktop/$OLD_APP_NAME.app"
-  if [[ -L "$OLD_DESKTOP_LINK" ]]; then
-    rm "$OLD_DESKTOP_LINK" 2>/dev/null || true
-  fi
-done
-if [[ -L "$DESKTOP_LINK" ]]; then
-  CURRENT_DESKTOP_TARGET="$(readlink "$DESKTOP_LINK" 2>/dev/null || true)"
-  if [[ "$CURRENT_DESKTOP_TARGET" != "$APP_PATH" ]]; then
-    rm "$DESKTOP_LINK" 2>/dev/null || true
-  fi
-fi
-if [[ ! -e "$DESKTOP_LINK" ]]; then
-  ln -s "$APP_PATH" "$DESKTOP_LINK" 2>/dev/null || true
-fi
-
-LEGACY_RELEASE_DIR="$ROOT_DIR/release/mac-arm64"
-LEGACY_APP_LINK="$LEGACY_RELEASE_DIR/$APP_NAME.app"
-mkdir -p "$LEGACY_RELEASE_DIR"
-for OLD_APP_NAME in "${OLD_APP_NAMES[@]}"; do
-  OLD_LEGACY_APP_LINK="$LEGACY_RELEASE_DIR/$OLD_APP_NAME.app"
-  if [[ -L "$OLD_LEGACY_APP_LINK" ]]; then
-    rm "$OLD_LEGACY_APP_LINK"
-  fi
-done
-if [[ -L "$LEGACY_APP_LINK" ]]; then
-  rm "$LEGACY_APP_LINK"
-fi
-if [[ ! -e "$LEGACY_APP_LINK" ]]; then
-  ln -s "$APP_PATH" "$LEGACY_APP_LINK"
+plutil -lint "$INFO_PLIST" "$WIDGET_CONTENTS/Info.plist" >/dev/null
+# NAS/iCloud-style filesystems can attach Finder/resource-fork metadata while
+# assembling the bundle. Ad-hoc signing rejects those attributes.
+xattr -cr "$APP_BUNDLE"
+/usr/bin/codesign --force --sign - --entitlements "$WIDGET_ENTITLEMENTS" "$WIDGET_BUNDLE" >/dev/null
+if ! /usr/bin/codesign --force --sign - "$APP_BUNDLE" >/dev/null 2>&1 \
+  || ! /usr/bin/codesign --verify --deep --strict "$APP_BUNDLE" >/dev/null 2>&1; then
+  LOCAL_OUTPUT_DIR="$SUPPORT_DIR/build-output"
+  LOCAL_APP_BUNDLE="$LOCAL_OUTPUT_DIR/$APP_NAME.app"
+  LOCAL_WIDGET_BUNDLE="$LOCAL_APP_BUNDLE/Contents/PlugIns/$WIDGET_EXECUTABLE_NAME.appex"
+  rm -rf "$LOCAL_APP_BUNDLE"
+  mkdir -p "$LOCAL_OUTPUT_DIR"
+  /usr/bin/ditto --noextattr --norsrc "$APP_BUNDLE" "$LOCAL_APP_BUNDLE"
+  xattr -cr "$LOCAL_APP_BUNDLE"
+  /usr/bin/codesign --force --sign - --entitlements "$WIDGET_ENTITLEMENTS" "$LOCAL_WIDGET_BUNDLE" >/dev/null
+  /usr/bin/codesign --force --sign - "$LOCAL_APP_BUNDLE" >/dev/null
+  /usr/bin/codesign --verify --deep --strict "$LOCAL_APP_BUNDLE" >/dev/null
+  APP_BUNDLE="$LOCAL_APP_BUNDLE"
+  APP_CONTENTS="$APP_BUNDLE/Contents"
+  APP_MACOS="$APP_CONTENTS/MacOS"
+  APP_BINARY="$APP_MACOS/$EXECUTABLE_NAME"
+  INFO_PLIST="$APP_CONTENTS/Info.plist"
+  WIDGET_BUNDLE="$APP_CONTENTS/PlugIns/$WIDGET_EXECUTABLE_NAME.appex"
 fi
 
-if [[ "$OPEN_APP" == "1" ]]; then
-  /usr/bin/open -n "$APP_PATH"
-  echo "Opened $APP_PATH"
-else
-  echo "Packaged $APP_PATH"
+"$ROOT_DIR/script/verify_widget_bundle.sh" "$APP_BUNDLE"
+
+open_app() {
+  /usr/bin/open -n "$APP_BUNDLE"
+}
+
+if [[ "${OPEN_APP:-1}" == "0" && "$MODE" == "run" ]]; then
+  echo "Packaged: $APP_BUNDLE"
+  exit 0
 fi
-echo "Desktop shortcut: $DESKTOP_LINK"
-echo "Legacy shortcut: $LEGACY_APP_LINK"
+
+case "$MODE" in
+  run)
+    open_app
+    ;;
+  --debug|debug)
+    lldb -- "$APP_BINARY"
+    ;;
+  --logs|logs)
+    open_app
+    /usr/bin/log stream --info --style compact --predicate "process == \"$EXECUTABLE_NAME\""
+    ;;
+  --telemetry|telemetry)
+    open_app
+    /usr/bin/log stream --info --style compact --predicate "subsystem == \"$BUNDLE_ID\""
+    ;;
+  --verify|verify)
+    open_app
+    sleep 2
+    pgrep -x "$EXECUTABLE_NAME" >/dev/null
+    echo "Verified running process: $EXECUTABLE_NAME"
+    ;;
+esac
+
+echo "App bundle: $APP_BUNDLE"

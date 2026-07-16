@@ -1,172 +1,201 @@
-# 算力码表 suanli-dashboard
+<p align="center">
+  <img src="assets/AppIcon-1024.png" width="144" alt="Codex 脉动 Logo">
+</p>
 
-> macOS 悬浮仪表盘：同时监控 **OpenAI Codex** 与 **Claude Code** 的订阅额度余额、Token 消耗与趋势。支持 Touch Bar 常驻显示、最近会话直达、多设备 iCloud 同步。
-
-![macOS](https://img.shields.io/badge/macOS-14%2B%20only-blue) ![Swift](https://img.shields.io/badge/Swift-6-orange) ![License](https://img.shields.io/badge/license-MIT-green) ![i18n](https://img.shields.io/badge/languages-10-purple)
+<h1 align="center">Codex 脉动</h1>
 
 <p align="center">
-  <img src="docs/screenshots/hero-rings.png" width="440" alt="悬浮双环样式 · Floating rings widget">
+  原生 macOS Codex 状态面板、悬浮框与桌面小组件
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/touchbar-live.png" width="940" alt="Touch Bar 常驻余额面板 · Always-on Touch Bar panel">
-  <br><sub>Touch Bar 常驻：双工具余额 + 最近 AI 会话直达 · Always-on balance & recent-session shortcuts</sub>
+  <img alt="Version" src="https://img.shields.io/badge/version-2.5.2-8b7cff">
+  <img alt="macOS" src="https://img.shields.io/badge/macOS-14%2B-111827?logo=apple">
+  <img alt="Apple Silicon" src="https://img.shields.io/badge/Apple%20Silicon-arm64-111827">
+  <img alt="Swift" src="https://img.shields.io/badge/Swift-6.0-f05138?logo=swift&logoColor=white">
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-22c55e"></a>
 </p>
 
-<table align="center">
-  <tr>
-    <td align="center"><img src="docs/screenshots/style-bars.png" width="380" alt="长条样式"><br><sub>长条样式 · Bars</sub></td>
-    <td align="center"><img src="docs/screenshots/style-badge.png" width="400" alt="徽章样式"><br><sub>徽章样式 · Badge</sub></td>
-  </tr>
-</table>
+`Codex 脉动` 将 Codex 的额度、Token 消耗、重置节奏和 Full reset 权益集中到一套原生 macOS 界面中。它既可以作为常驻悬浮框，也可以完全隐藏悬浮框，仅使用主窗口或 7 款桌面小组件。
 
-<table align="center">
-  <tr>
-    <td align="center" valign="top"><img src="docs/screenshots/panel-full.png" width="330" alt="展开面板全景"><br><sub>展开面板：余额 · 看板 · 多设备趋势 · Full panel</sub></td>
-    <td align="center" valign="top"><img src="docs/screenshots/settings-full.png" width="330" alt="设置面板"><br><sub>设置：样式 · 语言 · 主题 · Touch Bar · Settings</sub></td>
-  </tr>
-</table>
+> 当前版本：`2.5.2`。安装包为 Apple Silicon、ad-hoc 签名、未公证版本，要求 macOS 14 或更高版本。
 
-<details>
-<summary>📷 Touch Bar 真机实拍 · Touch Bar on real hardware</summary>
-<p align="center"><img src="docs/screenshots/touchbar-photo.jpg" width="720" alt="Touch Bar 实拍"></p>
-</details>
+## 功能一览
 
-**English**: A macOS-only floating dashboard for monitoring your **OpenAI Codex** and **Claude Code** subscription quotas (5-hour & 7-day rolling windows), token usage and multi-device trends — with an always-on Touch Bar panel and recent-session shortcuts. UI follows your system language (10 languages) with an in-app language picker. **Requires macOS 14+.** Windows/Linux are not supported (the app is built on AppKit/SwiftUI, Keychain, iCloud Drive and Touch Bar APIs) — PRs welcome, see [Platform support](#平台支持--platform-support). Download from [Releases](../../releases), unzip, run `安装并启用自动启动.command`, and see the English notes in [First launch](#三首次启动必读) for Gatekeeper/Keychain steps.
+| 能力 | 展示内容 |
+| --- | --- |
+| 官方额度 | Codex 7 天剩余额度、已用比例和重置倒计时 |
+| Token 统计 | 滚动 24 小时、今日、近 7 天、本月 Token，以及 input、cached input、output 和 model |
+| 重置雷达 | Codex 24h 重置概率、研判、公开摘要、更新时间和 Tibo PT 时钟 |
+| Full reset | 可用次数、获得时间和逐次到期日，只读展示，不提供消耗操作 |
+| 用量分析 | 最近 14 天趋势、设备对比、项目 Top、13 类工作用途、最近调用和 CSV 导出 |
+| 金额估算 | 按 OpenAI 官方模型价格估算 API 等价金额，并通过 Frankfurter 换算 USD/CNY |
+| 显示载体 | 主窗口、可配置悬浮框、Touch Bar、7 款 WidgetKit 桌面小组件 |
+| 外观 | 极光、玻璃、石墨三套视觉方案，六套主题色，以及跟随系统、白天、夜晚背景模式 |
 
----
+金额是 API 等价预估，不是 ChatGPT/Codex 订阅账单。reasoning token 已包含在 output 中，不重复计费。
 
-## ⚠️ 开始前请确认（必读）
+## 三种使用形态
 
-这个工具**只能在 Mac 上运行**，并且有明确的前提条件。下载前先对照检查：
+### 1. 完整主面板
 
-| 条件 | 要求 | 说明 |
-|---|---|---|
-| 操作系统 | **macOS 14 (Sonoma) 及以上** | 更早的系统无法运行 |
-| 机型 | Apple Silicon (M 系列) | Release 提供的安装包为 arm64；Intel Mac 请从源码构建 |
-| 监控 Codex | 本机安装并登录过 Codex（桌面版或 CLI） | 没装则在设置里关掉 Codex 即可 |
-| 监控 Claude | 本机用 **Claude Code CLI** 登录过一次 | 详见下方「Claude 余额显示前提」，只用网页版/桌面版是读不到余额的 |
-| 网络 | 能正常访问 OpenAI / Anthropic 服务 | 余额接口请求发往官方服务器，网络不通时显示「暂无数据」 |
-| Touch Bar 功能 | 带 Touch Bar 的 MacBook Pro | 没有 Touch Bar 的机器该选项自动置灰，其他功能不受影响 |
-| 多设备同步 | 各设备登录同一 iCloud 账号，开启 iCloud Drive | 只用一台 Mac 可完全忽略 |
+主窗口分为“概览、趋势、分析、设置”四个区域：
 
-**工具至少要装一个**（Codex 或 Claude Code）。首次启动会自动探测你装了哪个，只显示对应的码表。
+- 概览：额度、Token 汇总、重置雷达、Full reset 权益和最近额度事件。
+- 趋势：最近 14 天用量、日/月视图和多设备对比。
+- 分析：缓存输入占比、项目排行、工作类型构成和最近调用。
+- 设置：刷新频率、悬浮框、主题、背景模式、Touch Bar、桌面小组件说明和致谢。
 
-## 一、这是什么
+### 2. 可选择的悬浮框
 
-重度使用 Codex / Claude Code 的人都遇到过：干着干着突然「额度用完了」。算力码表把两个工具的 **5 小时滚动窗口**和 **7 天窗口**余额变成一个始终可见的小仪表，让你随时知道还剩多少、什么时候刷新。
+悬浮框不是必选项。在“设置 → 悬浮框”中可以：
 
-- **双工具监控**：Codex 与 Claude Code 可单选/多选
-- **5 种悬浮样式**：双环 / 长条 / 长条·全 / 徽章 / 徽章·全，标准与迷你两档，自动避让不挡内容
-- **Touch Bar 常驻**（带 Touch Bar 机型）：4 种面板样式、大数字模式、距刷新进度线（倒计时/正计时两种方向）、最近 AI 会话一键直达、合盖外接屏时浮窗自动接管（另有"尽力保持 Touch Bar 常亮"选项，但息屏由系统底层控制，新系统多半仍会息屏，属尽力而为）
-- **Token 消耗看板**：今日/近 7 天/本月、用途分布、项目 Top 3、多设备趋势对比
-- **10 种界面语言**：跟随系统自动切换，设置里也可手动选
-- **隐私原则**：只读本机日志与凭据、不上传任何数据、拿不到数据就显示「暂无数据」，绝不编数字
+- 开启或关闭悬浮框总开关；关闭后，小组件和普通主窗口仍可继续使用。
+- 分别选择是否显示 7 天额度、滚动 24h Token、重置雷达和 Full reset 权益。
+- 在“额度环、圆形、方形、胶囊、横条、横条·详细、徽章、徽章·详细”八种样式间切换。
+- 选择额度环横向或竖向排列；样式会随所选信息自动调整尺寸。
 
-## 二、安装（3 步）
+由 Codex 自动唤起时，如果悬浮框已关闭，App 会静默在后台更新数据；手动打开 App 时仍会显示普通主窗口。
 
-1. 从 [Releases](../../releases) 下载最新的 `算力码表-安装包-vX.X.X.zip` 并解压；
-2. 双击解压出来的 **`安装并启用自动启动.command`**；
-   - 若提示「无法打开，因为它来自身份不明的开发者」：**右键点击文件 → 打开 → 再点打开**（只需一次）；
-3. 脚本会把 App 装到 `~/Applications/算力码表.app` 并配置自动启动（检测到 Codex 或 Claude Code 运行时自动唤起码表）。
+### 3. 七款桌面小组件
 
-不想要自动启动的话，也可以直接把解压出来的 `算力码表.app` 拖到「应用程序」手动使用。
+| 小组件 | 尺寸 | 主要信息 |
+| --- | --- | --- |
+| Codex 算力总览 | 中、大 | 7 天额度、滚动 24h、重置概率、Full reset；大号增加 Token 汇总、费用和趋势 |
+| 7 天额度 | 小、中 | 剩余额度环、已用比例和重置倒计时 |
+| Codex 重置雷达 | 小、中 | 24h 重置概率、研判、公开摘要和更新时间 |
+| Full reset 权益 | 小、中 | 可用次数和最多 3 次到期时间 |
+| Token 汇总 | 小、中 | 滚动 24h、今日、近 7 天、本月 Token 和金额预估 |
+| Token 趋势 | 中、大 | 24 小时逐时柱状图；大号增加最近 14 天趋势 |
+| 项目与用途 | 中、大 | 今日项目 Top 3 和本月用途 Top 3 |
 
-## 三、首次启动必读
+安装并打开一次 App 后，在桌面空白处右键，选择“编辑小组件”，搜索“Codex 脉动”即可添加。更多说明见 [桌面小组件指南](docs/WIDGETS.md)。
 
-**1. Gatekeeper 安全拦截（一定会遇到）**
+## 白天与夜晚背景
 
-本 App 未做 Apple 公证（个人开源项目，不交年费）。首次打开如被拦截：
+App 提供三种背景模式：
 
-- 打开「**系统设置 → 隐私与安全性**」，页面下方会出现「已阻止使用算力码表」→ 点「**仍要打开**」；
-- 或右键点击 App → 打开 → 打开。
+- 跟随系统：随 macOS 外观自动切换。
+- 白天：手动固定为浅色背景。
+- 夜晚：手动固定为深色背景。
 
-**2. 钥匙串授权弹框（开了 Claude 监控会遇到）**
+主窗口、设置页和八种悬浮样式共享这一设置；桌面小组件随系统外观自动适配。
 
-码表需要读取 Claude Code 存在钥匙串里的凭据来查询余额。弹出「算力码表想访问钥匙串中的 Claude Code-credentials」时，点「**始终允许**」（点一次以后不再弹）。这是只读操作，凭据绝不会被写日志或上传。
+## 数据来源与工作方式
 
-**3. Claude 余额显示前提（最常见的「为什么是灰的」）**
-
-Claude 环显示「暂无数据」灰色，99% 是因为**本机没有 Claude Code CLI 的登录凭据**。网页版 claude.ai 和桌面 App 的登录是独立的，码表读不到。解决：
-
-```bash
-# 终端里运行（哪怕你平时只用桌面版，登录这一次即可）
-claude
-# 进入后输入 /login，按提示在浏览器完成授权，然后 /exit 退出
+```mermaid
+flowchart LR
+  A["~/.codex/sessions 本地日志"] --> E["本地聚合与缓存"]
+  B["Codex 账户只读状态"] --> E
+  C["Codex 重置雷达公开源"] --> E
+  D["Frankfurter 汇率"] --> E
+  E --> F["主窗口"]
+  E --> G["悬浮框 / Touch Bar"]
+  E --> H["脱敏 Widget 快照"]
+  H --> I["7 款桌面小组件"]
 ```
 
-登录成功后码表 1 分钟内自动亮起，之后 token 过期会自动续期，**不需要再碰终端**。
+- 本地用量从 `~/.codex/sessions` 增量读取，聚合 input、cached input、output、model、项目和工作类型。
+- Codex 额度和 Full reset 权益通过只读方式获取；Full reset 不提供兑换或消耗入口。
+- 重置雷达读取小程序实际使用的公开 `/radar-api/dashboard` 数据，无需 API Key，每 30 分钟自动同步。
+- USD/CNY 汇率来自 Frankfurter；网络失败时使用上次成功缓存。
+- iCloud 仅同步小时、日、月聚合 Token 与模型名，使用 schema 4 的 `设备-codex-v2.json`。
 
-**4. Codex 余额来源**
+## 隐私边界
 
-自动读取本机 Codex（桌面版或 CLI）的状态，无需任何配置。如果显示「没有余额事件」，在 Codex 里输入一次 `/status` 即可。
+- Codex 会话日志只在本机只读解析，不上传原始消息。
+- Full reset 凭据和原始响应只在内存中短暂使用；缓存不保存 token、完整账户 ID、后台权益 ID 或原始响应。
+- Widget 快照只包含额度、公开雷达、权益到期时间和聚合 Token，不包含会话内容、项目路径、账户凭据、API Key 或兑换 ID。
+- 重置雷达公开数据采用 30 分钟内存缓存，不写入 iCloud。
+- 会话解析缓存位于独立 Application Support 目录，只保存增量聚合所需结果。
 
-## 四、多设备同步（可选）
+## 安装
 
-在每台 Mac 上安装并打开码表即可——前提是它们登录**同一个 iCloud 账号**且开了 iCloud Drive。每台设备把自己的 token 消耗聚合成小 JSON 写进 iCloud（只有日期和数字，无任何内容），趋势图里自动出现所有设备的折线和总量。设备数量不限。
+在 [Releases](https://github.com/huohuo143/codex-pulse/releases) 下载：
 
-> 某台设备超过 48 小时没打开码表，趋势图会在它的卡片上标注「数据至 X」提醒你数据不是最新的。
-
-## 五、常见问题
-
-**Q: 打不开，提示已损坏？**
-A: `xattr -dr com.apple.quarantine ~/Applications/算力码表.app` 后再开（安装脚本已自动做过，手动拖装的可能遇到）。
-
-**Q: Claude 环之前亮着，某天变灰了？**
-A: 多数是续期链断了（长时间没开机等）。重新 `claude` → `/login` 一次即可，见上文第三节。
-
-**Q: 两台电脑的余额百分比不一样？**
-A: 余额是账号级的，同一账号在哪台机器看都一样；不一样说明两台登录的是不同账号。Token 消耗折线按设备分开是正常设计。
-
-**Q: Touch Bar 上没显示？**
-A: 只有带 Touch Bar 的 MacBook Pro 支持；在 设置 → 运行 里打开「Touch Bar 常驻余额」。
-
-**Q: 卸载怎么卸？**
-A: 删除 `~/Applications/算力码表.app`、`~/Library/LaunchAgents/dev.codex.balance-dashboard.watch-codex.plist`、`~/Library/Application Support/CodexBalanceDashboard/`，再在 iCloud Drive 删掉「算力码表」文件夹（如果不再需要同步数据）。
-
-## 平台支持 / Platform support
-
-| 平台 | 状态 |
-|---|---|
-| macOS 14+ (Apple Silicon) | ✅ 官方支持，Release 直接下载 |
-| macOS 14+ (Intel) | 🟡 源码构建可用（`./script/create_transfer_package.sh`） |
-| Windows / Linux | ❌ 暂不支持 |
-
-**为什么不支持 Windows/Linux**：界面（AppKit/SwiftUI）、凭据读取（Keychain）、多设备同步（iCloud Drive）、Touch Bar 全部是 macOS 专属技术。
-
-**想移植？欢迎 PR！** 数据层是跨平台的：两个工具在 Win/Linux 上同样把日志写在 `~/.codex` 和 `~/.claude`（结构一致），余额接口是标准 HTTP，多设备同步协议就是本仓库的聚合 JSON（`schemaVersion 2`）。用 Tauri/Electron 重写界面层即可，欢迎在 Issues 里认领。
-
-*Why macOS-only: the UI (AppKit/SwiftUI), credential access (Keychain), device sync (iCloud Drive) and Touch Bar are all Apple-specific. The data layer is portable — both tools write the same log structure to `~/.codex` / `~/.claude` on every OS, the quota APIs are plain HTTP, and the sync protocol is just JSON. A Tauri/Electron port is very feasible — PRs welcome!*
-
-## 源码构建
-
-```bash
-git clone https://github.com/waytosea-oss/suanli-dashboard.git
-cd suanli-dashboard
-./script/create_transfer_package.sh   # 产物在 dist/，含安装脚本
+```text
+Codex 脉动-v2.5.2-20260716-arm64.dmg
+Codex 脉动-v2.5.2-20260716-arm64.dmg.sha256
 ```
 
-需要 Xcode Command Line Tools（Swift 6）。跑测试：把 `TestRunner` product 构建后执行。
+1. 打开 DMG。
+2. 将 `Codex 脉动.app` 拖入 Applications；也可以运行 DMG 内的“安装并启用自动启动”脚本。
+3. 首次打开若被 Gatekeeper 拦截，在“系统设置 → 隐私与安全性”中选择“仍要打开”。
+4. 打开一次 App，等待首次历史数据解析完成。
 
-## 数据来源与隐私
+首次运行需要建立历史解析缓存；日志较多时可能持续约 1 分钟。缓存建立后只会恢复历史结果并增量读取新增字节。
 
-| 数据 | 来源 | 说明 |
-|---|---|---|
-| Codex 余额 | Codex app-server 本地 RPC / 会话日志 | 与官方 `/status` 一致 |
-| Claude 余额 | 本机已有的 Claude Code OAuth 凭据 + 官方 usage 接口 | accessToken 过期自动用 refreshToken 续期 |
-| Token 消耗 | 两个工具的本地会话日志（jsonl） | 逐条解析、按消息去重 |
-| 多设备数据 | iCloud Drive 聚合 JSON | 只含日期与数字 |
+## 与旧版并行
 
-- **只读**两个工具的日志与凭据，绝不修改、绝不发起登录
-- 凭据绝不写入日志、诊断报告或 iCloud
-- 不上传任何数据到第三方；找不到可靠来源就显示「暂无数据」，**永远不编数字**
+| 项目 | Codex 脉动 2.5.2 | 旧算力码表 0.1.0 |
+| --- | --- | --- |
+| App | `Codex 脉动.app` | `算力码表.app` |
+| Bundle ID | `dev.codex.balance-dashboard.codex` | `dev.codex.balance-dashboard` |
+| 进程 | `CodexSuanliMeter` | `CodexBalance` |
+| Application Support | `CodexSuanliMeter` | `CodexBalanceDashboard` |
+| LaunchAgent | `dev.codex.balance-dashboard.codex.watch-codex` | `dev.codex.balance-dashboard.watch-codex` |
 
-## 作者
+新版不会覆盖、删除或终止旧版。
 
-**Tilo Liang**（[@waytosea-oss](https://github.com/waytosea-oss)）
+卸载新版时，只删除新版路径：
 
-一个被额度反复背刺之后决定把仪表盘做出来的人。如果这个工具帮到了你，给个 ⭐️ 就是最好的支持。
+```text
+~/Applications/Codex 脉动.app
+~/Library/LaunchAgents/dev.codex.balance-dashboard.codex.watch-codex.plist
+~/Library/Application Support/CodexSuanliMeter/
+```
 
-## 许可证
+## 从源码构建
 
-[MIT](LICENSE) © 2026 Tilo Liang
+### 环境要求
+
+- macOS 14+
+- Apple Silicon Mac
+- Swift 6 / Xcode Command Line Tools
+- 完整 Xcode，用于构建原生 Widget App Extension
+
+### 构建与测试
+
+```bash
+./script/generate_app_icon.sh
+swift test --parallel
+OPEN_APP=0 ./script/build_and_run.sh
+./script/verify_widget_bundle.sh
+./script/package_release.sh
+```
+
+主程序由 SwiftPM 构建；Widget 扩展由 `xcode/CodexPulseWidgets.xcodeproj` 的原生 App Extension target 构建，以满足 WidgetKit 生命周期要求。
+
+主要目录：
+
+| 路径 | 内容 |
+| --- | --- |
+| `Sources/CodexBalance` | App 生命周期、状态管理、主窗口、悬浮框和设置界面 |
+| `Sources/CodexBalanceCore` | Codex 状态读取、Token 聚合、雷达、汇率、权益和 Widget 快照 |
+| `Sources/CodexSuanliWidgets` | 7 款 WidgetKit 组件 |
+| `Tests/CodexBalanceCoreTests` | 核心逻辑测试 |
+| `script` | 图标生成、构建、验证、打包与迁移脚本 |
+| `config` / `xcode` | Widget 扩展配置、entitlements 和 Xcode target |
+
+## 已知边界
+
+- 当前 DMG 仅支持 arm64，采用 ad-hoc 签名且尚未公证。
+- 本地 Token 统计来自 Codex 会话日志，不包含无法在本机日志中观察到的网页端用量。
+- 未知模型不会猜测价格，而会保持“未计价”。
+- WidgetKit 的实际刷新时刻仍受 macOS 桌面小组件预算控制。
+- Full reset 和重置雷达均为只读信息，概率与研判仅供参考。
+
+## 版本说明
+
+2.5.2 新增桌面小组件、悬浮框总开关与信息选择、昼夜背景模式和全新 Logo，并修复 WidgetKit 无法识别扩展入口的问题。完整内容见 [2.5.2 改版说明](docs/RELEASE_2.5.2.md)。
+
+## 致谢
+
+- 最初源码与构思：[waytosea-oss/suanli-dashboard](https://github.com/waytosea-oss/suanli-dashboard)。
+- Codex 重置雷达：感谢 [Codex 雷达](https://codexradar.com/) 提供公开数据；官网公开署名为 `designed by Codex`，未公开个人作者姓名。
+
+感谢上述作者与公开项目为 Codex 脉动提供起点、思路与公开雷达数据。
+
+## License
+
+本项目采用 [MIT License](LICENSE)。
