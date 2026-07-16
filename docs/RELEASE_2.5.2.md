@@ -33,6 +33,6 @@
 安装包：
 
 ```text
-Codex 脉动-v2.5.2-20260716-arm64.dmg
-Codex 脉动-v2.5.2-20260716-arm64.dmg.sha256
+Codex-Pulse-v2.5.2-20260716-arm64.dmg
+Codex-Pulse-v2.5.2-20260716-arm64.dmg.sha256
 ```
