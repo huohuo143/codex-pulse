@@ -20,6 +20,29 @@
 
 > 当前版本：`2.5.2`。安装包为 Apple Silicon、ad-hoc 签名、未公证版本，要求 macOS 14 或更高版本。
 
+## 当前版本界面
+
+以下截图直接来自已安装的 `Codex 脉动 2.5.2`，不再使用旧版 Codex/Claude 双面板图片。
+
+<p align="center">
+  <img src="docs/screenshots/codex-pulse-overview-v2.5.2.png" width="680" alt="Codex 脉动 2.5.2 概览">
+  <br>
+  <sub>主面板：7 天额度、滚动 24h Token、重置雷达与 Tibo 雷达</sub>
+</p>
+
+<table>
+  <tr>
+    <td align="center" valign="top" width="34%">
+      <img src="docs/screenshots/codex-pulse-floating-v2.5.2.png" width="236" alt="Codex 脉动 2.5.2 悬浮框">
+      <br><sub>悬浮框：额度、Token、重置概率与 Full reset 权益</sub>
+    </td>
+    <td align="center" valign="top" width="66%">
+      <img src="docs/screenshots/codex-pulse-settings-v2.5.2.png" width="520" alt="Codex 脉动 2.5.2 设置页">
+      <br><sub>设置：跟随系统 / 白天 / 夜晚、悬浮框开关、信息选择与八种样式</sub>
+    </td>
+  </tr>
+</table>
+
 ## 功能一览
 
 | 能力 | 展示内容 |
