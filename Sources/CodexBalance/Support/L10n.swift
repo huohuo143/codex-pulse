@@ -4,7 +4,7 @@ import Foundation
 /// 未翻译的 key 自动回退中文原文。
 extension String {
   var l10n: String {
-    NSLocalizedString(self, bundle: .module, comment: "")
+    NSLocalizedString(self, bundle: .main, comment: "")
   }
 }
 

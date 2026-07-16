@@ -1,44 +1,87 @@
 import AppKit
+import CodexBalanceCore
 
 @MainActor
 enum WindowConfigurator {
-  // 方案 B：并排双组双环，胶囊加宽
-  static let compactSize = NSSize(width: 320, height: 196)
-  static let miniCompactSize = NSSize(width: 236, height: 148)
-  static let expandedSize = NSSize(width: 620, height: 820)
+  // 额度环使用横向长方形，给 Token 单位和重置明细留出清晰的字号空间。
+  static let compactSize = NSSize(width: 300, height: 310)
+  static let miniCompactSize = NSSize(width: 248, height: 258)
+  static let expandedSize = NSSize(width: 680, height: 860)
 
   static func compactSize(
     for mode: CompactSizeMode,
     style: CompactStyle = .rings,
-    toolCount: Int = 2
+    toolCount: Int = 2,
+    ringOrientation: CompactRingOrientation = .horizontal,
+    metrics: Set<FloatingPanelMetric> = FloatingPanelMetric.defaults
   ) -> NSSize {
-    let dual = toolCount >= 2
+    let metrics = metrics.isEmpty ? FloatingPanelMetric.defaults : metrics
+    let isMini = mode == .mini
+    let showsWeekly = metrics.contains(.weeklyQuota)
+    let showsRolling = metrics.contains(.rolling24Tokens)
+    let showsRadar = metrics.contains(.resetRadar)
+    let showsResetCredits = metrics.contains(.resetCredits)
+
     switch style {
     case .rings:
-      if mode == .mini {
-        return dual ? miniCompactSize : NSSize(width: 138, height: 148)
+      var heights: [CGFloat] = []
+      if ringOrientation == .horizontal {
+        if showsWeekly && showsRolling { heights.append(isMini ? 116 : 148) }
+        else if showsWeekly { heights.append(isMini ? 116 : 148) }
+        else if showsRolling { heights.append(isMini ? 72 : 92) }
+      } else {
+        if showsWeekly { heights.append(isMini ? 116 : 148) }
+        if showsRolling { heights.append(isMini ? 44 : 54) }
       }
-      return dual ? compactSize : NSSize(width: 184, height: 196)
+      if showsRadar { heights.append(isMini ? 24 : 28) }
+      if showsResetCredits { heights.append(isMini ? 86 : 90) }
+
+      let padding = isMini ? CGFloat(20) : CGFloat(28)
+      let spacing = isMini ? CGFloat(6) : CGFloat(8)
+      let height = max(isMini ? 64 : 76, padding + heights.reduce(0, +) + spacing * CGFloat(max(0, heights.count - 1)))
+      let width: CGFloat
+      if ringOrientation == .vertical {
+        width = isMini ? 204 : 236
+      } else if showsWeekly && showsRolling {
+        width = isMini ? 248 : 300
+      } else if showsWeekly {
+        width = isMini ? 160 : 190
+      } else {
+        width = isMini ? 218 : 260
+      }
+      return NSSize(width: width, height: height)
+    case .circle:
+      return mode == .mini ? NSSize(width: 144, height: 144) : NSSize(width: 176, height: 176)
+    case .square:
+      let height = isMini
+        ? max(CGFloat(104), CGFloat(52 + metrics.count * 27))
+        : max(CGFloat(128), CGFloat(62 + metrics.count * 32))
+      return NSSize(width: isMini ? 148 : 180, height: height)
+    case .pill:
+      let width = isMini
+        ? max(CGFloat(168), CGFloat(70 + metrics.count * 57))
+        : max(CGFloat(198), CGFloat(82 + metrics.count * 66))
+      return NSSize(width: width, height: isMini ? 56 : 68)
     case .bars:
-      if mode == .mini {
-        return NSSize(width: 212, height: dual ? 62 : 42)
-      }
-      return NSSize(width: 248, height: dual ? 74 : 50)
+      let height = isMini
+        ? max(CGFloat(64), CGFloat(30 + metrics.count * 21 + (showsWeekly ? 8 : 0)))
+        : max(CGFloat(78), CGFloat(34 + metrics.count * 25 + (showsWeekly ? 10 : 0)))
+      return NSSize(width: isMini ? 238 : 286, height: height)
     case .barsQuad:
-      if mode == .mini {
-        return NSSize(width: 212, height: dual ? 104 : 62)
-      }
-      return NSSize(width: 248, height: dual ? 122 : 74)
+      let height = isMini
+        ? max(CGFloat(76), CGFloat(32 + metrics.count * 24 + (showsWeekly ? 8 : 0)))
+        : max(CGFloat(92), CGFloat(38 + metrics.count * 29 + (showsWeekly ? 10 : 0)))
+      return NSSize(width: isMini ? 248 : 300, height: height)
     case .badge:
-      if mode == .mini {
-        return NSSize(width: dual ? 138 : 80, height: 34)
-      }
-      return NSSize(width: dual ? 158 : 92, height: 40)
+      let width = isMini
+        ? max(CGFloat(138), CGFloat(55 + metrics.count * 75))
+        : max(CGFloat(158), CGFloat(65 + metrics.count * 85))
+      return NSSize(width: width, height: isMini ? 42 : 50)
     case .badgeQuad:
-      if mode == .mini {
-        return NSSize(width: dual ? 208 : 118, height: 34)
-      }
-      return NSSize(width: dual ? 238 : 134, height: 40)
+      let width = isMini
+        ? max(CGFloat(148), CGFloat(60 + metrics.count * 78))
+        : max(CGFloat(168), CGFloat(70 + metrics.count * 88))
+      return NSSize(width: width, height: isMini ? 42 : 50)
     }
   }
 
@@ -48,19 +91,33 @@ enum WindowConfigurator {
     compactSizeMode: CompactSizeMode = .standard,
     compactStyle: CompactStyle = .rings,
     toolCount: Int = 2,
+    ringOrientation: CompactRingOrientation = .horizontal,
+    metrics: Set<FloatingPanelMetric> = FloatingPanelMetric.defaults,
     keepPosition: Bool = true
   ) {
-    window.title = "算力码表"
+    window.title = AppInfo.appName
     window.styleMask = [.borderless, .resizable]
     window.isOpaque = false
     window.backgroundColor = .clear
-    window.hasShadow = false
-    window.level = .floating
-    window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-    window.isMovableByWindowBackground = true
-    let resolvedCompactSize = compactSize(for: compactSizeMode, style: compactStyle, toolCount: toolCount)
-    window.minSize = compact ? resolvedCompactSize : NSSize(width: 560, height: 720)
-    window.maxSize = compact ? resolvedCompactSize : NSSize(width: 760, height: 940)
+    window.hasShadow = !compact
+    window.level = compact ? .floating : .normal
+    window.collectionBehavior = compact
+      ? [.canJoinAllSpaces, .fullScreenAuxiliary]
+      : [.managed, .participatesInCycle]
+    window.isMovable = true
+    // Dragging is handled by WindowDragSurface. Letting NSWindow also treat the
+    // SwiftUI hosting background as draggable can swallow the view's drag
+    // events in a borderless window.
+    window.isMovableByWindowBackground = false
+    let resolvedCompactSize = compactSize(
+      for: compactSizeMode,
+      style: compactStyle,
+      toolCount: toolCount,
+      ringOrientation: ringOrientation,
+      metrics: metrics
+    )
+    window.minSize = compact ? resolvedCompactSize : NSSize(width: 640, height: 760)
+    window.maxSize = compact ? resolvedCompactSize : NSSize(width: 820, height: 980)
 
     let targetSize = compact ? resolvedCompactSize : expandedSize
     let origin = keepPosition ? window.frame.origin : topRightOrigin(for: targetSize, window: window)

@@ -1,0 +1,206 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 60;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A10000000000000000000001 /* WidgetBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000001 /* WidgetBundle.swift */; };
+		A10000000000000000000002 /* WidgetProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000002 /* WidgetProvider.swift */; };
+		A10000000000000000000003 /* WidgetTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000003 /* WidgetTheme.swift */; };
+		A10000000000000000000004 /* WidgetViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000004 /* WidgetViews.swift */; };
+		A10000000000000000000005 /* WidgetSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000005 /* WidgetSnapshot.swift */; };
+		A10000000000000000000006 /* Formatters.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000006 /* Formatters.swift */; };
+		A10000000000000000000007 /* L10nCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000007 /* L10nCore.swift */; };
+		A10000000000000000000008 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B10000000000000000000008 /* SwiftUI.framework */; };
+		A10000000000000000000009 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B10000000000000000000009 /* WidgetKit.framework */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		B10000000000000000000001 /* WidgetBundle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../Sources/CodexSuanliWidgets/WidgetBundle.swift; sourceTree = "<group>"; };
+		B10000000000000000000002 /* WidgetProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../Sources/CodexSuanliWidgets/WidgetProvider.swift; sourceTree = "<group>"; };
+		B10000000000000000000003 /* WidgetTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../Sources/CodexSuanliWidgets/WidgetTheme.swift; sourceTree = "<group>"; };
+		B10000000000000000000004 /* WidgetViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../Sources/CodexSuanliWidgets/WidgetViews.swift; sourceTree = "<group>"; };
+		B10000000000000000000005 /* WidgetSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../Sources/CodexBalanceCore/WidgetSnapshot.swift; sourceTree = "<group>"; };
+		B10000000000000000000006 /* Formatters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../Sources/CodexBalanceCore/Formatters.swift; sourceTree = "<group>"; };
+		B10000000000000000000007 /* L10nCore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../Sources/CodexBalanceCore/L10nCore.swift; sourceTree = "<group>"; };
+		B10000000000000000000008 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		B10000000000000000000009 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		B1000000000000000000000A /* CodexSuanliWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CodexSuanliWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		C10000000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000008 /* SwiftUI.framework in Frameworks */,
+				A10000000000000000000009 /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		D10000000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				D10000000000000000000002 /* Sources */,
+				D10000000000000000000003 /* Frameworks */,
+				D10000000000000000000004 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		D10000000000000000000002 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000001 /* WidgetBundle.swift */,
+				B10000000000000000000002 /* WidgetProvider.swift */,
+				B10000000000000000000003 /* WidgetTheme.swift */,
+				B10000000000000000000004 /* WidgetViews.swift */,
+				B10000000000000000000005 /* WidgetSnapshot.swift */,
+				B10000000000000000000006 /* Formatters.swift */,
+				B10000000000000000000007 /* L10nCore.swift */,
+			);
+			name = Sources;
+			sourceTree = "<group>";
+		};
+		D10000000000000000000003 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000008 /* SwiftUI.framework */,
+				B10000000000000000000009 /* WidgetKit.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		D10000000000000000000004 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				B1000000000000000000000A /* CodexSuanliWidgets.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		E10000000000000000000001 /* CodexSuanliWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F10000000000000000000003 /* Build configuration list for PBXNativeTarget "CodexSuanliWidgets" */;
+			buildPhases = (
+				C10000000000000000000002 /* Sources */,
+				C10000000000000000000001 /* Frameworks */,
+				C10000000000000000000003 /* Resources */,
+			);
+			buildRules = ();
+			dependencies = ();
+			name = CodexSuanliWidgets;
+			productName = CodexSuanliWidgets;
+			productReference = B1000000000000000000000A /* CodexSuanliWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		E10000000000000000000002 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2660;
+				LastUpgradeCheck = 2660;
+				TargetAttributes = { E10000000000000000000001 = { CreatedOnToolsVersion = 26.6; }; };
+			};
+			buildConfigurationList = F10000000000000000000002 /* Build configuration list for PBXProject "CodexPulseWidgets" */;
+			compatibilityVersion = "Xcode 15.0";
+			developmentRegion = zh-Hans;
+			hasScannedForEncodings = 0;
+			knownRegions = (Base, "zh-Hans", en);
+			mainGroup = D10000000000000000000001;
+			productRefGroup = D10000000000000000000004 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (E10000000000000000000001 /* CodexSuanliWidgets */);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		C10000000000000000000003 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		C10000000000000000000002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000001 /* WidgetBundle.swift in Sources */,
+				A10000000000000000000002 /* WidgetProvider.swift in Sources */,
+				A10000000000000000000003 /* WidgetTheme.swift in Sources */,
+				A10000000000000000000004 /* WidgetViews.swift in Sources */,
+				A10000000000000000000005 /* WidgetSnapshot.swift in Sources */,
+				A10000000000000000000006 /* Formatters.swift in Sources */,
+				A10000000000000000000007 /* L10nCore.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		F10000000000000000000004 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {CLANG_ENABLE_MODULES = YES; MACOSX_DEPLOYMENT_TARGET = 14.0; SDKROOT = macosx; SWIFT_VERSION = 6.0; }; name = Debug; };
+		F10000000000000000000005 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {CLANG_ENABLE_MODULES = YES; MACOSX_DEPLOYMENT_TARGET = 14.0; SDKROOT = macosx; SWIFT_VERSION = 6.0; }; name = Release; };
+		F10000000000000000000006 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ARCHS = arm64;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGN_ENTITLEMENTS = ../config/CodexSuanliWidgets.entitlements;
+				CURRENT_PROJECT_VERSION = 252;
+				DEFINES_MODULE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ../config/CodexSuanliWidgets-Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/../Frameworks", "@executable_path/../../../../Frameworks");
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 2.5.2;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.codex.balance-dashboard.codex.widgets;
+				PRODUCT_NAME = CodexSuanliWidgets;
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG XCODE_WIDGET_BUILD";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		F10000000000000000000007 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ARCHS = arm64;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGN_ENTITLEMENTS = ../config/CodexSuanliWidgets.entitlements;
+				CURRENT_PROJECT_VERSION = 252;
+				DEFINES_MODULE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ../config/CodexSuanliWidgets-Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/../Frameworks", "@executable_path/../../../../Frameworks");
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 2.5.2;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.codex.balance-dashboard.codex.widgets;
+				PRODUCT_NAME = CodexSuanliWidgets;
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = XCODE_WIDGET_BUILD;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		F10000000000000000000002 /* Build configuration list for PBXProject "CodexPulseWidgets" */ = {isa = XCConfigurationList; buildConfigurations = (F10000000000000000000004 /* Debug */, F10000000000000000000005 /* Release */); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		F10000000000000000000003 /* Build configuration list for PBXNativeTarget "CodexSuanliWidgets" */ = {isa = XCConfigurationList; buildConfigurations = (F10000000000000000000006 /* Debug */, F10000000000000000000007 /* Release */); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+/* End XCConfigurationList section */
+	};
+	rootObject = E10000000000000000000002 /* Project object */;
+}

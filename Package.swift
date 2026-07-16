@@ -18,23 +18,27 @@ let testingLinkerFlags: [LinkerSetting] = FileManager.default.fileExists(atPath:
   : []
 
 let package = Package(
-  name: "CodexBalanceDashboard",
+  name: "CodexSuanliMeter",
   defaultLocalization: "zh-Hans",
   platforms: [
     .macOS(.v14)
   ],
   products: [
-    .executable(name: "CodexBalance", targets: ["CodexBalance"])
+    .executable(name: "CodexSuanliMeter", targets: ["CodexBalance"]),
+    .executable(name: "CodexSuanliWidgets", targets: ["CodexSuanliWidgets"])
   ],
   targets: [
-    .target(
-      name: "CodexBalanceCore",
-      resources: [.process("Resources")]
-    ),
+    .target(name: "CodexBalanceCore"),
     .executableTarget(
       name: "CodexBalance",
+      dependencies: ["CodexBalanceCore"]
+    ),
+    .executableTarget(
+      name: "CodexSuanliWidgets",
       dependencies: ["CodexBalanceCore"],
-      resources: [.process("Resources")]
+      swiftSettings: [
+        .unsafeFlags(["-application-extension"], .when(platforms: [.macOS]))
+      ]
     ),
     .executableTarget(
       name: "TestRunner",

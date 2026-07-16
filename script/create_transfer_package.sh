@@ -2,387 +2,144 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP_NAME="算力码表"
-PACKAGE_NAME="算力码表-安装包"
+APP_NAME="Codex 脉动"
+EXECUTABLE_NAME="CodexSuanliMeter"
+VERSION="2.5.2"
+DATE_TAG="20260716"
+ARCH="arm64"
 DIST_DIR="$ROOT_DIR/dist"
-PACKAGE_DIR="$DIST_DIR/$PACKAGE_NAME"
-ZIP_PATH="$DIST_DIR/$PACKAGE_NAME.zip"
-DESKTOP_ZIP="$HOME/Desktop/$PACKAGE_NAME.zip"
+APP_OUTPUT_DIR="$DIST_DIR/build-v$VERSION"
+APP_BUNDLE="$APP_OUTPUT_DIR/$APP_NAME.app"
+DMG_PATH="$DIST_DIR/$APP_NAME-v$VERSION-$DATE_TAG-$ARCH.dmg"
+SHA_PATH="$DMG_PATH.sha256"
+NOTES_PATH="$DIST_DIR/$APP_NAME-v$VERSION-改版说明.md"
+STAGE_DIR="$ROOT_DIR/.build/dmg-stage-$VERSION"
 
 cd "$ROOT_DIR"
 
-OPEN_APP=0 ./script/build_and_run.sh
+if [[ -e "$DMG_PATH" || -e "$SHA_PATH" || -e "$NOTES_PATH" ]]; then
+  echo "Refusing to overwrite an existing $VERSION release artifact." >&2
+  exit 1
+fi
 
-rm -rf "$PACKAGE_DIR" "$ZIP_PATH"
-mkdir -p "$PACKAGE_DIR"
-ditto "$DIST_DIR/$APP_NAME.app" "$PACKAGE_DIR/$APP_NAME.app"
+APP_OUTPUT_DIR="$APP_OUTPUT_DIR" OPEN_APP=0 "$ROOT_DIR/script/build_and_run.sh"
 
-cat > "$PACKAGE_DIR/安装并启用自动启动.command" <<'INSTALLER'
+cat >"$NOTES_PATH" <<'NOTES'
+# Codex 脉动 2.5.2 改版说明
+
+- App 正式更名为“Codex 脉动”，保留原 Bundle ID、进程名和数据目录，历史统计与设置无需迁移。
+- 新增 7 款 macOS WidgetKit 桌面小组件：总览、7 天额度、Codex 重置雷达、Full reset 权益、Token 汇总、Token 趋势、项目与用途。
+- 中/大号总览复刻悬浮框的核心信息；用户也可按关注点拆分组合小组件。
+- 新增“启用悬浮框”总开关；关闭后由 Codex 自动唤起时静默后台运行，手动打开 App 仍显示普通主窗口。
+- 悬浮框可分别勾选 7 天额度、滚动 24h Token、重置雷达与 Full reset 权益，八种样式会自动适配内容和尺寸。
+- 新增“跟随系统 / 白天 / 夜晚”三种背景模式；主窗口、设置页和八种悬浮样式均可自动或手动切换，桌面小组件随 macOS 外观适配。
+- Widget 扩展启用标准 App Sandbox；主 App 将脱敏聚合快照写入扩展自身容器，不读取会话内容、凭据、项目路径或权益兑换 ID。
+- 修复 2.5.1 中扩展入口按普通 SwiftPM 可执行程序链接、WidgetKit 无法取得组件清单的问题；改为原生 App Extension 生命周期后，系统可识别全部 7 款组件并生成预览。
+- 主 App 最多每分钟通知 WidgetKit 重载；雷达仍保持独立 30 分钟同步，未增加额外公开源请求。
+- 新增额度环/雷达主题的原生多尺寸 macOS logo，统一用于 Dock、Finder 与小组件库。
+- 设置页新增桌面小组件说明和“致谢”区：感谢最初源码与构思作者 waytosea-oss；感谢 Codex 重置雷达公开数据，官网署名为“designed by Codex”。
+- 延续 2.4.7 的重置雷达防回退、Full reset 只读展示、八种悬浮样式、拖动优化、工作分析、CSV 和独立安装边界。
+
+本包为 arm64、ad-hoc 签名、未公证版本。首次打开可能出现 Gatekeeper 提示。
+NOTES
+
+rm -rf "$STAGE_DIR"
+mkdir -p "$STAGE_DIR"
+/usr/bin/ditto "$APP_BUNDLE" "$STAGE_DIR/$APP_NAME.app"
+ln -s /Applications "$STAGE_DIR/Applications"
+cp "$NOTES_PATH" "$STAGE_DIR/改版说明.md"
+
+cat >"$STAGE_DIR/安装并启用自动启动.command" <<'INSTALLER'
 #!/bin/zsh
 set -euo pipefail
 
-APP_NAME="算力码表"
-BUNDLE_ID="dev.codex.balance-dashboard"
-LABEL="dev.codex.balance-dashboard.watch-codex"
-SCRIPT_DIR="${0:A:h}"
-SOURCE_APP="$SCRIPT_DIR/$APP_NAME.app"
+APP_NAME="Codex 脉动"
+EXECUTABLE_NAME="CodexSuanliMeter"
+BUNDLE_ID="dev.codex.balance-dashboard.codex"
+LABEL="dev.codex.balance-dashboard.codex.watch-codex"
+SOURCE_DIR="${0:A:h}"
+SOURCE_APP="$SOURCE_DIR/$APP_NAME.app"
 DEST_DIR="$HOME/Applications"
 DEST_APP="$DEST_DIR/$APP_NAME.app"
-WATCHER_DIR="$HOME/Library/Application Support/CodexBalanceDashboard"
-WATCHER_SCRIPT="$WATCHER_DIR/watch-codex.sh"
+LEGACY_APP="$DEST_DIR/Codex算力码表.app"
+SUPPORT_DIR="$HOME/Library/Application Support/CodexSuanliMeter"
+LEGACY_BACKUP_DIR="$SUPPORT_DIR/legacy-app-backups"
+WATCHER_SCRIPT="$SUPPORT_DIR/watch-codex.sh"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 
 if [[ ! -d "$SOURCE_APP" ]]; then
-  echo "找不到 $APP_NAME.app。请把安装脚本和 app 放在同一个文件夹里。"
+  echo "找不到 $APP_NAME.app。请从 DMG 中直接运行本脚本。"
   read -r "?按回车退出。"
   exit 1
 fi
 
-mkdir -p "$DEST_DIR" "$WATCHER_DIR" "$HOME/Library/LaunchAgents"
+mkdir -p "$DEST_DIR" "$SUPPORT_DIR" "$LEGACY_BACKUP_DIR" "$HOME/Library/LaunchAgents"
 /bin/launchctl bootout "gui/$(/usr/bin/id -u)" "$PLIST" >/dev/null 2>&1 || true
-/usr/bin/pkill -x CodexBalance >/dev/null 2>&1 || true
-/bin/sleep 1
+/usr/bin/pkill -x "$EXECUTABLE_NAME" >/dev/null 2>&1 || true
 rm -rf "$DEST_APP"
 /usr/bin/ditto "$SOURCE_APP" "$DEST_APP"
-/usr/bin/xattr -dr com.apple.quarantine "$DEST_APP" 2>/dev/null || true
+LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+WIDGET_BUNDLE="$DEST_APP/Contents/PlugIns/CodexSuanliWidgets.appex"
+"$LSREGISTER" -f "$DEST_APP" >/dev/null 2>&1 || true
+/usr/bin/pluginkit -a "$WIDGET_BUNDLE" >/dev/null 2>&1 || true
+/usr/bin/pluginkit -e use -i "dev.codex.balance-dashboard.codex.widgets" >/dev/null 2>&1 || true
+if [[ -d "$LEGACY_APP" ]]; then
+  LEGACY_BACKUP="$LEGACY_BACKUP_DIR/Codex算力码表-$(/bin/date +%Y%m%d-%H%M%S).app"
+  /bin/mv "$LEGACY_APP" "$LEGACY_BACKUP"
+  echo "旧名称 App 已备份：$LEGACY_BACKUP"
+fi
 
-cat > "$WATCHER_SCRIPT" <<'WATCHER'
+cat >"$WATCHER_SCRIPT" <<'WATCHER'
 #!/bin/zsh
 set -u
-
-APP_PATH="$HOME/Applications/算力码表.app"
-OLD_APP_PATH="$HOME/Applications/Codex算力宝.app"
-BUILD_LOCK="$HOME/Library/Application Support/CodexBalanceDashboard/build.lock"
-BUNDLE_ID="dev.codex.balance-dashboard"
-
-resolve_dashboard_app() {
-  local candidates=(
-    "$APP_PATH"
-    "$OLD_APP_PATH"
-    "$HOME/Desktop/算力码表.app"
-    "$HOME/Applications/算力码表.app"
-    "/Applications/算力码表.app"
-    "$HOME/Desktop/Codex算力宝.app"
-    "$HOME/Applications/Codex算力宝.app"
-    "/Applications/Codex算力宝.app"
-    "$HOME/Desktop/算力余额宝.app"
-    "$HOME/Applications/算力余额宝.app"
-    "/Applications/算力余额宝.app"
-    "$HOME/Desktop/Codex 算力浮窗.app"
-    "$HOME/Applications/Codex 算力浮窗.app"
-    "/Applications/Codex 算力浮窗.app"
-  )
-
-  local candidate
-  for candidate in "${candidates[@]}"; do
-    if [[ -d "$candidate" ]]; then
-      print -r -- "$candidate"
-      return 0
-    fi
-  done
-
-  /usr/bin/mdfind "kMDItemCFBundleIdentifier == '$BUNDLE_ID'" | /usr/bin/head -n 1
-}
-
-is_codex_running() {
-  /usr/bin/pgrep -f "Codex.app/Contents/MacOS/Codex" >/dev/null 2>&1 ||
-    /usr/bin/pgrep -x "Codex" >/dev/null 2>&1 ||
-    /usr/bin/pgrep -f "Contents/Resources/codex app-server" >/dev/null 2>&1
-}
-
-is_claude_running() {
-  # 只认 Claude Code CLI（精确进程名），不把 Claude Desktop 当触发条件
-  /usr/bin/pgrep -x "claude" >/dev/null 2>&1
-}
-
+APP_PATH="$HOME/Applications/Codex 脉动.app"
 while true; do
-  if is_codex_running || is_claude_running; then
-    if [[ -e "$BUILD_LOCK" ]]; then
-      NOW=$(/bin/date +%s)
-      MODIFIED=$(/usr/bin/stat -f %m "$BUILD_LOCK" 2>/dev/null || echo 0)
-      if (( NOW - MODIFIED < 300 )); then
-        /bin/sleep 5
-        continue
-      fi
-      /bin/rm -f "$BUILD_LOCK"
-    elif ! /usr/bin/pgrep -x "CodexBalance" >/dev/null 2>&1; then
-      DASHBOARD_APP="$(resolve_dashboard_app)"
-      if [[ -n "$DASHBOARD_APP" ]]; then
-        /usr/bin/open "$DASHBOARD_APP"
-      fi
+  if /usr/bin/pgrep -f "Codex.app/Contents/MacOS/Codex" >/dev/null 2>&1 ||
+     /usr/bin/pgrep -x "Codex" >/dev/null 2>&1 ||
+     /usr/bin/pgrep -f "Contents/Resources/codex app-server" >/dev/null 2>&1; then
+    if ! /usr/bin/pgrep -x "CodexSuanliMeter" >/dev/null 2>&1 && [[ -d "$APP_PATH" ]]; then
+      /usr/bin/open -g "$APP_PATH" --args --background
     fi
   fi
   /bin/sleep 5
 done
 WATCHER
+chmod +x "$WATCHER_SCRIPT"
 
-/bin/chmod +x "$WATCHER_SCRIPT"
-
-cat > "$PLIST" <<PLIST
+cat >"$PLIST" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>Label</key>
-  <string>$LABEL</string>
+  <key>Label</key><string>$LABEL</string>
   <key>ProgramArguments</key>
-  <array>
-    <string>/bin/zsh</string>
-    <string>$WATCHER_SCRIPT</string>
-  </array>
-  <key>RunAtLoad</key>
-  <true/>
-  <key>KeepAlive</key>
-  <true/>
-  <key>StandardOutPath</key>
-  <string>/tmp/$LABEL.out.log</string>
-  <key>StandardErrorPath</key>
-  <string>/tmp/$LABEL.err.log</string>
+  <array><string>/bin/zsh</string><string>$WATCHER_SCRIPT</string></array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>StandardOutPath</key><string>/tmp/$LABEL.out.log</string>
+  <key>StandardErrorPath</key><string>/tmp/$LABEL.err.log</string>
 </dict>
 </plist>
 PLIST
 
 /bin/launchctl bootstrap "gui/$(/usr/bin/id -u)" "$PLIST"
 /usr/bin/open "$DEST_APP"
-
 echo
 echo "安装完成：$DEST_APP"
-echo "已启用：打开 Codex 时自动启动算力码表。"
-echo "以后可以在算力码表的设置里关闭这个选项。"
-echo
+echo "已启用：打开 Codex 时自动启动 Codex 脉动。"
+echo "旧版 App 文件仍保留；自动启动已切换为 Codex 脉动。"
 read -r "?按回车退出。"
 INSTALLER
+chmod +x "$STAGE_DIR/安装并启用自动启动.command"
 
-chmod +x "$PACKAGE_DIR/安装并启用自动启动.command"
+/usr/bin/hdiutil create \
+  -volname "$APP_NAME $VERSION" \
+  -srcfolder "$STAGE_DIR" \
+  -ov \
+  -format UDZO \
+  "$DMG_PATH" >/dev/null
 
-cat > "$PACKAGE_DIR/诊断数据.command" <<'DIAGNOSE'
-#!/bin/zsh
-set -euo pipefail
-
-REPORT="$HOME/Desktop/算力码表诊断-$(/bin/date +%Y%m%d-%H%M%S).txt"
-LABEL="dev.codex.balance-dashboard.watch-codex"
-
-count_root() {
-  local root="$1"
-  local files=0
-  local token_lines=0
-  local rate_lines=0
-  local latest="无"
-  local file
-
-  if [[ ! -d "$root" ]]; then
-    echo "目录不存在：$root"
-    return
-  fi
-
-  while IFS= read -r -d '' file; do
-    files=$((files + 1))
-    token_lines=$((token_lines + $(/usr/bin/grep -c '"token_count"' "$file" 2>/dev/null || true)))
-    rate_lines=$((rate_lines + $(/usr/bin/grep -c '"rate_limits"' "$file" 2>/dev/null || true)))
-  done < <(/usr/bin/find "$root" -type f -name '*.jsonl' -print0 2>/dev/null)
-
-  latest="$(/usr/bin/find "$root" -type f -name '*.jsonl' -exec /usr/bin/stat -f "%m %Sm %N" -t "%Y-%m-%d %H:%M:%S" {} + 2>/dev/null | /usr/bin/sort -nr | /usr/bin/head -n 1 | /usr/bin/cut -d' ' -f2- || true)"
-  [[ -n "$latest" ]] || latest="无"
-
-  echo "目录：$root"
-  echo "  JSONL 文件：$files"
-  echo "  token_count 行：$token_lines"
-  echo "  rate_limits 行：$rate_lines"
-  echo "  最新日志：$latest"
-}
-
-count_claude_root() {
-  local root="$1"
-  local files=0
-  local usage_lines=0
-  local latest="无"
-  local file
-
-  if [[ ! -d "$root" ]]; then
-    echo "目录不存在：$root"
-    return
-  fi
-
-  while IFS= read -r -d '' file; do
-    files=$((files + 1))
-    usage_lines=$((usage_lines + $(/usr/bin/grep -c '"usage"' "$file" 2>/dev/null || true)))
-  done < <(/usr/bin/find "$root" -type f -name '*.jsonl' -print0 2>/dev/null)
-
-  latest="$(/usr/bin/find "$root" -type f -name '*.jsonl' -exec /usr/bin/stat -f "%m %Sm %N" -t "%Y-%m-%d %H:%M:%S" {} + 2>/dev/null | /usr/bin/sort -nr | /usr/bin/head -n 1 | /usr/bin/cut -d' ' -f2- || true)"
-  [[ -n "$latest" ]] || latest="无"
-
-  echo "目录：$root"
-  echo "  JSONL 文件：$files"
-  echo "  usage 行：$usage_lines"
-  echo "  最新日志：$latest"
-}
-
-latest_balance_event() {
-  local root="$1"
-  local line
-
-  if [[ ! -d "$root" ]]; then
-    return
-  fi
-
-  line="$(/usr/bin/find "$root" -type f -name '*.jsonl' -print0 2>/dev/null |
-    /usr/bin/xargs -0 /usr/bin/grep -h '"token_count".*"rate_limits"' 2>/dev/null |
-    /usr/bin/sort |
-    /usr/bin/tail -n 1 || true)"
-
-  [[ -n "$line" ]] || return
-
-  LINE="$line" /usr/bin/perl -MJSON::PP -MTime::Piece -e '
-    my $line = $ENV{"LINE"} // "";
-    my $obj = eval { decode_json($line) };
-    exit 0 unless $obj && $obj->{payload} && $obj->{payload}->{rate_limits};
-    my $limits = $obj->{payload}->{rate_limits};
-    my $primary = $limits->{primary} || {};
-    my $secondary = $limits->{secondary} || {};
-    my $primary_used = $primary->{used_percent};
-    my $secondary_used = $secondary->{used_percent};
-    my $primary_left = defined $primary_used ? sprintf("%.0f%%", 100 - $primary_used) : "--";
-    my $secondary_left = defined $secondary_used ? sprintf("%.0f%%", 100 - $secondary_used) : "--";
-    my $primary_reset = defined $primary->{resets_at} ? scalar localtime($primary->{resets_at}) : "--";
-    my $secondary_reset = defined $secondary->{resets_at} ? scalar localtime($secondary->{resets_at}) : "--";
-    print "  最新余额事件：", ($obj->{timestamp} // "--"), "\n";
-    print "  5小时余额：$primary_left，重置：$primary_reset\n";
-    print "  7天余额：$secondary_left，重置：$secondary_reset\n";
-    print "  primary 原始字段：", JSON::PP->new->canonical->encode($primary), "\n";
-    print "  secondary 原始字段：", JSON::PP->new->canonical->encode($secondary), "\n";
-  ' 2>/dev/null || true
-}
-
-{
-  echo "算力码表诊断"
-  echo "生成时间：$(/bin/date '+%Y-%m-%d %H:%M:%S')"
-  echo "用户：$USER"
-  echo "系统：$(/usr/bin/sw_vers -productVersion)"
-  echo "架构：$(/usr/bin/uname -m)"
-  echo
-  echo "Codex 进程："
-  /bin/ps -axo pid,comm,args | /opt/homebrew/bin/rg -i 'Codex.app|codex app-server' 2>/dev/null || \
-    /bin/ps -axo pid,comm,args | /usr/bin/grep -Ei 'Codex.app|codex app-server' | /usr/bin/grep -v grep || true
-  echo
-  echo "算力码表进程："
-  /usr/bin/pgrep -fl CodexBalance || true
-  echo
-  echo "数据目录检查："
-  count_root "$HOME/.codex/sessions"
-  latest_balance_event "$HOME/.codex/sessions"
-  echo
-  count_root "$HOME/.codex/browser/sessions"
-  latest_balance_event "$HOME/.codex/browser/sessions"
-  echo
-  count_root "$HOME/Library/Application Support/Codex/sessions"
-  latest_balance_event "$HOME/Library/Application Support/Codex/sessions"
-  echo
-  count_root "$HOME/Library/Application Support/com.openai.codex/sessions"
-  latest_balance_event "$HOME/Library/Application Support/com.openai.codex/sessions"
-  echo
-  echo "===== Claude Code ====="
-  echo "Claude CLI 进程："
-  /usr/bin/pgrep -xl claude || echo "  未运行"
-  echo
-  count_claude_root "$HOME/.claude/projects"
-  echo
-  echo "Claude 余额来源（只验存在性，不输出内容）："
-  if [[ -f "$HOME/.claude/.credentials.json" ]]; then
-    echo "  ~/.claude/.credentials.json：存在"
-  else
-    echo "  ~/.claude/.credentials.json：不存在"
-  fi
-  if /usr/bin/security find-generic-password -s "Claude Code-credentials" >/dev/null 2>&1; then
-    echo "  Keychain[Claude Code-credentials]：存在"
-  else
-    echo "  Keychain[Claude Code-credentials]：不存在（本机 Claude 双环显示「暂无数据」）"
-  fi
-  echo
-  echo "口径说明：Claude 本机 token = input + cache_creation + cache_read + output（含 cache_read）。"
-  echo "官方总量与设备合计的差额含网页 Chat / Cowork 等非 CLI 消耗，属正常现象。"
-  echo
-  echo "自动启动监听器："
-  /bin/launchctl print "gui/$(/usr/bin/id -u)/$LABEL" 2>&1 | /usr/bin/sed -n '1,80p' || true
-  echo
-  echo "监听器脚本："
-  /usr/bin/sed -n '1,80p' "$HOME/Library/Application Support/CodexBalanceDashboard/watch-codex.sh" 2>&1 || true
-  echo
-  echo "iCloud 同步快照（新目录，按工具命名）："
-  NEW_SYNC_DIR="$HOME/Library/Mobile Documents/com~apple~CloudDocs/算力码表/设备统计"
-  echo "目录：$NEW_SYNC_DIR"
-  if [[ -d "$NEW_SYNC_DIR" ]]; then
-    /bin/ls -1 "$NEW_SYNC_DIR"/*.json 2>/dev/null | while IFS= read -r snapshot; do
-      /usr/bin/stat -f "%Sm %N" -t "%Y-%m-%d %H:%M:%S" "$snapshot"
-    done || true
-  else
-    echo "目录不存在；请确认 iCloud Drive 已开启，并在两台 Mac 都打开一次新版算力码表。"
-  fi
-  echo
-  echo "iCloud 同步快照（旧目录，迁移源）："
-  SYNC_DIR="$HOME/Library/Mobile Documents/com~apple~CloudDocs/APP安装包/算力码表/sync"
-  echo "目录：$SYNC_DIR"
-  if [[ -d "$SYNC_DIR" ]]; then
-    /bin/ls -lah "$SYNC_DIR" 2>&1 || true
-    echo
-    /bin/ls -1 "$SYNC_DIR"/*.json 2>/dev/null | while IFS= read -r snapshot; do
-      /usr/bin/stat -f "%Sm %N" -t "%Y-%m-%d %H:%M:%S" "$snapshot"
-    done || true
-  else
-    echo "目录不存在；请确认 iCloud Drive 已开启，并在两台 Mac 都打开一次算力码表。"
-  fi
-} > "$REPORT"
-
-echo "诊断完成：$REPORT"
-/usr/bin/open -R "$REPORT"
-read -r "?请把桌面上的诊断 txt 发给我，按回车退出。"
-DIAGNOSE
-
-chmod +x "$PACKAGE_DIR/诊断数据.command"
-
-cat > "$PACKAGE_DIR/README-先看我.txt" <<'README'
-算力码表安装包
-
-安装：
-1. 双击“安装并启用自动启动.command”。
-2. 如果 macOS 提示不信任，右键脚本选择“打开”。
-3. 安装完成后 app 会打开，并且已启用“打开 Codex 时自动启动”。
-
-安装位置：
-~/Applications/算力码表.app
-
-隐私：
-算力码表只读本机 Codex 会话日志，不上传、不修改你的 Codex 文件。
-如果你有两台 Mac，它只会把按天/按月聚合后的 Token 快照写到 iCloud，不会同步原始对话日志。
-
-双 Mac 同步：
-1. 两台 Mac 都安装并打开一次算力码表。
-2. iCloud Drive 会同步这个目录：
-   ~/Library/Mobile Documents/com~apple~CloudDocs/APP安装包/算力码表/sync
-3. 里面正常会出现 macbook-pro.json 和 mac-studio.json。
-4. Token 趋势里可以同时勾选 MacBook Pro、Mac Studio、总算力。
-
-源码项目：
-不要把源码项目直接放进 iCloud 盘里运行。建议用 Git/GitHub 管源码，两台 Mac 各自 clone 或拉取更新；iCloud 只放安装包和同步快照。
-
-关闭自动启动：
-打开算力码表 -> 展开 -> 齿轮设置 -> 关闭“打开 Codex 时自动启动”。
-
-没有数据：
-1. 先在那台 Mac 上打开 Codex，并随便跑一次对话或 /status。
-2. 等 5 秒后点算力码表左上角刷新。
-3. 仍然没有数据时，双击“诊断数据.command”，把桌面生成的诊断 txt 发给我。
-
-数据不准：
-1. 请确认安装的是最新安装包。新版会同时扫描多个 Codex 会话目录。
-2. 在那台 Mac 的 Codex 里输入 /status，等 5 秒后刷新算力码表。
-3. 如果仍然不一致，运行“诊断数据.command”，诊断里会列出每个目录最新余额事件。
-
-系统要求：
-macOS 14 或更新版本。当前包为 Apple Silicon Mac 使用。
-README
-
-ditto -c -k --sequesterRsrc --keepParent "$PACKAGE_DIR" "$ZIP_PATH"
-cp "$ZIP_PATH" "$DESKTOP_ZIP"
-
-echo "Transfer package: $ZIP_PATH"
-echo "Desktop copy: $DESKTOP_ZIP"
+/usr/bin/shasum -a 256 "$DMG_PATH" >"$SHA_PATH"
+echo "DMG: $DMG_PATH"
+echo "SHA-256: $SHA_PATH"
+echo "Notes: $NOTES_PATH"

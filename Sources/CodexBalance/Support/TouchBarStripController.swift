@@ -1,45 +1,36 @@
 import AppKit
 import CodexBalanceCore
-import IOKit.pwr_mgt
 
-/// 把余额做成 Touch Bar 常驻显示（DFRFoundation 非公开接口，Pock/BetterTouchTool 同款机制）。
-/// 结构：Control Strip 常驻一个紧凑数字块（锚点）+ 点按后展开的「全宽余额面板」，
-/// 全宽面板用整条 Touch Bar 显示 Codex/Claude 各两条进度条（5时/7天）带百分比与重置倒计时。
-/// 无 Touch Bar 的机型所有调用安全空转。
+/// Touch Bar 显示 7 天剩余额度与滚动 24h 消耗；无 Touch Bar 的 Mac 会安全空转。
 @MainActor
 final class TouchBarStripController: NSObject, NSTouchBarDelegate {
   static let shared = TouchBarStripController()
 
-  nonisolated static let trayIdentifier = NSTouchBarItem.Identifier("dev.codex.balance-dashboard.strip")
-  nonisolated static let panelIdentifier = NSTouchBarItem.Identifier("dev.codex.balance-dashboard.panel")
+  nonisolated static let trayIdentifier = NSTouchBarItem.Identifier("dev.codex.balance-dashboard.codex.strip")
+  nonisolated static let panelIdentifier = NSTouchBarItem.Identifier("dev.codex.balance-dashboard.codex.panel")
 
   struct ToolData {
-    var letter: String
-    var color5: NSColor
-    var color7: NSColor
-    var percent5: Double?
-    var percent7: Double?
-    var reset5: Date?
-    var reset7: Date?
+    var color24h: NSColor
+    var color7d: NSColor
+    var percent7d: Double?
+    var reset7d: Date?
+    var tokens24h: Int
+    var cost24hUSD: Double
   }
-
-  private var trayItem: NSCustomTouchBarItem?
-  private let trayButton: NSButton
-  private var trayWidthConstraint: NSLayoutConstraint?
-  private var panelTouchBar: NSTouchBar?
-  private let panelView = BalanceStripView()
-  private var installed = false
-  var onOpenPanel: (() -> Void)?
 
   private typealias SetPresenceFunc = @convention(c) (CFString, DarwinBoolean) -> Void
   private let setPresence: SetPresenceFunc?
+  private let trayButton = NSButton(title: "C --", target: nil, action: nil)
+  private var trayWidthConstraint: NSLayoutConstraint?
+  private var trayItem: NSCustomTouchBarItem?
+  private var panelTouchBar: NSTouchBar?
+  private let panelView = CodexTouchBarView()
+  private var installed = false
+  var onOpenPanel: (() -> Void)?
 
   override private init() {
-    trayButton = NSButton(title: "--", target: nil, action: nil)
-    if let handle = dlopen(
-      "/System/Library/PrivateFrameworks/DFRFoundation.framework/DFRFoundation",
-      RTLD_LAZY
-    ), let symbol = dlsym(handle, "DFRElementSetControlStripPresenceForIdentifier") {
+    if let handle = dlopen("/System/Library/PrivateFrameworks/DFRFoundation.framework/DFRFoundation", RTLD_LAZY),
+       let symbol = dlsym(handle, "DFRElementSetControlStripPresenceForIdentifier") {
       setPresence = unsafeBitCast(symbol, to: SetPresenceFunc.self)
     } else {
       setPresence = nil
@@ -48,44 +39,23 @@ final class TouchBarStripController: NSObject, NSTouchBarDelegate {
     trayButton.target = self
     trayButton.action = #selector(handleTrayTap)
     trayButton.bezelStyle = .rounded
-    trayButton.font = .monospacedDigitSystemFont(ofSize: 14, weight: .heavy)
-    trayButton.cell?.lineBreakMode = .byClipping
+    trayButton.font = .monospacedDigitSystemFont(ofSize: 13, weight: .heavy)
     trayButton.translatesAutoresizingMaskIntoConstraints = false
-    trayWidthConstraint = trayButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 96)
+    trayWidthConstraint = trayButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 82)
     trayWidthConstraint?.isActive = true
     panelView.onOpenPanel = { [weak self] in self?.onOpenPanel?() }
   }
 
-  var isSupported: Bool {
-    setPresence != nil
-  }
+  var isSupported: Bool { setPresence != nil }
 
   func setEnabled(_ enabled: Bool) {
     guard isSupported else { return }
-    if enabled {
-      installIfNeeded()
-      presentPanel()
-    } else {
-      dismissPanel()
-      uninstall()
-    }
+    if enabled { installIfNeeded(); presentPanel() }
+    else { dismissPanel(); uninstall() }
   }
 
   func setPanelStyle(_ style: TouchBarPanelStyle) {
     panelView.style = style
-    panelView.invalidateIntrinsicContentSize()
-    panelView.needsDisplay = true
-  }
-
-  func setResetProgressAscending(_ ascending: Bool) {
-    panelView.resetProgressAscending = ascending
-    panelView.needsDisplay = true
-  }
-
-  func setDisplayOptions(showsPercentSign: Bool, showsWindowTags: Bool) {
-    panelView.showsPercentSign = showsPercentSign
-    panelView.showsWindowTags = showsWindowTags
-    panelView.invalidateIntrinsicContentSize()
     panelView.needsDisplay = true
   }
 
@@ -95,60 +65,20 @@ final class TouchBarStripController: NSObject, NSTouchBarDelegate {
     panelView.needsDisplay = true
   }
 
-  func update(codex: ToolData?, claude: ToolData?) {
+  func update(codex: ToolData?) {
     guard installed else { return }
-    updateTrayText(tools: [codex, claude].compactMap { $0 })
-    panelView.codex = codex
-    panelView.claude = claude
-    panelView.invalidateIntrinsicContentSize()
+    panelView.data = codex
+    let percent = codex?.percent7d.map { "\(Int($0.rounded()))%" } ?? "--"
+    let text = "C \(percent) · 24h \(compact(codex?.tokens24h ?? 0))"
+    trayButton.attributedTitle = NSAttributedString(string: text, attributes: [
+      .font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .heavy),
+      .foregroundColor: codex?.color7d ?? NSColor.secondaryLabelColor
+    ])
+    trayWidthConstraint?.constant = max(82, ceil(trayButton.attributedTitle.size().width) + 20)
     panelView.needsDisplay = true
   }
 
-  // MARK: - 托盘紧凑块
-
-  private func updateTrayText(tools: [ToolData]) {
-    let text = NSMutableAttributedString()
-    func tighter(_ tool: ToolData) -> (Double?, NSColor) {
-      let pairs: [(Double, NSColor)] = [
-        tool.percent5.map { ($0, tool.color5) },
-        tool.percent7.map { ($0, tool.color7) }
-      ].compactMap { $0 }
-      guard let minPair = pairs.min(by: { $0.0 < $1.0 }) else { return (nil, tool.color5) }
-      return (minPair.0, minPair.1)
-    }
-    for (index, tool) in tools.enumerated() {
-      if index > 0 {
-        text.append(NSAttributedString(string: "  ", attributes: [.font: NSFont.systemFont(ofSize: 6)]))
-      }
-      let (percent, color) = tighter(tool)
-      let effective = (percent ?? 100) < 20 ? NSColor.systemRed : color
-      text.append(NSAttributedString(string: tool.letter, attributes: [
-        .font: NSFont.systemFont(ofSize: 10, weight: .heavy),
-        .foregroundColor: effective.withAlphaComponent(0.85),
-        .baselineOffset: 2.5
-      ]))
-      text.append(NSAttributedString(string: percent.map { "\(Int($0.rounded()))" } ?? "--", attributes: [
-        .font: NSFont.monospacedDigitSystemFont(ofSize: 15, weight: .heavy),
-        .foregroundColor: effective
-      ]))
-    }
-    trayButton.attributedTitle = text
-    trayWidthConstraint?.constant = max(96, ceil(text.size().width) + 22)
-  }
-
-  // MARK: - 全宽面板
-
-  func makePanelTouchBar() -> NSTouchBar {
-    let bar = NSTouchBar()
-    bar.delegate = self
-    bar.defaultItemIdentifiers = [Self.panelIdentifier]
-    return bar
-  }
-
-  nonisolated func touchBar(
-    _ touchBar: NSTouchBar,
-    makeItemForIdentifier identifier: NSTouchBarItem.Identifier
-  ) -> NSTouchBarItem? {
+  nonisolated func touchBar(_ touchBar: NSTouchBar, makeItemForIdentifier identifier: NSTouchBarItem.Identifier) -> NSTouchBarItem? {
     guard identifier == Self.panelIdentifier else { return nil }
     return MainActor.assumeIsolated {
       let item = NSCustomTouchBarItem(identifier: identifier)
@@ -157,114 +87,77 @@ final class TouchBarStripController: NSObject, NSTouchBarDelegate {
     }
   }
 
+  private func makePanelTouchBar() -> NSTouchBar {
+    let bar = NSTouchBar()
+    bar.delegate = self
+    bar.defaultItemIdentifiers = [Self.panelIdentifier]
+    return bar
+  }
+
+  private func installIfNeeded() {
+    guard !installed else { return }
+    let item = NSCustomTouchBarItem(identifier: Self.trayIdentifier)
+    item.view = trayButton
+    let selector = NSSelectorFromString("addSystemTrayItem:")
+    guard NSTouchBarItem.responds(to: selector) else { return }
+    NSTouchBarItem.perform(selector, with: item)
+    setPresence?(Self.trayIdentifier.rawValue as CFString, true)
+    trayItem = item
+    installed = true
+  }
+
+  private func uninstall() {
+    guard installed, let trayItem else { installed = false; return }
+    setPresence?(Self.trayIdentifier.rawValue as CFString, false)
+    let selector = NSSelectorFromString("removeSystemTrayItem:")
+    if NSTouchBarItem.responds(to: selector) { NSTouchBarItem.perform(selector, with: trayItem) }
+    self.trayItem = nil
+    installed = false
+  }
+
   private func presentPanel() {
     guard installed else { return }
-    if panelTouchBar == nil {
-      panelTouchBar = makePanelTouchBar()
-    }
+    if panelTouchBar == nil { panelTouchBar = makePanelTouchBar() }
     guard let panelTouchBar else { return }
-    // +[NSTouchBar presentSystemModalTouchBar:systemTrayItemIdentifier:]（私有）
-    let selector = NSSelectorFromString("presentSystemModalTouchBar:systemTrayItemIdentifier:")
-    let legacySelector = NSSelectorFromString("presentSystemModalFunctionBar:systemTrayItemIdentifier:")
-    if NSTouchBar.responds(to: selector) {
-      NSLog("CodexBalance touchbar: presenting system modal touch bar")
-      _ = NSTouchBar.perform(selector, with: panelTouchBar, with: Self.trayIdentifier.rawValue)
-    } else if NSTouchBar.responds(to: legacySelector) {
-      NSLog("CodexBalance touchbar: presenting legacy system modal function bar")
-      _ = NSTouchBar.perform(legacySelector, with: panelTouchBar, with: Self.trayIdentifier.rawValue)
-    } else {
-      NSLog("CodexBalance touchbar: NO system modal selector available")
-    }
+    let modern = NSSelectorFromString("presentSystemModalTouchBar:systemTrayItemIdentifier:")
+    let legacy = NSSelectorFromString("presentSystemModalFunctionBar:systemTrayItemIdentifier:")
+    if NSTouchBar.responds(to: modern) { _ = NSTouchBar.perform(modern, with: panelTouchBar, with: Self.trayIdentifier.rawValue) }
+    else if NSTouchBar.responds(to: legacy) { _ = NSTouchBar.perform(legacy, with: panelTouchBar, with: Self.trayIdentifier.rawValue) }
   }
 
   private func dismissPanel() {
     guard let panelTouchBar else { return }
     let selector = NSSelectorFromString("dismissSystemModalTouchBar:")
-    if NSTouchBar.responds(to: selector) {
-      _ = NSTouchBar.perform(selector, with: panelTouchBar)
-    }
+    if NSTouchBar.responds(to: selector) { _ = NSTouchBar.perform(selector, with: panelTouchBar) }
     self.panelTouchBar = nil
   }
 
-  private func installIfNeeded() {
-    guard !installed else { return }
-    let newItem = NSCustomTouchBarItem(identifier: Self.trayIdentifier)
-    newItem.view = trayButton
-    let addSelector = NSSelectorFromString("addSystemTrayItem:")
-    guard NSTouchBarItem.responds(to: addSelector) else { return }
-    NSTouchBarItem.perform(addSelector, with: newItem)
-    setPresence?(Self.trayIdentifier.rawValue as CFString, true)
-    trayItem = newItem
-    installed = true
-  }
+  @objc private func handleTrayTap() { presentPanel() }
 
-  private func uninstall() {
-    guard installed, let trayItem else {
-      installed = false
-      return
-    }
-    setPresence?(Self.trayIdentifier.rawValue as CFString, false)
-    let removeSelector = NSSelectorFromString("removeSystemTrayItem:")
-    if NSTouchBarItem.responds(to: removeSelector) {
-      NSTouchBarItem.perform(removeSelector, with: trayItem)
-    }
-    self.trayItem = nil
-    installed = false
-  }
-
-  @objc private func handleTrayTap() {
-    // 点托盘小块 → 重新铺开全宽面板
-    presentPanel()
+  private func compact(_ value: Int) -> String {
+    if value >= 1_000_000 { return String(format: "%.1fM", Double(value) / 1_000_000) }
+    if value >= 1_000 { return String(format: "%.1fK", Double(value) / 1_000) }
+    return "\(value)"
   }
 }
 
-/// 全宽 Touch Bar 余额面板：两组（Codex/Claude），每组 = 字母章 + 5时/7天两条进度条（含百分比+倒计时）
 @MainActor
-private final class BalanceStripView: NSView {
-  var codex: TouchBarStripController.ToolData?
-  var claude: TouchBarStripController.ToolData?
+private final class CodexTouchBarView: NSView {
+  var data: TouchBarStripController.ToolData?
   var style: TouchBarPanelStyle = .barsQuad
-  var showsPercentSign = true
-  var showsWindowTags = true
   var sessions: [RecentSessionChip] = []
-  /// false=倒计时（深色段=剩余等待），true=正计时（深色段=已走过，充满即刷新）
-  var resetProgressAscending = false
   var onOpenPanel: (() -> Void)?
-  private var sessionHitRects: [(rect: NSRect, tool: ToolID)] = []
-  /// Touch Bar 实际可用宽度（挂上窗口后实测，之前是猜的会溢出）
-  private var measuredWidth: CGFloat?
-
-  override func viewDidMoveToWindow() {
-    super.viewDidMoveToWindow()
-    remeasureWidth()
-  }
-
-  override func layout() {
-    super.layout()
-    remeasureWidth()
-  }
-
-  private func remeasureWidth() {
-    guard let windowWidth = window?.frame.width, windowWidth > 100 else { return }
-    if measuredWidth != windowWidth {
-      measuredWidth = windowWidth
-      invalidateIntrinsicContentSize()
-      needsDisplay = true
-    }
-  }
-
+  private var sessionRects: [NSRect] = []
   private let openButton = NSButton(title: "⤢", target: nil, action: nil)
 
   override init(frame frameRect: NSRect) {
     super.init(frame: frameRect)
     wantsLayer = true
     layer?.backgroundColor = NSColor.black.cgColor
-    // Touch Bar 点按是 direct touch，不是鼠标事件；必须声明才能收到 touchesBegan/Ended
     allowedTouchTypes = [.direct]
     openButton.target = self
     openButton.action = #selector(openPanel)
     openButton.bezelStyle = .rounded
-    openButton.font = .systemFont(ofSize: 15, weight: .heavy)
     openButton.translatesAutoresizingMaskIntoConstraints = false
     addSubview(openButton)
     NSLayoutConstraint.activate([
@@ -277,29 +170,7 @@ private final class BalanceStripView: NSView {
   @available(*, unavailable)
   required init?(coder: NSCoder) { fatalError() }
 
-  /// 会话区开启且是进度条样式时收紧余额区，避免总宽超出 Touch Bar 被裁掉
-  private var isTight: Bool {
-    !sessions.isEmpty && (style == .barsQuad || style == .bars)
-  }
-
-  override var intrinsicContentSize: NSSize {
-    let count = max(1, [codex, claude].compactMap { $0 }.count)
-    var perTool: CGFloat
-    switch style {
-    case .barsQuad: perTool = isTight ? 178 : 268
-    case .bars: perTool = isTight ? 204 : 292
-    case .badgeQuad: perTool = 188
-    case .badge: perTool = 106
-    }
-    if !showsWindowTags { perTool -= (style == .badgeQuad ? 24 : 12) }
-    let chipWidth: CGFloat = sessions.count == 1 ? 216 : (sessions.count == 2 ? 148 : 118)
-    let sessionsWidth = sessions.isEmpty ? 0 : CGFloat(sessions.count) * chipWidth + 16
-    let ideal = perTool * CGFloat(count) + 24 * CGFloat(count - 1) + 64 + sessionsWidth
-    // 封顶在实测的 Touch Bar 宽度内（未挂窗口时先给保守值），
-    // 右侧 ⤢ 按钮永远可见，会话区在 draw 里按剩余空间自适应
-    let cap = measuredWidth.map { $0 - 8 } ?? 920
-    return NSSize(width: min(ideal + 52, cap), height: 30)
-  }
+  override var intrinsicContentSize: NSSize { NSSize(width: 920, height: 30) }
 
   @objc private func openPanel() {
     NSApp.activate(ignoringOtherApps: true)
@@ -308,308 +179,85 @@ private final class BalanceStripView: NSView {
 
   override func draw(_ dirtyRect: NSRect) {
     super.draw(dirtyRect)
-    NSColor.black.setFill()
-    bounds.fill()
+    NSColor.black.setFill(); bounds.fill()
+    sessionRects = []
+    guard let data else { drawText("正在读取 Codex…", x: 56, color: .secondaryLabelColor); return }
+    var x: CGFloat = 54
+    let percent = data.percent7d.map { "\(Int($0.rounded()))%" } ?? "--"
 
-    sessionHitRects = []
-    var x: CGFloat = 52 // 最左侧是 ⤢ 按钮的固定区域
-    if let codex {
-      x = drawTool(codex, startX: x)
-      x += 12
-      drawSeparator(at: x)
-      x += 12
+    drawChip("C", x: x, color: data.color7d); x += 29
+    switch style {
+    case .barsQuad:
+      drawText("7天 \(percent)", x: x, color: data.color7d); x += 72
+      drawBar(x: x, width: 110, value: data.percent7d, color: data.color7d); x += 124
+      drawText("24h \(compact(data.tokens24h))", x: x, color: data.color24h); x += 105
+      drawText(String(format: "$%.2f", data.cost24hUSD), x: x, color: .white); x += 68
+    case .bars:
+      drawText("7天 \(percent)", x: x, color: data.color7d); x += 72
+      drawBar(x: x, width: 180, value: data.percent7d, color: data.color7d); x += 194
+    case .badgeQuad:
+      drawText("7天 \(percent)   24h \(compact(data.tokens24h))", x: x, color: data.color7d, size: 16); x += 230
+    case .badge:
+      drawText("7天 \(percent)", x: x, color: data.color7d, size: 18); x += 105
     }
-    if let claude {
-      x = drawTool(claude, startX: x)
-    }
+
     if !sessions.isEmpty {
-      x += 12
-      drawSeparator(at: x)
-      x += 10
-      drawSessionChips(startX: x, maxX: bounds.width - 10)
-    }
-  }
-
-  /// 最近会话小条目：工具色点 + 标题；进行中的加呼吸点。点击激活对应 App。
-  private func drawSessionChips(startX: CGFloat, maxX: CGFloat) {
-    var x = startX
-    let midY = bounds.midY
-
-    // 剩余空间不够时：先缩条目宽度，再减条目数量；按钮区域绝不侵占
-    let available = maxX - startX
-    guard available > 60 else { return }
-    var visible = sessions
-    let idealWidth: CGFloat = visible.count == 1 ? 210 : (visible.count == 2 ? 142 : 112)
-    var chipWidth = idealWidth
-    while visible.count > 1 {
-      chipWidth = min(idealWidth, (available - CGFloat(visible.count - 1) * 6) / CGFloat(visible.count))
-      if chipWidth >= 84 { break }
-      visible.removeLast()
-    }
-    if visible.count == 1 {
-      chipWidth = min(210, available)
-    }
-    let chipHeight: CGFloat = visible.count == 1 ? 28 : 22
-    let fontSize: CGFloat = visible.count == 1 ? 15 : (visible.count == 2 ? 12 : 10.5)
-    let dotSize: CGFloat = visible.count == 1 ? 8 : 6
-
-    for session in visible {
-      let chipRect = NSRect(x: x, y: midY - chipHeight / 2, width: chipWidth, height: chipHeight)
-      let path = NSBezierPath(roundedRect: chipRect, xRadius: chipHeight / 3.2, yRadius: chipHeight / 3.2)
-      NSColor.white.withAlphaComponent(0.08).setFill()
-      path.fill()
-
-      let toolColor: NSColor = session.tool == .codex
-        ? NSColor(calibratedRed: 1.0, green: 0.62, blue: 0.24, alpha: 1)
-        : NSColor(calibratedRed: 0.55, green: 0.72, blue: 1.0, alpha: 1)
-      let dotRect = NSRect(x: chipRect.minX + 8, y: midY - dotSize / 2, width: dotSize, height: dotSize)
-      (session.isActive ? NSColor.systemGreen : toolColor).setFill()
-      NSBezierPath(ovalIn: dotRect).fill()
-
-      let title = NSAttributedString(
-        string: session.title,
-        attributes: [
-          .font: NSFont.systemFont(ofSize: fontSize, weight: .bold),
-          .foregroundColor: NSColor.white.withAlphaComponent(0.88)
-        ]
-      )
-      let maxWidth = chipRect.width - dotSize - 22
-      let size = title.size()
-      let drawRect = NSRect(
-        x: dotRect.maxX + 6,
-        y: midY - size.height / 2,
-        width: min(size.width, maxWidth),
-        height: size.height
-      )
-      title.draw(with: drawRect, options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine])
-
-      sessionHitRects.append((chipRect, session.tool))
-      x = chipRect.maxX + 6
+      separator(x: x); x += 12
+      for session in sessions.prefix(3) where x < bounds.maxX - 90 {
+        let width = min(130, bounds.maxX - x - 8)
+        let rect = NSRect(x: x, y: 5, width: width, height: 20)
+        NSColor.white.withAlphaComponent(0.08).setFill()
+        NSBezierPath(roundedRect: rect, xRadius: 6, yRadius: 6).fill()
+        drawText(session.title, x: x + 8, color: session.isActive ? .systemGreen : .white, size: 10)
+        sessionRects.append(rect)
+        x += width + 6
+      }
     }
   }
 
   override func mouseDown(with event: NSEvent) {
     let point = convert(event.locationInWindow, from: nil)
-    if handleTap(at: point) { return }
+    if sessionRects.contains(where: { $0.contains(point) }) { SessionAppLauncher.open(tool: .codex); return }
     super.mouseDown(with: event)
   }
 
   override func touchesEnded(with event: NSEvent) {
-    for touch in event.touches(matching: .ended, in: self) {
-      let point = touch.location(in: self)
-      if handleTap(at: point) { return }
+    for touch in event.touches(matching: .ended, in: self) where sessionRects.contains(where: { $0.contains(touch.location(in: self)) }) {
+      SessionAppLauncher.open(tool: .codex); return
     }
     super.touchesEnded(with: event)
   }
 
-  private func handleTap(at point: NSPoint) -> Bool {
-    for hit in sessionHitRects where hit.rect.insetBy(dx: -4, dy: -5).contains(point) {
-      SessionAppLauncher.open(tool: hit.tool)
-      return true
-    }
-    return false
+  private func drawChip(_ text: String, x: CGFloat, color: NSColor) {
+    let rect = NSRect(x: x, y: 5, width: 21, height: 20)
+    color.setFill(); NSBezierPath(roundedRect: rect, xRadius: 6, yRadius: 6).fill()
+    let string = NSAttributedString(string: text, attributes: [.font: NSFont.systemFont(ofSize: 12, weight: .black), .foregroundColor: NSColor.black])
+    string.draw(at: NSPoint(x: rect.midX - string.size().width / 2, y: rect.midY - string.size().height / 2))
   }
 
-  private func drawSeparator(at x: CGFloat) {
+  private func drawBar(x: CGFloat, width: CGFloat, value: Double?, color: NSColor) {
+    let track = NSRect(x: x, y: 12, width: width, height: 6)
+    color.withAlphaComponent(0.22).setFill(); NSBezierPath(roundedRect: track, xRadius: 3, yRadius: 3).fill()
+    let fill = NSRect(x: x, y: 12, width: width * max(0, min(1, (value ?? 0) / 100)), height: 6)
+    color.setFill(); NSBezierPath(roundedRect: fill, xRadius: 3, yRadius: 3).fill()
+  }
+
+  private func drawText(_ text: String, x: CGFloat, color: NSColor, size: CGFloat = 12) {
+    let string = NSAttributedString(string: text, attributes: [
+      .font: NSFont.monospacedDigitSystemFont(ofSize: size, weight: .bold),
+      .foregroundColor: color
+    ])
+    string.draw(at: NSPoint(x: x, y: bounds.midY - string.size().height / 2))
+  }
+
+  private func separator(x: CGFloat) {
     NSColor.white.withAlphaComponent(0.16).setFill()
-    NSRect(x: x, y: 4, width: 1, height: bounds.height - 8).fill()
+    NSRect(x: x, y: 5, width: 1, height: 20).fill()
   }
 
-  /// 一个工具组，按当前样式绘制，返回结束 x 坐标
-  @discardableResult
-  private func drawTool(_ tool: TouchBarStripController.ToolData, startX: CGFloat) -> CGFloat {
-    var x = startX
-    let midY = bounds.midY
-
-    let chipRect = NSRect(x: x, y: midY - 10, width: 20, height: 20)
-    let chipPath = NSBezierPath(roundedRect: chipRect, xRadius: 5, yRadius: 5)
-    tool.color5.withAlphaComponent(0.92).setFill()
-    chipPath.fill()
-    draw(text: tool.letter, at: NSPoint(x: chipRect.midX, y: midY), font: .systemFont(ofSize: 12, weight: .black), color: .black, centered: true)
-    x = chipRect.maxX + 8
-
-    let percentSuffix = showsPercentSign ? "%" : ""
-    func tighter() -> (Double?, Date?, CountdownMode, NSColor, String) {
-      let p5 = tool.percent5 ?? .infinity
-      let p7 = tool.percent7 ?? .infinity
-      if p5 <= p7 {
-        return (tool.percent5, tool.reset5, .hours, tool.color5, "5时".l10n)
-      }
-      return (tool.percent7, tool.reset7, .days, tool.color7, "7天".l10n)
-    }
-
-    switch style {
-    case .barsQuad:
-      // 两行：上 5时、下 7天；紧凑模式下条变短、省倒计时
-      let topY = bounds.height * 0.72
-      let bottomY = bounds.height * 0.28
-      let barWidth: CGFloat = isTight ? 62 : 116
-      let widthTop = drawWindowRow(
-        label: "5时".l10n, percent: tool.percent5, reset: tool.reset5, mode: .hours, color: tool.color5,
-        startX: x, centerY: topY, barWidth: barWidth, showsCountdown: !isTight
-      )
-      let widthBottom = drawWindowRow(
-        label: "7天".l10n, percent: tool.percent7, reset: tool.reset7, mode: .days, color: tool.color7,
-        startX: x, centerY: bottomY, barWidth: barWidth, showsCountdown: !isTight
-      )
-      return x + max(widthTop, widthBottom)
-    case .bars:
-      // 单行：更紧张窗口一条大进度条 + 顶满高度的大数字
-      let (percent, reset, mode, color, tag) = tighter()
-      let width = drawWindowRow(
-        label: tag, percent: percent, reset: reset, mode: mode, color: color,
-        startX: x, centerY: midY, barWidth: isTight ? 72 : 128,
-        percentFontSize: 22, percentAdvance: 60, showsCountdown: !isTight
-      )
-      return x + width
-    case .badgeQuad:
-      // 竖排小标签在左、大号数字 + 数字下方「距刷新」下划线进度条
-      var cx = x
-      for (percent, color, tag, reset, mode) in [
-        (tool.percent5, tool.color5, "5时".l10n, tool.reset5, CountdownMode.hours),
-        (tool.percent7, tool.color7, "7天".l10n, tool.reset7, CountdownMode.days)
-      ] {
-        let effective = (percent ?? 100) < 20 ? NSColor.systemRed : color
-        if showsWindowTags {
-          cx += drawVerticalLabel(tag, at: cx, centerY: midY, color: NSColor.white.withAlphaComponent(0.55)) + 3
-        }
-        let text = percent.map { "\(Int($0.rounded()))\(percentSuffix)" } ?? "--"
-        let numberWidth = drawBigNumber(text, at: cx, centerY: midY + 2, color: effective)
-        drawResetUnderline(x: cx, width: numberWidth, reset: reset, mode: mode, color: effective)
-        cx += numberWidth + 10
-      }
-      return cx
-    case .badge:
-      // 只有一个大数字（更紧张窗口），竖排标签在左，下方「距刷新」下划线
-      let (percent, reset, mode, color, tag) = tighter()
-      let effective = (percent ?? 100) < 20 ? NSColor.systemRed : color
-      var cx = x
-      if showsWindowTags {
-        cx += drawVerticalLabel(tag, at: cx, centerY: midY, color: NSColor.white.withAlphaComponent(0.55)) + 3
-      }
-      let text = percent.map { "\(Int($0.rounded()))\(percentSuffix)" } ?? "--"
-      let numberWidth = drawBigNumber(text, at: cx, centerY: midY + 2, color: effective)
-      drawResetUnderline(x: cx, width: numberWidth, reset: reset, mode: mode, color: effective)
-      cx += numberWidth
-      return cx
-    }
-  }
-
-  /// 单行：标签 + 进度条 + 百分比 + 倒计时（紧凑行高），返回行宽
-  private func drawWindowRow(
-    label: String,
-    percent: Double?,
-    reset: Date?,
-    mode: CountdownMode,
-    color: NSColor,
-    startX: CGFloat,
-    centerY: CGFloat,
-    barWidth: CGFloat = 116,
-    percentFontSize: CGFloat = 11,
-    percentAdvance: CGFloat = 36,
-    showsCountdown: Bool = true
-  ) -> CGFloat {
-    var x = startX
-    let effective = (percent ?? 100) < 20 ? NSColor.systemRed : color
-
-    if showsWindowTags {
-      draw(text: label, at: NSPoint(x: x, y: centerY), font: .systemFont(ofSize: 9, weight: .heavy), color: NSColor.white.withAlphaComponent(0.55))
-      x += 22
-    }
-    let track = NSRect(x: x, y: centerY - 3, width: barWidth, height: 6)
-    effective.withAlphaComponent(0.22).setFill()
-    NSBezierPath(roundedRect: track, xRadius: 3, yRadius: 3).fill()
-    let ratio = max(0, min(1, (percent ?? 0) / 100))
-    if ratio > 0.01 {
-      let fillRect = NSRect(x: x, y: centerY - 3, width: barWidth * ratio, height: 6)
-      effective.setFill()
-      NSBezierPath(roundedRect: fillRect, xRadius: 3, yRadius: 3).fill()
-    }
-    x += barWidth + 6
-
-    let percentText = percent.map { "\(Int($0.rounded()))\(showsPercentSign ? "%" : "")" } ?? "--"
-    let percentString = NSAttributedString(
-      string: percentText,
-      attributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: percentFontSize, weight: .heavy), .foregroundColor: effective]
-    )
-    let percentY = percentFontSize >= 18 ? centerY + 2 : centerY
-    percentString.draw(at: NSPoint(x: x, y: percentY - percentString.size().height / 2))
-    if percentFontSize >= 18 {
-      // 大数字模式：数字下方画「距刷新」下划线进度条
-      drawResetUnderline(x: x, width: percentString.size().width, reset: reset, mode: mode, color: effective)
-    }
-    x += percentAdvance
-
-    if showsCountdown {
-      let resetText = BalanceFormatters.resetCountdownShort(reset, mode: mode)
-      draw(text: resetText, at: NSPoint(x: x, y: centerY), font: .monospacedDigitSystemFont(ofSize: 9, weight: .bold), color: NSColor.white.withAlphaComponent(0.48))
-      x += 50
-    }
-    return x - startX
-  }
-
-  /// 竖排小标签（如「5时」上下两个字），返回占用宽度
-  private func drawVerticalLabel(_ text: String, at x: CGFloat, centerY: CGFloat, color: NSColor) -> CGFloat {
-    let font = NSFont.systemFont(ofSize: 8.5, weight: .heavy)
-    let characters = text.map(String.init)
-    let lineHeight: CGFloat = 10
-    let totalHeight = CGFloat(characters.count) * lineHeight
-    var y = centerY + totalHeight / 2 - lineHeight / 2
-    var maxWidth: CGFloat = 0
-    for character in characters {
-      let string = NSAttributedString(string: character, attributes: [.font: font, .foregroundColor: color])
-      let size = string.size()
-      maxWidth = max(maxWidth, size.width)
-      string.draw(at: NSPoint(x: x, y: y - size.height / 2))
-      y -= lineHeight
-    }
-    return maxWidth
-  }
-
-  /// 数字下方的「距刷新」下划线：淡色轨道 = 完整窗口，深色段 = 还要等的时间。
-  /// 深色段走完（长度归零）即刷新。reset 为空时不画。
-  private func drawResetUnderline(x: CGFloat, width: CGFloat, reset: Date?, mode: CountdownMode, color: NSColor) {
-    guard let reset, width > 10 else { return }
-    let windowSeconds: TimeInterval = mode == .hours ? 5 * 3600 : 7 * 24 * 3600
-    let remaining = reset.timeIntervalSinceNow
-    guard remaining > 0 else { return }
-    let remainingFraction = max(0, min(1, remaining / windowSeconds))
-    let fraction = resetProgressAscending ? 1 - remainingFraction : remainingFraction
-
-    let barHeight: CGFloat = 3
-    let y: CGFloat = 1.5
-    let track = NSRect(x: x, y: y, width: width, height: barHeight)
-    NSGraphicsContext.current?.saveGraphicsState()
-    NSBezierPath(roundedRect: track, xRadius: barHeight / 2, yRadius: barHeight / 2).addClip()
-    color.withAlphaComponent(0.28).setFill()
-    track.fill()
-    color.setFill()
-    NSRect(x: x, y: y, width: width * fraction, height: barHeight).fill()
-    NSGraphicsContext.current?.restoreGraphicsState()
-  }
-
-  /// 顶满 Touch Bar 高度的大号数字，返回实际宽度
-  private func drawBigNumber(_ text: String, at x: CGFloat, centerY: CGFloat, color: NSColor) -> CGFloat {
-    let font = NSFont.monospacedDigitSystemFont(ofSize: 22, weight: .heavy)
-    let string = NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: color])
-    let size = string.size()
-    string.draw(at: NSPoint(x: x, y: centerY - size.height / 2))
-    return size.width
-  }
-
-  private func draw(
-    text: String,
-    at point: NSPoint,
-    font: NSFont,
-    color: NSColor,
-    centered: Bool = false
-  ) {
-    let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: color]
-    let string = NSAttributedString(string: text, attributes: attributes)
-    let size = string.size()
-    let origin = centered
-      ? NSPoint(x: point.x - size.width / 2, y: point.y - size.height / 2)
-      : NSPoint(x: point.x, y: point.y - size.height / 2)
-    string.draw(at: origin)
+  private func compact(_ value: Int) -> String {
+    if value >= 1_000_000 { return String(format: "%.1fM", Double(value) / 1_000_000) }
+    if value >= 1_000 { return String(format: "%.1fK", Double(value) / 1_000) }
+    return "\(value)"
   }
 }

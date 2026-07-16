@@ -1,0 +1,49 @@
+{
+  "schema_version": "2.0",
+  "service": "codex-reset-radar",
+  "type": "public_summary",
+  "monitored_at": "2026-07-15T16:21:07.261261+08:00",
+  "timezone": "Asia/Shanghai",
+  "window_open": false,
+  "status": "prediction",
+  "recommended_action": "wait",
+  "window": {
+    "open": false,
+    "status": "prediction",
+    "action": "wait",
+    "message": "当前尚未确认开启重置窗口。",
+    "title": "ChatGPT Work / Codex usage reset",
+    "scope": "ChatGPT Work 和 Codex 用户",
+    "opened_at": null,
+    "closed_at": null,
+    "source_url": "https://x.com/thsottiaux"
+  },
+  "prediction": {
+    "level": "high",
+    "probability_24h": 0.86,
+    "probability_48h": 0.93,
+    "summary": "Tibo 正在公开试探下一次 Codex usage reset；这是概率研判，不是官方承诺。",
+    "summary_en": "Tibo is publicly probing another Codex usage reset.",
+    "updated_at": "2026-07-15T16:21:07.802432+08:00"
+  },
+  "tibo_presence": {
+    "handle": "@thsottiaux",
+    "timezone": "America/Los_Angeles",
+    "location_label_zh": "旧金山湾区 / PT",
+    "location_label_en": "San Francisco Bay Area / PT",
+    "probability": 0.3,
+    "confidence": "low",
+    "evidence_summary_zh": "公开动态未明确披露当前位置，因此采用默认 PT 时区。",
+    "should_display": true,
+    "safety_note_zh": "仅展示粗粒度公开时区推测。",
+    "latest_activity_zh": "资源过剩的窘境。不过看来我们可能很快会达到 900 万。我们是应该再次重置 ChatGPT Work 和 Codex 的使用额度，还是给它留点空间？",
+    "latest_activity_at": "2026-07-15T13:59:00+08:00",
+    "updated_at": "2026-07-15T07:36:17.896568Z",
+    "observed_at": "2026-07-15T06:39:09Z",
+    "stale_at": null
+  },
+  "links": {
+    "html": "https://codexradar.com/",
+    "full_api": "https://codexradar.com/api/v1/current"
+  }
+}

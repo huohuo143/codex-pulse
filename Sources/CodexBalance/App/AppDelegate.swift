@@ -7,14 +7,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     guard Self.acquireSingleInstanceLock() else {
       // 已有实例在跑：把它带到前台，本副本退出
       let others = NSRunningApplication.runningApplications(
-        withBundleIdentifier: Bundle.main.bundleIdentifier ?? "dev.codex.balance-dashboard"
+        withBundleIdentifier: Bundle.main.bundleIdentifier ?? "dev.codex.balance-dashboard.codex"
       ).filter { $0 != NSRunningApplication.current }
       others.first?.activate(options: [.activateAllWindows])
       NSApp.terminate(nil)
       return
     }
     NSApp.setActivationPolicy(.regular)
-    NSApp.activate(ignoringOtherApps: true)
+    if !CommandLine.arguments.contains("--background") {
+      NSApp.activate(ignoringOtherApps: true)
+    }
+  }
+
+  func applicationShouldHandleReopen(
+    _ sender: NSApplication,
+    hasVisibleWindows flag: Bool
+  ) -> Bool {
+    if !flag {
+      NotificationCenter.default.post(name: .codexRequestMainWindow, object: nil)
+    }
+    return true
   }
 
   nonisolated(unsafe) private static var lockFileDescriptor: Int32 = -1
@@ -22,7 +34,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   /// 用文件锁保证全局单实例（跨「不同路径的同一程序」也有效，比 bundleID 判断更稳）
   private static func acquireSingleInstanceLock() -> Bool {
     let lockPath = NSHomeDirectory()
-      + "/Library/Application Support/CodexBalanceDashboard/.instance.lock"
+      + "/Library/Application Support/CodexSuanliMeter/.instance.lock"
     try? FileManager.default.createDirectory(
       atPath: (lockPath as NSString).deletingLastPathComponent,
       withIntermediateDirectories: true
@@ -40,4 +52,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
     true
   }
+}
+
+extension Notification.Name {
+  static let codexRequestMainWindow = Notification.Name("dev.codex.balance-dashboard.codex.request-main-window")
 }
