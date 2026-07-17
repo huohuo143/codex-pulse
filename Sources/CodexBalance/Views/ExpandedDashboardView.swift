@@ -207,19 +207,7 @@ struct ExpandedDashboardView: View {
     PanelCard {
       VStack(alignment: .leading, spacing: 12) {
         sectionTitle("最近24小时", subtitle: "按本机时区显示；滚动值按精确时间戳计算")
-        GeometryReader { proxy in
-          let rows = stats.hourly
-          let maximum = max(1, rows.map(\.totalTokens).max() ?? 1)
-          HStack(alignment: .bottom, spacing: 3) {
-            ForEach(rows) { row in
-              RoundedRectangle(cornerRadius: 2)
-                .fill(store.palette.usage24h.opacity(row.totalTokens > 0 ? 0.92 : 0.16))
-                .frame(height: max(3, proxy.size.height * CGFloat(row.totalTokens) / CGFloat(maximum)))
-                .help("\(row.label) · \(BalanceFormatters.compactNumber(row.totalTokens)) Token")
-            }
-          }
-        }
-        .frame(height: 96)
+        HourlyUsageChart(rows: stats.hourly, tint: store.palette.usage24h)
         HStack {
           Text(stats.hourly.first?.label ?? "--")
           Spacer()

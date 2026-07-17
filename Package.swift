@@ -51,6 +51,12 @@ let package = Package(
       dependencies: ["CodexBalanceCore"],
       swiftSettings: testingFlags,
       linkerSettings: testingLinkerFlags
+    ),
+    .testTarget(
+      name: "CodexBalanceViewTests",
+      dependencies: ["CodexBalance"],
+      swiftSettings: testingFlags,
+      linkerSettings: testingLinkerFlags
     )
   ]
 )
