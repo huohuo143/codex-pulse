@@ -50,10 +50,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   }
 
   func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
-    true
+    false
   }
 }
 
 extension Notification.Name {
   static let codexRequestMainWindow = Notification.Name("dev.codex.balance-dashboard.codex.request-main-window")
+  static let codexOpenOverview = Notification.Name("dev.codex.balance-dashboard.codex.open-overview")
 }

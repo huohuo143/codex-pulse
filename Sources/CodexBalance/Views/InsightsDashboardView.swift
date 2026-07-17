@@ -17,6 +17,7 @@ struct InsightsDashboardView: View {
 
   var body: some View {
     VStack(spacing: 16) {
+      AdvancedInsightsView(stats: stats, palette: palette)
       efficiencyCards
       categoryPanel
       projectPanel

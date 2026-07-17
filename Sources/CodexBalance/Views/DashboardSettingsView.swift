@@ -88,6 +88,55 @@ struct DashboardSettingsView: View {
         }
       }
 
+      settingsSection("额度预测与提醒") {
+        Toggle(isOn: Binding(
+          get: { store.quotaAlertsEnabled },
+          set: { store.setQuotaAlertsEnabled($0) }
+        )) {
+          VStack(alignment: .leading, spacing: 2) {
+            Text("启用额度提醒")
+              .font(.system(size: 12.5, weight: .bold))
+            Text("首次开启时才申请 macOS 通知权限")
+              .font(.caption)
+              .foregroundStyle(DashboardColors.subtleText)
+          }
+        }
+
+        HStack {
+          Label(store.notificationAuthorization.label, systemImage: notificationStatusSymbol)
+            .font(.caption)
+            .foregroundStyle(notificationStatusColor)
+          Spacer()
+          if store.notificationAuthorization == .denied {
+            Button("打开系统通知设置", systemImage: "gearshape") {
+              store.openSystemNotificationSettings()
+            }
+          }
+        }
+
+        Picker("额度阈值预设", selection: $store.quotaAlertPreset) {
+          ForEach(QuotaAlertPreset.allCases) { preset in
+            Text(alertPresetTitle(preset)).tag(preset)
+          }
+        }
+        .disabled(!store.quotaAlertsEnabled)
+
+        VStack(alignment: .leading, spacing: 8) {
+          Toggle("剩余额度进入阈值时提醒", isOn: $store.quotaThresholdAlertsEnabled)
+          Toggle("预计在官方重置前耗尽时提醒", isOn: $store.quotaForecastAlertsEnabled)
+          Toggle("Full reset 距到期不足 24 小时时提醒", isOn: $store.quotaResetCreditAlertsEnabled)
+        }
+        .disabled(!store.quotaAlertsEnabled)
+
+        Text("每个额度周期的同一阈值只提醒一次；持续高风险每 6 小时最多重复一次。通知不包含账号、路径、项目或对话内容。")
+          .font(.caption)
+          .foregroundStyle(DashboardColors.subtleText)
+      }
+
+      ReliabilityAutomationSettingsView()
+
+      AppUpdateSettingsView()
+
       settingsSection("macOS 桌面小组件") {
         Text("共 7 款：Codex 总览、7 天额度、重置雷达、Full reset 权益、Token 汇总、Token 趋势、项目与用途。")
           .font(.caption)
@@ -194,6 +243,30 @@ struct DashboardSettingsView: View {
   private func referenceLink(_ title: String, _ address: String) -> some View {
     Link(title, destination: URL(string: address)!)
       .font(.caption)
+  }
+
+  private var notificationStatusSymbol: String {
+    switch store.notificationAuthorization {
+    case .authorized: "checkmark.circle.fill"
+    case .denied: "exclamationmark.triangle.fill"
+    case .notDetermined: "bell.badge"
+    }
+  }
+
+  private var notificationStatusColor: Color {
+    switch store.notificationAuthorization {
+    case .authorized: .green
+    case .denied: .orange
+    case .notDetermined: DashboardColors.subtleText
+    }
+  }
+
+  private func alertPresetTitle(_ preset: QuotaAlertPreset) -> String {
+    switch preset {
+    case .standard: "标准 · 30% / 15% / 5%"
+    case .early: "提前 · 50% / 30% / 15%"
+    case .urgentOnly: "仅紧急 · 15% / 5%"
+    }
   }
 
   private func creditRow(title: String, author: String, address: String) -> some View {

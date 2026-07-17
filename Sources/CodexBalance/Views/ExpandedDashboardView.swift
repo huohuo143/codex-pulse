@@ -99,6 +99,7 @@ struct ExpandedDashboardView: View {
   private var overviewSection: some View {
     VStack(spacing: 16) {
       summaryPanel
+      QuotaForecastCard(forecast: store.quotaForecast, tint: store.palette.weekly)
       CodexRadarView()
       ExpandedResetCreditsView(
         summary: store.rateLimitResetCredits,

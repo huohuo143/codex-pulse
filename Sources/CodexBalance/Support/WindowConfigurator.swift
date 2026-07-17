@@ -96,7 +96,10 @@ enum WindowConfigurator {
     keepPosition: Bool = true
   ) {
     window.title = AppInfo.appName
-    window.styleMask = [.borderless, .resizable]
+    // Keep the custom borderless presentation, but preserve the standard
+    // Close command so the main window can be dismissed while MenuBarExtra
+    // and background automation continue running.
+    window.styleMask = [.borderless, .closable, .resizable]
     window.isOpaque = false
     window.backgroundColor = .clear
     window.hasShadow = !compact

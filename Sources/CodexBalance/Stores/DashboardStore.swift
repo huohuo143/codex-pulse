@@ -141,6 +141,16 @@ enum RefreshIntervalOption: String, CaseIterable, Identifiable, Hashable {
   static let recommended: RefreshIntervalOption = .thirty
 }
 
+enum ReliabilityIntervalOption: String, CaseIterable, Identifiable, Hashable {
+  case fifteen = "15"
+  case thirty = "30"
+  case sixty = "60"
+
+  var id: String { rawValue }
+  var title: String { "\(rawValue) 分钟" }
+  var seconds: TimeInterval { TimeInterval((Int(rawValue) ?? 30) * 60) }
+}
+
 enum DashboardSection: String, CaseIterable, Identifiable, Hashable {
   case overview
   case trends
@@ -184,6 +194,60 @@ final class DashboardStore: ObservableObject {
   @Published private(set) var codexRadarStatusMessage = "正在连接重置雷达小程序公开源…"
   @Published private(set) var codexRadarLastSyncAt: Date?
   @Published private(set) var codexRadarNextSyncAt: Date?
+  @Published private(set) var quotaForecast: QuotaForecast?
+  @Published private(set) var usageAnalysis = UsageAnalysis()
+  @Published private(set) var projectBudgets: [ProjectBudget] = []
+  @Published private(set) var budgetMessage: String?
+  @Published private(set) var reliabilitySnapshot = ReliabilitySnapshot()
+  @Published private(set) var reliabilityEvents: [ReliabilityEvent] = []
+  @Published private(set) var reliabilityMessage: String?
+  @Published private(set) var latestAppRelease: AppRelease?
+  @Published private(set) var appUpdateAvailability: AppUpdateAvailability?
+  @Published private(set) var appUpdateIsChecking = false
+  @Published private(set) var appUpdateStatusMessage = "尚未检查版本更新"
+  @Published private(set) var lastAppUpdateCheckAt: Date?
+  @Published private(set) var quotaAlertsEnabled: Bool
+  @Published private(set) var notificationAuthorization: QuotaNotificationAuthorization = .notDetermined
+  @Published var quotaAlertPreset: QuotaAlertPreset {
+    didSet { save(quotaAlertPreset.rawValue, "quotaAlertPreset") }
+  }
+  @Published var quotaThresholdAlertsEnabled: Bool {
+    didSet { save(quotaThresholdAlertsEnabled, "quotaThresholdAlertsEnabled") }
+  }
+  @Published var quotaForecastAlertsEnabled: Bool {
+    didSet { save(quotaForecastAlertsEnabled, "quotaForecastAlertsEnabled") }
+  }
+  @Published var quotaResetCreditAlertsEnabled: Bool {
+    didSet { save(quotaResetCreditAlertsEnabled, "quotaResetCreditAlertsEnabled") }
+  }
+  @Published var reliabilityHealthChecksEnabled: Bool {
+    didSet { save(reliabilityHealthChecksEnabled, "reliabilityHealthChecksEnabled"); restartReliabilityAutomation() }
+  }
+  @Published var reliabilityAutoRecoveryEnabled: Bool {
+    didSet { save(reliabilityAutoRecoveryEnabled, "reliabilityAutoRecoveryEnabled") }
+  }
+  @Published var reliabilityBackupsEnabled: Bool {
+    didSet { save(reliabilityBackupsEnabled, "reliabilityBackupsEnabled"); restartReliabilityAutomation() }
+  }
+  @Published var reliabilityDailySummaryEnabled: Bool {
+    didSet { save(reliabilityDailySummaryEnabled, "reliabilityDailySummaryEnabled"); restartReliabilityAutomation() }
+  }
+  @Published var reliabilityIntervalOption: ReliabilityIntervalOption {
+    didSet { save(reliabilityIntervalOption.rawValue, "reliabilityIntervalOption"); restartReliabilityAutomation() }
+  }
+  @Published var reliabilityDailySummaryHour: Int {
+    didSet {
+      let clamped = min(23, max(0, reliabilityDailySummaryHour))
+      if clamped != reliabilityDailySummaryHour { reliabilityDailySummaryHour = clamped; return }
+      save(reliabilityDailySummaryHour, "reliabilityDailySummaryHour")
+    }
+  }
+  @Published var automaticUpdateChecksEnabled: Bool {
+    didSet {
+      save(automaticUpdateChecksEnabled, "automaticUpdateChecksEnabled")
+      restartAppUpdateChecks()
+    }
+  }
 
   @Published var floatingPanelEnabled: Bool {
     didSet {
@@ -276,13 +340,25 @@ final class DashboardStore: ObservableObject {
   var rateLimitResetCredits: RateLimitResetCreditsSummary? { status?.rateLimitResetCredits }
   var tokenStats: TokenStats { status?.tokenStats ?? TokenStats() }
   var cnyAvailable: Bool { exchangeRate != nil }
+  var menuBarTitle: String { weekly.map { "7天 \(Int($0.remainingPercent.rounded()))%" } ?? "7天 --" }
+  var appUpdateAvailable: Bool { appUpdateAvailability == .updateAvailable }
+  var latestAppReleaseVersionText: String? { latestAppRelease?.version.map { "v\($0)" } }
 
   private let fastReader = CodexStatusReader()
   private let fullReader = CodexStatusReader()
   private let exchangeRateService: ExchangeRateService
   private let codexRadarService = CodexRadarService()
+  private let quotaHistoryStore = QuotaHistoryStore()
+  private let projectBudgetStore = ProjectBudgetStore()
+  private let reliabilityEventStore = ReliabilityEventStore()
+  private let localAutomationArchive = LocalAutomationArchive()
+  private let appUpdateService = GitHubReleaseUpdateService()
+  private let quotaNotificationService = QuotaNotificationService.shared
+  private var quotaAlertLedger: QuotaAlertLedger
   private var refreshTimer: Timer?
   private var codexRadarRefreshTimer: Timer?
+  private var reliabilityTimer: Timer?
+  private var appUpdateTimer: Timer?
   private var fullRefreshInFlight = false
   private var isWindowDragging = false
   private var refreshRequestedAfterDrag = false
@@ -293,9 +369,29 @@ final class DashboardStore: ObservableObject {
   private var refreshRequestedWhileBusy = false
   private var forceFullRefreshWhileBusy = false
   private var lastWidgetReloadAt: Date?
+  private var lastReliabilityLevel: ReliabilityHealthLevel?
+  private var lastAutomaticRecoveryAt: Date?
+  private var automaticRecoveryAttempts = 0
 
   init() {
     let defaults = UserDefaults.standard
+    quotaAlertsEnabled = defaults.object(forKey: "quotaAlertsEnabled") as? Bool ?? false
+    quotaAlertPreset = defaults.string(forKey: "quotaAlertPreset").flatMap(QuotaAlertPreset.init) ?? .standard
+    quotaThresholdAlertsEnabled = defaults.object(forKey: "quotaThresholdAlertsEnabled") as? Bool ?? true
+    quotaForecastAlertsEnabled = defaults.object(forKey: "quotaForecastAlertsEnabled") as? Bool ?? true
+    quotaResetCreditAlertsEnabled = defaults.object(forKey: "quotaResetCreditAlertsEnabled") as? Bool ?? true
+    reliabilityHealthChecksEnabled = defaults.object(forKey: "reliabilityHealthChecksEnabled") as? Bool ?? true
+    reliabilityAutoRecoveryEnabled = defaults.object(forKey: "reliabilityAutoRecoveryEnabled") as? Bool ?? true
+    reliabilityBackupsEnabled = defaults.object(forKey: "reliabilityBackupsEnabled") as? Bool ?? true
+    reliabilityDailySummaryEnabled = defaults.object(forKey: "reliabilityDailySummaryEnabled") as? Bool ?? false
+    reliabilityIntervalOption = defaults.string(forKey: "reliabilityIntervalOption")
+      .flatMap(ReliabilityIntervalOption.init) ?? .thirty
+    reliabilityDailySummaryHour = min(23, max(0, defaults.object(forKey: "reliabilityDailySummaryHour") as? Int ?? 20))
+    automaticUpdateChecksEnabled = defaults.object(forKey: "automaticUpdateChecksEnabled") as? Bool ?? true
+    lastAutomaticRecoveryAt = defaults.object(forKey: "lastAutomaticRecoveryAt") as? Date
+    automaticRecoveryAttempts = defaults.object(forKey: "automaticRecoveryAttempts") as? Int ?? 0
+    quotaAlertLedger = defaults.data(forKey: "quotaAlertLedger")
+      .flatMap { try? JSONDecoder().decode(QuotaAlertLedger.self, from: $0) } ?? QuotaAlertLedger()
     let persistedFloatingPanelEnabled = defaults.object(forKey: "floatingPanelEnabled") as? Bool ?? true
     let launchedInBackground = CommandLine.arguments.contains("--background")
     floatingPanelEnabled = persistedFloatingPanelEnabled
@@ -340,6 +436,10 @@ final class DashboardStore: ObservableObject {
     let cacheURL = FileManager.default.homeDirectoryForCurrentUser
       .appendingPathComponent("Library/Application Support/CodexSuanliMeter/exchange-rate-usd-cny.json")
     exchangeRateService = ExchangeRateService(cacheURL: cacheURL)
+    projectBudgets = projectBudgetStore.load()
+    reliabilityEvents = reliabilityEventStore.load()
+    restoreCachedAppUpdate(defaults: defaults)
+    updateUsageAnalysis()
 
     repairLaunchWatcherIfNeeded(showMessage: false)
     TouchBarStripController.shared.onOpenPanel = { [weak self] in self?.isCompact = false; self?.refresh() }
@@ -356,6 +456,11 @@ final class DashboardStore: ObservableObject {
       object: nil,
       queue: .main
     ) { [weak self] _ in Task { @MainActor in self?.showDashboard() } }
+    NotificationCenter.default.addObserver(
+      forName: .codexOpenOverview,
+      object: nil,
+      queue: .main
+    ) { [weak self] _ in Task { @MainActor in self?.showDashboard() } }
     installCodexRadarLifecycleObservers()
     #if DEBUG
     if let fixturePath = ProcessInfo.processInfo.environment["CODEX_RADAR_FIXTURE_PATH"],
@@ -366,9 +471,12 @@ final class DashboardStore: ObservableObject {
     }
     #endif
     Task { [weak self] in await self?.loadExchangeRate() }
+    Task { [weak self] in await self?.refreshNotificationAuthorization() }
     DispatchQueue.main.async { [weak self] in
       self?.startAutoRefresh()
       self?.refreshCodexRadar()
+      self?.startReliabilityAutomation()
+      self?.startAppUpdateChecks()
     }
   }
 
@@ -402,6 +510,171 @@ final class DashboardStore: ObservableObject {
     codexRadarRefreshTimer?.invalidate()
     codexRadarRefreshTimer = nil
     codexRadarNextSyncAt = nil
+  }
+
+  func startReliabilityAutomation() {
+    guard reliabilityTimer == nil else { return }
+    runReliabilityCheck()
+    guard reliabilityHealthChecksEnabled || reliabilityBackupsEnabled || reliabilityDailySummaryEnabled else { return }
+    let timer = Timer(timeInterval: reliabilityIntervalOption.seconds, repeats: true) { [weak self] _ in
+      Task { @MainActor in self?.runReliabilityCheck() }
+    }
+    timer.tolerance = min(120, reliabilityIntervalOption.seconds * 0.1)
+    RunLoop.main.add(timer, forMode: .common)
+    reliabilityTimer = timer
+  }
+
+  func runReliabilityCheck(manual: Bool = false, allowAutomation: Bool = true) {
+    let now = Date()
+    let next = ReliabilityAuditor.audit(
+      inputs: ReliabilityAuditor.Inputs(
+        lastQuotaRefresh: lastRefresh,
+        hasOfficialQuota: weekly != nil,
+        lastUsageRefresh: lastFullRefresh,
+        usageSampleCount: tokenStats.sampleCount,
+        radarUpdatedAt: codexRadarLastSyncAt,
+        launchWatcherEnabled: CodexWatcherManager.isEnabled()
+      ),
+      now: now
+    )
+    reliabilitySnapshot = next
+
+    if manual {
+      appendReliabilityEvent(.init(
+        timestamp: now,
+        kind: .info,
+        title: "手动健康检查完成",
+        detail: "\(next.criticalCount) 项异常，\(next.warningCount) 项需关注"
+      ))
+      reliabilityMessage = "健康检查已完成"
+    } else if let previous = lastReliabilityLevel, previous != next.overall, next.overall != .unknown {
+      let recovered = previous.rank > next.overall.rank
+      appendReliabilityEvent(.init(
+        timestamp: now,
+        kind: recovered ? .recovery : .warning,
+        title: recovered ? "可靠性状态恢复" : "可靠性状态变化",
+        detail: "当前状态：\(reliabilityLevelLabel(next.overall))"
+      ))
+    }
+    lastReliabilityLevel = next.overall
+
+    guard allowAutomation else { return }
+    if reliabilityBackupsEnabled, !localAutomationArchive.hasBackup(for: now) {
+      performLocalBackup(manual: false, now: now)
+    }
+    if reliabilityDailySummaryEnabled,
+       Calendar.current.component(.hour, from: now) >= reliabilityDailySummaryHour,
+       !localAutomationArchive.hasDailySummary(for: now) {
+      archiveDailySummary(now: now)
+    }
+    if reliabilityHealthChecksEnabled, reliabilityAutoRecoveryEnabled {
+      attemptAutomaticRecovery(snapshot: next, now: now)
+    }
+  }
+
+  func performLocalBackup(manual: Bool = true, now: Date = Date()) {
+    do {
+      let result = try localAutomationArchive.backup(
+        sourceURLs: [QuotaHistoryStore.defaultURL, ProjectBudgetStore.defaultURL],
+        now: now,
+        retentionDays: 7
+      )
+      reliabilityMessage = result.itemCount > 0
+        ? "已备份 \(result.itemCount) 个关键数据文件"
+        : "当前没有可备份的关键数据文件"
+      appendReliabilityEvent(.init(
+        timestamp: now,
+        kind: .info,
+        title: manual ? "手动备份完成" : "每日备份完成",
+        detail: "已保存 \(result.itemCount) 个文件，保留最近 7 天"
+      ))
+    } catch {
+      reliabilityMessage = "备份失败：\(error.localizedDescription)"
+      appendReliabilityEvent(.init(timestamp: now, kind: .failure, title: "关键数据备份失败", detail: "本地归档未完成"))
+    }
+  }
+
+  func exportDiagnosticReport() {
+    runReliabilityCheck(allowAutomation: false)
+    let panel = NSSavePanel()
+    panel.title = "导出脱敏诊断报告"
+    panel.prompt = "导出"
+    panel.canCreateDirectories = true
+    panel.allowedContentTypes = [.plainText]
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyyMMdd-HHmm"
+    panel.nameFieldStringValue = "codex-pulse-diagnostics-\(formatter.string(from: Date())).md"
+    guard panel.runModal() == .OK, let url = panel.url else { return }
+    let markdown = ReliabilityReportBuilder.diagnosticMarkdown(
+      appVersion: AppInfo.version,
+      snapshot: reliabilitySnapshot,
+      recentEvents: reliabilityEvents
+    )
+    do {
+      try markdown.write(to: url, atomically: true, encoding: .utf8)
+      reliabilityMessage = "诊断报告已导出：\(url.lastPathComponent)"
+    } catch {
+      reliabilityMessage = "诊断报告导出失败：\(error.localizedDescription)"
+    }
+  }
+
+  func openAutomationFolder() {
+    do {
+      try FileManager.default.createDirectory(at: LocalAutomationArchive.defaultRoot, withIntermediateDirectories: true)
+      NSWorkspace.shared.open(LocalAutomationArchive.defaultRoot)
+    } catch {
+      reliabilityMessage = "无法打开自动化目录：\(error.localizedDescription)"
+    }
+  }
+
+  func startAppUpdateChecks() {
+    guard automaticUpdateChecksEnabled else { return }
+    if appUpdateTimer == nil {
+      let timer = Timer(timeInterval: 6 * 60 * 60, repeats: true) { [weak self] _ in
+        Task { @MainActor in self?.checkForAppUpdate(manual: false) }
+      }
+      timer.tolerance = 15 * 60
+      RunLoop.main.add(timer, forMode: .common)
+      appUpdateTimer = timer
+    }
+    checkForAppUpdate(manual: false)
+  }
+
+  func checkForAppUpdate(manual: Bool = true) {
+    guard !appUpdateIsChecking else { return }
+    if !manual,
+       let lastAppUpdateCheckAt,
+       Date().timeIntervalSince(lastAppUpdateCheckAt) < 24 * 60 * 60 {
+      return
+    }
+
+    appUpdateIsChecking = true
+    if manual { appUpdateStatusMessage = "正在检查 GitHub Releases…" }
+    let service = appUpdateService
+    Task {
+      do {
+        let result = try await service.check(currentVersion: AppInfo.version)
+        applyAppUpdateResult(result)
+      } catch {
+        if manual || latestAppRelease == nil {
+          appUpdateStatusMessage = "版本检查失败：\(error.localizedDescription)"
+        }
+      }
+      appUpdateIsChecking = false
+    }
+  }
+
+  func openAppUpdatePage() {
+    let fallback = URL(string: AppInfo.releasesURL)
+    let candidate = latestAppRelease?.htmlURL ?? fallback
+    guard let candidate, candidate.scheme == "https",
+          let host = candidate.host?.lowercased(),
+          host == "github.com" || host.hasSuffix(".github.com")
+    else {
+      appUpdateStatusMessage = "更新页面地址无效"
+      return
+    }
+    NSWorkspace.shared.open(candidate)
   }
 
   func refreshAll() {
@@ -511,7 +784,10 @@ final class DashboardStore: ObservableObject {
   }
 
   func toggleCompactSizeMode() { compactSizeMode = compactSizeMode == .standard ? .mini : .standard }
-  func refreshSettingsState() { repairLaunchWatcherIfNeeded(showMessage: false) }
+  func refreshSettingsState() {
+    repairLaunchWatcherIfNeeded(showMessage: false)
+    Task { await refreshNotificationAuthorization() }
+  }
   func syncWindowPresentation() { applyWindowVisibility() }
 
   func showsFloatingPanelMetric(_ metric: FloatingPanelMetric) -> Bool {
@@ -555,6 +831,7 @@ final class DashboardStore: ObservableObject {
     selectedSection = .overview
     isCompact = false
     isWindowVisible = true
+    AppWindowRouter.shared.ensureMainWindow()
     refreshAll()
   }
 
@@ -562,6 +839,7 @@ final class DashboardStore: ObservableObject {
     selectedSection = .settings
     isCompact = false
     isWindowVisible = true
+    AppWindowRouter.shared.ensureMainWindow()
     refreshSettingsState()
   }
 
@@ -569,12 +847,63 @@ final class DashboardStore: ObservableObject {
     selectedSection = .trends
     isCompact = false
     isWindowVisible = true
+    AppWindowRouter.shared.ensureMainWindow()
   }
 
   func showInsights() {
     selectedSection = .insights
     isCompact = false
     isWindowVisible = true
+    AppWindowRouter.shared.ensureMainWindow()
+  }
+
+  func setQuotaAlertsEnabled(_ enabled: Bool) {
+    quotaAlertsEnabled = enabled
+    save(enabled, "quotaAlertsEnabled")
+    guard enabled else { return }
+    Task {
+      notificationAuthorization = await quotaNotificationService.requestAuthorization()
+      if notificationAuthorization == .authorized {
+        evaluateQuotaAlerts()
+      }
+    }
+  }
+
+  func refreshNotificationAuthorization() async {
+    notificationAuthorization = await quotaNotificationService.authorizationStatus()
+  }
+
+  func openSystemNotificationSettings() {
+    quotaNotificationService.openSystemNotificationSettings()
+  }
+
+  func setProjectBudget(project: TokenProjectBucket, monthlyTokenLimit: Int) {
+    guard monthlyTokenLimit > 0 else {
+      budgetMessage = "预算必须大于 0 Token"
+      return
+    }
+    let budget = ProjectBudget(
+      projectName: project.projectName,
+      projectPath: project.projectPath,
+      monthlyTokenLimit: monthlyTokenLimit
+    )
+    do {
+      projectBudgets = try projectBudgetStore.upsert(budget)
+      budgetMessage = "已保存 \(project.projectName) 的月度预算"
+      updateUsageAnalysis()
+    } catch {
+      budgetMessage = "预算保存失败：\(error.localizedDescription)"
+    }
+  }
+
+  func removeProjectBudget(id: String) {
+    do {
+      projectBudgets = try projectBudgetStore.remove(id: id)
+      budgetMessage = "已移除项目预算"
+      updateUsageAnalysis()
+    } catch {
+      budgetMessage = "预算移除失败：\(error.localizedDescription)"
+    }
   }
 
   func setLaunchWithCodexEnabled(_ enabled: Bool) {
@@ -608,6 +937,16 @@ final class DashboardStore: ObservableObject {
       let level = codexRadarSnapshot?.prediction?.levelLabel ?? "研判中"
       lines.append("Codex 24h 重置概率：\(probability)%（\(level)）")
       lines.append(CodexRadarService.attributionText)
+    }
+    if let forecast = quotaForecast {
+      if let rate = forecast.ratePerDay {
+        lines.append("额度节奏：\(String(format: "%.1f", rate)) 个百分点/天")
+      }
+      if let exhaustion = forecast.estimatedExhaustion {
+        lines.append("预计耗尽：\(exhaustion.formatted(date: .abbreviated, time: .shortened))")
+      } else if let reason = forecast.reason {
+        lines.append("额度预测：\(reason)")
+      }
     }
     let pasteboard = NSPasteboard.general
     pasteboard.clearContents()
@@ -679,7 +1018,10 @@ final class DashboardStore: ObservableObject {
     status = mergeFastStatus(next, withExisting: status)
     lastRefresh = next.generatedAt
     errorMessage = nil
+    updateQuotaForecast()
+    updateUsageAnalysis()
     updateTouchBar()
+    if reliabilityHealthChecksEnabled { runReliabilityCheck(allowAutomation: false) }
     scheduleFullRefreshIfNeeded(force: forceFull)
   }
 
@@ -690,13 +1032,77 @@ final class DashboardStore: ObservableObject {
     // later UI-apply time can move a large boundary event in or out of range.
     lastFullRefresh = full.generatedAt
     errorMessage = nil
+    updateQuotaForecast()
+    updateUsageAnalysis(now: full.generatedAt)
     updateTouchBar()
+    if reliabilityHealthChecksEnabled { runReliabilityCheck(allowAutomation: false) }
     Task { await loadExchangeRate() }
   }
 
   private func loadExchangeRate() async {
     exchangeRate = await exchangeRateService.current()
     writeWidgetSnapshotFile()
+  }
+
+  private func updateUsageAnalysis(now: Date = Date()) {
+    usageAnalysis = UsageAnalyzer.analyze(stats: tokenStats, budgets: projectBudgets, now: now)
+  }
+
+  private func updateQuotaForecast(now: Date = Date()) {
+    let mainEvent = status?.main
+    let window = mainEvent?.sevenDayWindow
+    var history = quotaHistoryStore.snapshots()
+    let current: QuotaSnapshot?
+    if let mainEvent, let window, let reset = window.resetsAt,
+       window.inferredReset == false,
+       abs(window.windowMinutes - QuotaHistoryStore.expectedWindowMinutes) <= 60 {
+      let incoming = QuotaSnapshot(
+        recordedAt: mainEvent.timestamp,
+        remainingPercent: window.remainingPercent,
+        resetsAt: reset,
+        windowMinutes: window.windowMinutes
+      )
+      history = quotaHistoryStore.record(window: window, at: mainEvent.timestamp, now: now)
+      current = history
+        .filter { abs($0.resetsAt.timeIntervalSince(reset)) <= 300 }
+        .max(by: { $0.recordedAt < $1.recordedAt }) ?? incoming
+    } else {
+      current = nil
+    }
+    quotaForecast = QuotaForecaster.forecast(
+      snapshots: history,
+      current: current,
+      now: now
+    )
+    evaluateQuotaAlerts(now: now)
+  }
+
+  private func evaluateQuotaAlerts(now: Date = Date()) {
+    guard quotaAlertsEnabled, notificationAuthorization == .authorized else { return }
+    let evaluation = QuotaAlertEvaluator.evaluate(
+      remainingPercent: weekly?.remainingPercent,
+      resetAt: weekly?.resetsAt,
+      forecast: quotaForecast,
+      resetCredits: rateLimitResetCredits?.availableCredits ?? [],
+      thresholds: quotaAlertPreset.thresholds,
+      thresholdAlertsEnabled: quotaThresholdAlertsEnabled,
+      forecastAlertsEnabled: quotaForecastAlertsEnabled,
+      resetCreditAlertsEnabled: quotaResetCreditAlertsEnabled,
+      ledger: quotaAlertLedger,
+      now: now
+    )
+    quotaAlertLedger = evaluation.ledger
+    if let data = try? JSONEncoder().encode(quotaAlertLedger) {
+      UserDefaults.standard.set(data, forKey: "quotaAlertLedger")
+    }
+    guard !evaluation.candidates.isEmpty else { return }
+    let remaining = weekly?.remainingPercent
+    let forecast = quotaForecast
+    Task {
+      for candidate in evaluation.candidates {
+        await quotaNotificationService.deliver(candidate, remainingPercent: remaining, forecast: forecast)
+      }
+    }
   }
 
   private func mergeFastStatus(_ fast: CodexStatus, withExisting existing: CodexStatus?) -> CodexStatus {
@@ -854,6 +1260,137 @@ final class DashboardStore: ObservableObject {
         WidgetCenter.shared.reloadAllTimelines()
         lastWidgetReloadAt = now
       }
+    }
+  }
+
+  private func restartReliabilityAutomation() {
+    reliabilityTimer?.invalidate()
+    reliabilityTimer = nil
+    DispatchQueue.main.async { [weak self] in self?.startReliabilityAutomation() }
+  }
+
+  private func restartAppUpdateChecks() {
+    appUpdateTimer?.invalidate()
+    appUpdateTimer = nil
+    guard automaticUpdateChecksEnabled else {
+      appUpdateStatusMessage = lastAppUpdateCheckAt == nil
+        ? "自动版本检查已关闭"
+        : "自动版本检查已关闭 · 可手动检查"
+      return
+    }
+    DispatchQueue.main.async { [weak self] in self?.startAppUpdateChecks() }
+  }
+
+  private func restoreCachedAppUpdate(defaults: UserDefaults) {
+    guard let data = defaults.data(forKey: "cachedAppRelease"),
+          let release = try? JSONDecoder().decode(AppRelease.self, from: data),
+          let currentVersion = SemanticVersion(AppInfo.version),
+          let checkedAt = defaults.object(forKey: "lastAppUpdateCheckAt") as? Date,
+          let result = try? GitHubReleaseUpdateService.evaluate(
+            release: release,
+            currentVersion: currentVersion,
+            checkedAt: checkedAt
+          )
+    else { return }
+    applyAppUpdateResult(result, persist: false)
+  }
+
+  private func applyAppUpdateResult(_ result: AppUpdateResult, persist: Bool = true) {
+    latestAppRelease = result.release
+    appUpdateAvailability = result.availability
+    lastAppUpdateCheckAt = result.checkedAt
+    let remote = result.release.version.map { "v\($0)" } ?? result.release.tagName
+    switch result.availability {
+    case .updateAvailable:
+      appUpdateStatusMessage = "发现新版本 \(remote)"
+    case .upToDate:
+      appUpdateStatusMessage = "当前已是最新版本 \(remote)"
+    case .localVersionNewer:
+      appUpdateStatusMessage = "当前 v\(AppInfo.version) 高于线上最新 \(remote)"
+    }
+    guard persist else { return }
+    let defaults = UserDefaults.standard
+    if let data = try? JSONEncoder().encode(result.release) {
+      defaults.set(data, forKey: "cachedAppRelease")
+    }
+    defaults.set(result.checkedAt, forKey: "lastAppUpdateCheckAt")
+  }
+
+  private func attemptAutomaticRecovery(snapshot: ReliabilitySnapshot, now: Date) {
+    let recoverable = snapshot.checks.filter {
+      $0.level == .critical && [.officialQuota, .tokenAggregation, .radar, .widgetSnapshot].contains($0.id)
+    }
+    guard !recoverable.isEmpty else {
+      if automaticRecoveryAttempts != 0 {
+        automaticRecoveryAttempts = 0
+        save(0, "automaticRecoveryAttempts")
+      }
+      return
+    }
+    guard automaticRecoveryAttempts < 2 else {
+      reliabilityMessage = "自动恢复已达到本轮上限，等待下一次有效刷新"
+      return
+    }
+    if let lastAutomaticRecoveryAt, now.timeIntervalSince(lastAutomaticRecoveryAt) < 15 * 60 { return }
+
+    lastAutomaticRecoveryAt = now
+    automaticRecoveryAttempts += 1
+    save(now, "lastAutomaticRecoveryAt")
+    save(automaticRecoveryAttempts, "automaticRecoveryAttempts")
+
+    let ids = Set(recoverable.map(\.id))
+    if ids.contains(.officialQuota) || ids.contains(.tokenAggregation) {
+      refresh(forceFull: true)
+    }
+    if ids.contains(.radar) {
+      refreshCodexRadar(force: true)
+    }
+    if ids.contains(.widgetSnapshot) {
+      writeWidgetSnapshotFile()
+    }
+    appendReliabilityEvent(.init(
+      timestamp: now,
+      kind: .recovery,
+      title: "已触发受控自动恢复",
+      detail: "重新读取额度、汇总或刷新快照；第 \(automaticRecoveryAttempts)/2 次"
+    ))
+    reliabilityMessage = "已触发受控自动恢复"
+  }
+
+  private func archiveDailySummary(now: Date) {
+    let markdown = ReliabilityReportBuilder.dailySummaryMarkdown(
+      remainingPercent: weekly?.remainingPercent,
+      rolling24hTokens: tokenStats.rolling24HoursTokens,
+      monthTokens: tokenStats.monthTokens,
+      projectedMonthTokens: usageAnalysis.projectedMonthTokens,
+      quotaRisk: quotaForecast?.risk.rawValue ?? "insufficientData",
+      health: reliabilitySnapshot.overall,
+      generatedAt: now
+    )
+    do {
+      _ = try localAutomationArchive.archiveDailySummary(markdown, now: now)
+      appendReliabilityEvent(.init(timestamp: now, kind: .info, title: "每日摘要已归档", detail: "已保存本机聚合指标"))
+      reliabilityMessage = "今日自动摘要已归档"
+    } catch {
+      appendReliabilityEvent(.init(timestamp: now, kind: .failure, title: "每日摘要归档失败", detail: "本地文件未写入"))
+      reliabilityMessage = "每日摘要归档失败：\(error.localizedDescription)"
+    }
+  }
+
+  private func appendReliabilityEvent(_ event: ReliabilityEvent) {
+    do {
+      reliabilityEvents = try reliabilityEventStore.append(event)
+    } catch {
+      dashboardLogger.error("Reliability event write failed: \(error.localizedDescription, privacy: .public)")
+    }
+  }
+
+  private func reliabilityLevelLabel(_ level: ReliabilityHealthLevel) -> String {
+    switch level {
+    case .healthy: "健康"
+    case .warning: "需关注"
+    case .critical: "异常"
+    case .unknown: "学习中"
     }
   }
 

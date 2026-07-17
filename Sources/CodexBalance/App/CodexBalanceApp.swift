@@ -6,7 +6,7 @@ struct CodexBalanceApp: App {
   @StateObject private var store = DashboardStore()
 
   var body: some Scene {
-    WindowGroup(AppInfo.appName) {
+    WindowGroup(AppInfo.appName, id: "main") {
       ContentView()
         .environmentObject(store)
     }
@@ -54,11 +54,27 @@ struct CodexBalanceApp: App {
 
         Divider()
 
+        Button("检查版本更新…") {
+          store.checkForAppUpdate()
+          store.showSettings()
+        }
+        .disabled(store.appUpdateIsChecking)
+
+        Divider()
+
         Button(store.floatingPanelEnabled ? "收起为悬浮框" : "悬浮框设置…") {
           store.requestCompactPanel()
         }
         .keyboardShortcut("1", modifiers: [.command, .shift])
       }
     }
+
+    MenuBarExtra {
+      MenuBarStatusView()
+        .environmentObject(store)
+    } label: {
+      Label(store.menuBarTitle, systemImage: "gauge.with.dots.needle.50percent")
+    }
+    .menuBarExtraStyle(.window)
   }
 }

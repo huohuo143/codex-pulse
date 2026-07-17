@@ -4,8 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_NAME="Codex 脉动"
 EXECUTABLE_NAME="CodexSuanliMeter"
-VERSION="2.5.4"
-DATE_TAG="20260716"
+VERSION="2.9.0"
+DATE_TAG="20260717"
 ARCH="arm64"
 DIST_DIR="$ROOT_DIR/dist"
 APP_OUTPUT_DIR="$DIST_DIR/build-v$VERSION"
@@ -26,12 +26,14 @@ fi
 APP_OUTPUT_DIR="$APP_OUTPUT_DIR" OPEN_APP=0 "$ROOT_DIR/script/build_and_run.sh"
 
 cat >"$NOTES_PATH" <<'NOTES'
-# Codex 脉动 2.5.4 改版说明
+# Codex 脉动 2.9.0 改版说明
 
-- “设置 → 关于”中的“开发维护”署名更正为 `ZhangS`。
-- “最初源码与构思”继续在致谢区单独标注为 `waytosea-oss`，不与当前维护者混淆。
-- 延续 2.5.3 的最近 24 小时即时悬停气泡、M/亿紧凑读数和精确 Token 整数。
-- 未改变 Token 统计、额度解析、重置雷达、Widget 或同步数据口径。
+- 新增自动版本更新检测，默认开启，从项目公开 GitHub Releases 读取最新正式版。
+- 启动时自动检查，成功后 24 小时内不重复请求；网络失败时保留上次结果并延后重试。
+- 新增设置页更新状态、手动检查、发布说明和查看下载入口。
+- 菜单栏在检测到新版本时显示明确提示；不自动下载、不自动安装、不读取 GitHub 凭据。
+- 版本比较支持语义化版本、预发布标记与本地开发版，避免把较旧的线上版本误报为更新。
+- 未改变 Widget、iCloud 设备同步、额度预测、高级分析或可靠性 schema。
 
 本包为 arm64、ad-hoc 签名、未公证版本。首次打开可能出现 Gatekeeper 提示。
 NOTES

@@ -3,6 +3,7 @@ import SwiftUI
 
 struct ContentView: View {
   @EnvironmentObject private var store: DashboardStore
+  @Environment(\.openWindow) private var openWindow
   @State private var configuredWindow: NSWindow?
   @State private var lastManualMove: Date?
   private let dodgeTimer = Timer.publish(every: 45, on: .main, in: .common).autoconnect()
@@ -41,11 +42,11 @@ struct ContentView: View {
     .environment(\.dashboardAppearance, store.appearance)
     .tint(store.palette.weekly)
     .onAppear {
+      AppWindowRouter.shared.register { openWindow(id: "main") }
       store.startAutoRefresh()
     }
     .onDisappear {
       store.endWindowDrag()
-      store.stopAutoRefresh()
     }
     .onChange(of: store.isCompact) { _, isCompact in
       if let configuredWindow {
