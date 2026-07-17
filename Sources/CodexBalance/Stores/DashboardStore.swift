@@ -369,6 +369,8 @@ final class DashboardStore: ObservableObject {
   private var refreshRequestedWhileBusy = false
   private var forceFullRefreshWhileBusy = false
   private var lastWidgetReloadAt: Date?
+  private var pendingWidgetReloadTask: Task<Void, Never>?
+  private let widgetReloadPolicy = CodexWidgetReloadPolicy(minimumInterval: 10)
   private var lastReliabilityLevel: ReliabilityHealthLevel?
   private var lastAutomaticRecoveryAt: Date?
   private var automaticRecoveryAttempts = 0
@@ -1236,31 +1238,55 @@ final class DashboardStore: ObservableObject {
         .map { CodexWidgetMetric(label: $0.category.label, tokens: $0.totalTokens) }
     )
 
-    var didPublishSnapshot = false
     do {
       try CodexWidgetSnapshotStore.save(snapshot)
-      didPublishSnapshot = true
     } catch {
       dashboardLogger.error("Legacy widget snapshot write failed: \(error.localizedDescription, privacy: .public)")
     }
 
+    let widgetSnapshotURL = CodexWidgetSnapshotStore.widgetContainerURL()
+    let previousWidgetSnapshot = try? CodexWidgetSnapshotStore.load(from: widgetSnapshotURL)
     do {
       try CodexWidgetSnapshotStore.save(
         snapshot,
-        to: CodexWidgetSnapshotStore.widgetContainerURL()
+        to: widgetSnapshotURL
       )
-      didPublishSnapshot = true
+      let now = Date()
+      let contentChanged = previousWidgetSnapshot.map { !$0.hasSameWidgetContent(as: snapshot) } ?? true
+      requestWidgetReload(needsReload: contentChanged || lastWidgetReloadAt == nil, now: now)
     } catch {
       dashboardLogger.error("Widget container snapshot write failed: \(error.localizedDescription, privacy: .public)")
     }
+  }
 
-    if didPublishSnapshot {
-      let now = Date()
-      if lastWidgetReloadAt.map({ now.timeIntervalSince($0) >= 60 }) ?? true {
-        WidgetCenter.shared.reloadAllTimelines()
-        lastWidgetReloadAt = now
+  private func requestWidgetReload(needsReload: Bool, now: Date) {
+    let decision = widgetReloadPolicy.decision(
+      needsReload: needsReload,
+      lastReloadAt: lastWidgetReloadAt,
+      hasPendingReload: pendingWidgetReloadTask != nil,
+      now: now
+    )
+
+    switch decision {
+    case .none:
+      return
+    case .reloadNow:
+      pendingWidgetReloadTask?.cancel()
+      pendingWidgetReloadTask = nil
+      reloadAllWidgetTimelines(at: now)
+    case .schedule(let delay):
+      pendingWidgetReloadTask = Task { [weak self] in
+        try? await Task.sleep(for: .seconds(delay))
+        guard !Task.isCancelled, let self else { return }
+        self.pendingWidgetReloadTask = nil
+        self.reloadAllWidgetTimelines(at: Date())
       }
     }
+  }
+
+  private func reloadAllWidgetTimelines(at date: Date) {
+    WidgetCenter.shared.reloadAllTimelines()
+    lastWidgetReloadAt = date
   }
 
   private func restartReliabilityAutomation() {

@@ -8,7 +8,7 @@ WIDGET_EXECUTABLE_NAME="CodexSuanliWidgets"
 BUNDLE_ID="dev.codex.balance-dashboard.codex"
 WIDGET_BUNDLE_ID="$BUNDLE_ID.widgets"
 VERSION="2.9.0"
-BUILD_NUMBER="290"
+BUILD_NUMBER="291"
 MIN_SYSTEM_VERSION="14.0"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

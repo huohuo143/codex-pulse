@@ -162,6 +162,45 @@ public struct CodexWidgetSnapshot: Codable, Equatable, Sendable {
       ]
     )
   }
+
+  /// 比较会影响 Widget 展示的内容，忽略每次轮询都会改变的写入时间。
+  package func hasSameWidgetContent(as other: CodexWidgetSnapshot) -> Bool {
+    var lhs = self
+    var rhs = other
+    lhs.updatedAt = .distantPast
+    rhs.updatedAt = .distantPast
+    return lhs == rhs
+  }
+}
+
+package enum CodexWidgetReloadDecision: Equatable, Sendable {
+  case none
+  case reloadNow
+  case schedule(after: TimeInterval)
+}
+
+/// WidgetKit 重载策略：首次立即刷新，密集变化合并到最早可刷新时刻。
+package struct CodexWidgetReloadPolicy: Sendable {
+  package let minimumInterval: TimeInterval
+
+  package init(minimumInterval: TimeInterval = 10) {
+    self.minimumInterval = minimumInterval
+  }
+
+  package func decision(
+    needsReload: Bool,
+    lastReloadAt: Date?,
+    hasPendingReload: Bool,
+    now: Date
+  ) -> CodexWidgetReloadDecision {
+    guard needsReload else { return .none }
+    guard let lastReloadAt else { return .reloadNow }
+
+    let remaining = minimumInterval - now.timeIntervalSince(lastReloadAt)
+    if remaining <= 0 { return .reloadNow }
+    if hasPendingReload { return .none }
+    return .schedule(after: remaining)
+  }
 }
 
 public enum CodexWidgetSnapshotStore {
