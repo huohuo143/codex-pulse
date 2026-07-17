@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-2.5.2-8b7cff">
+  <img alt="Version" src="https://img.shields.io/badge/version-2.5.4-8b7cff">
   <img alt="macOS" src="https://img.shields.io/badge/macOS-14%2B-111827?logo=apple">
   <img alt="Apple Silicon" src="https://img.shields.io/badge/Apple%20Silicon-arm64-111827">
   <img alt="Swift" src="https://img.shields.io/badge/Swift-6.0-f05138?logo=swift&logoColor=white">
@@ -18,11 +18,11 @@
 
 `Codex 脉动` 将 Codex 的额度、Token 消耗、重置节奏和 Full reset 权益集中到一套原生 macOS 界面中。它既可以作为常驻悬浮框，也可以完全隐藏悬浮框，仅使用主窗口或 7 款桌面小组件。
 
-> 当前版本：`2.5.2`。安装包为 Apple Silicon、ad-hoc 签名、未公证版本，要求 macOS 14 或更高版本。
+> 当前版本：`2.5.4`。安装包为 Apple Silicon、ad-hoc 签名、未公证版本，要求 macOS 14 或更高版本。
 
 ## 当前版本界面
 
-以下截图直接来自已安装的 `Codex 脉动 2.5.2`，不再使用旧版 Codex/Claude 双面板图片。
+以下截图展示 `Codex 脉动 2.5.2` 的基础界面；`2.5.3–2.5.4` 在此基础上增加小时柱悬停读数并修正维护者署名。
 
 <p align="center">
   <img src="docs/screenshots/codex-pulse-overview-v2.5.2.png" width="680" alt="Codex 脉动 2.5.2 概览">
@@ -137,8 +137,8 @@ flowchart LR
 在 [Releases](https://github.com/huohuo143/codex-pulse/releases) 下载：
 
 ```text
-Codex-Pulse-v2.5.2-20260716-arm64.dmg
-Codex-Pulse-v2.5.2-20260716-arm64.dmg.sha256
+Codex-Pulse-v2.5.4-20260716-arm64.dmg
+Codex-Pulse-v2.5.4-20260716-arm64.dmg.sha256
 ```
 
 1. 打开 DMG。
@@ -150,7 +150,7 @@ Codex-Pulse-v2.5.2-20260716-arm64.dmg.sha256
 
 ## 与旧版并行
 
-| 项目 | Codex 脉动 2.5.2 | 旧算力码表 0.1.0 |
+| 项目 | Codex 脉动 2.5.4 | 旧算力码表 0.1.0 |
 | --- | --- | --- |
 | App | `Codex 脉动.app` | `算力码表.app` |
 | Bundle ID | `dev.codex.balance-dashboard.codex` | `dev.codex.balance-dashboard` |
@@ -210,7 +210,11 @@ OPEN_APP=0 ./script/build_and_run.sh
 
 ## 版本说明
 
-2.5.2 新增桌面小组件、悬浮框总开关与信息选择、昼夜背景模式和全新 Logo，并修复 WidgetKit 无法识别扩展入口的问题。完整内容见 [2.5.2 改版说明](docs/RELEASE_2.5.2.md)。
+2.5.4 将“开发维护”署名更正为 `ZhangS`，并继续把原项目作者保留在致谢区。完整内容见 [2.5.4 改版说明](docs/RELEASE_2.5.4.md)。
+
+2.5.3 为最近 24 小时柱状图新增即时悬停气泡、M/亿紧凑读数和精确 Token 整数。历史说明见 [2.5.3 改版说明](docs/RELEASE_2.5.3.md)。
+
+2.5.2 新增桌面小组件、悬浮框总开关与信息选择、昼夜背景模式和全新 Logo，并修复 WidgetKit 无法识别扩展入口的问题。历史说明见 [2.5.2 改版说明](docs/RELEASE_2.5.2.md)。
 
 ## 致谢
 

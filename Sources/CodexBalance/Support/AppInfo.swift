@@ -3,8 +3,8 @@ import Foundation
 /// 项目元信息（开源署名与主页）
 enum AppInfo {
   static let appName = "Codex 脉动"
-  static let version = "2.5.2"
-  static let author = "Tilo Liang"
+  static let version = "2.5.4"
+  static let author = "ZhangS"
   static let license = "MIT"
   static let originalAuthor = "waytosea-oss"
   static let codexRadarAuthor = "Codex（官网署名：designed by Codex）"

@@ -4,15 +4,16 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_NAME="Codex 脉动"
 EXECUTABLE_NAME="CodexSuanliMeter"
-VERSION="2.5.2"
+VERSION="2.5.4"
 DATE_TAG="20260716"
 ARCH="arm64"
 DIST_DIR="$ROOT_DIR/dist"
 APP_OUTPUT_DIR="$DIST_DIR/build-v$VERSION"
 APP_BUNDLE="$APP_OUTPUT_DIR/$APP_NAME.app"
-DMG_PATH="$DIST_DIR/$APP_NAME-v$VERSION-$DATE_TAG-$ARCH.dmg"
+RELEASE_NAME="Codex-Pulse-v$VERSION"
+DMG_PATH="$DIST_DIR/$RELEASE_NAME-$DATE_TAG-$ARCH.dmg"
 SHA_PATH="$DMG_PATH.sha256"
-NOTES_PATH="$DIST_DIR/$APP_NAME-v$VERSION-改版说明.md"
+NOTES_PATH="$DIST_DIR/$RELEASE_NAME-改版说明.md"
 STAGE_DIR="$ROOT_DIR/.build/dmg-stage-$VERSION"
 
 cd "$ROOT_DIR"
@@ -25,20 +26,12 @@ fi
 APP_OUTPUT_DIR="$APP_OUTPUT_DIR" OPEN_APP=0 "$ROOT_DIR/script/build_and_run.sh"
 
 cat >"$NOTES_PATH" <<'NOTES'
-# Codex 脉动 2.5.2 改版说明
+# Codex 脉动 2.5.4 改版说明
 
-- App 正式更名为“Codex 脉动”，保留原 Bundle ID、进程名和数据目录，历史统计与设置无需迁移。
-- 新增 7 款 macOS WidgetKit 桌面小组件：总览、7 天额度、Codex 重置雷达、Full reset 权益、Token 汇总、Token 趋势、项目与用途。
-- 中/大号总览复刻悬浮框的核心信息；用户也可按关注点拆分组合小组件。
-- 新增“启用悬浮框”总开关；关闭后由 Codex 自动唤起时静默后台运行，手动打开 App 仍显示普通主窗口。
-- 悬浮框可分别勾选 7 天额度、滚动 24h Token、重置雷达与 Full reset 权益，八种样式会自动适配内容和尺寸。
-- 新增“跟随系统 / 白天 / 夜晚”三种背景模式；主窗口、设置页和八种悬浮样式均可自动或手动切换，桌面小组件随 macOS 外观适配。
-- Widget 扩展启用标准 App Sandbox；主 App 将脱敏聚合快照写入扩展自身容器，不读取会话内容、凭据、项目路径或权益兑换 ID。
-- 修复 2.5.1 中扩展入口按普通 SwiftPM 可执行程序链接、WidgetKit 无法取得组件清单的问题；改为原生 App Extension 生命周期后，系统可识别全部 7 款组件并生成预览。
-- 主 App 最多每分钟通知 WidgetKit 重载；雷达仍保持独立 30 分钟同步，未增加额外公开源请求。
-- 新增额度环/雷达主题的原生多尺寸 macOS logo，统一用于 Dock、Finder 与小组件库。
-- 设置页新增桌面小组件说明和“致谢”区：感谢最初源码与构思作者 waytosea-oss；感谢 Codex 重置雷达公开数据，官网署名为“designed by Codex”。
-- 延续 2.4.7 的重置雷达防回退、Full reset 只读展示、八种悬浮样式、拖动优化、工作分析、CSV 和独立安装边界。
+- “设置 → 关于”中的“开发维护”署名更正为 `ZhangS`。
+- “最初源码与构思”继续在致谢区单独标注为 `waytosea-oss`，不与当前维护者混淆。
+- 延续 2.5.3 的最近 24 小时即时悬停气泡、M/亿紧凑读数和精确 Token 整数。
+- 未改变 Token 统计、额度解析、重置雷达、Widget 或同步数据口径。
 
 本包为 arm64、ad-hoc 签名、未公证版本。首次打开可能出现 Gatekeeper 提示。
 NOTES
