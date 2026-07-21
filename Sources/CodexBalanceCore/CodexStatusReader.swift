@@ -1085,7 +1085,7 @@ public final class CodexStatusReader: @unchecked Sendable {
       add(event, to: &modelHourly, hourKey: hour)
     }
 
-    let dailyRows = fillDailyRows(daily, count: 14, now: now)
+    let dailyRows = fillDailyRows(daily, count: 30, now: now)
     let monthlyRows = fillMonthlyRows(monthly, count: 6, now: now)
     let todayKey = periodKey(now, period: .day)
     let monthKey = periodKey(now, period: .month)

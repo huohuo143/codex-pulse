@@ -4,9 +4,9 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_NAME="Codex 脉动"
 EXECUTABLE_NAME="CodexSuanliMeter"
-VERSION="2.9.0"
-BUILD_NUMBER="291"
-DATE_TAG="20260717"
+VERSION="2.10.0"
+BUILD_NUMBER="2101"
+DATE_TAG="20260721"
 ARCH="arm64"
 DIST_DIR="$ROOT_DIR/dist"
 APP_OUTPUT_DIR="$DIST_DIR/build-v$VERSION-build$BUILD_NUMBER"
@@ -27,17 +27,17 @@ fi
 APP_OUTPUT_DIR="$APP_OUTPUT_DIR" OPEN_APP=0 "$ROOT_DIR/script/build_and_run.sh"
 
 cat >"$NOTES_PATH" <<'NOTES'
-# Codex 脉动 2.9.0 改版说明
+# Codex 脉动 2.10.0 改版说明
 
-- build 291 修复主面板与 Widget 的刷新延迟：展示内容变化后约 10 秒内请求重载，密集变化自动合并。
-- 安装时注销历史构建副本的 Widget 注册，避免系统在多个同 Bundle ID 扩展之间选错。
-- 安装后自动重载 WidgetKit 时间线服务，避免桌面卡片继续显示旧缓存；不删除小组件布局或用户数据。
-- 新增自动版本更新检测，默认开启，从项目公开 GitHub Releases 读取最新正式版。
-- 启动时自动检查，成功后 24 小时内不重复请求；网络失败时保留上次结果并延后重试。
-- 新增设置页更新状态、手动检查、发布说明和查看下载入口。
-- 菜单栏在检测到新版本时显示明确提示；不自动下载、不自动安装、不读取 GitHub 凭据。
-- 版本比较支持语义化版本、预发布标记与本地开发版，避免把较旧的线上版本误报为更新。
-- 未改变 Widget、iCloud 设备同步、额度预测、高级分析或可靠性 schema。
+- 趋势页新增“24 小时 / 按天”切换，默认保持原有 24 小时视图。
+- 按天视图展示包含今天在内的最近 30 个自然日，可横向滚动并默认定位到最新日期。
+- 每日柱支持悬停查看日期、精确 Token 数和调用次数；无调用日期按 0 保留。
+- 24 小时和按天视图使用本机时间轴对齐多台 iCloud 设备，并按设备稳定分色堆叠。
+- 图例与悬停气泡显示合计、各设备 Token、调用次数和快照更新时间。
+- 显式 0 Token 与缺少 bucket 分开处理；缺失值不参与合计，旧 schema 无趋势时不生成虚假数据。
+- 本地与 iCloud 设备日序列扩展为 30 天，schema 继续为 4，兼容旧设备的可变长度数组。
+- 高级分析仍使用最近 14 天，Widget 的 `daily14` 也仍为 14 天，未改变 Widget schema。
+- 完整测试覆盖多设备对齐、缺失值、旧 schema、跨月、跨年、30 日上限和 14 日兼容性。
 
 本包为 arm64、ad-hoc 签名、未公证版本。首次打开可能出现 Gatekeeper 提示。
 NOTES

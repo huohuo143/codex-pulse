@@ -1,12 +1,39 @@
 import Testing
+import CodexBalanceCore
 @testable import CodexBalance
 
 @Suite("Hourly token tooltip formatting")
 struct HourlyTokenTooltipFormatterTests {
   @Test
   func appMetadataUsesCurrentMaintainer() {
+    #expect(AppInfo.version == "2.10.0")
     #expect(AppInfo.author == "ZhangS")
     #expect(AppInfo.originalAuthor == "waytosea-oss")
+  }
+
+  @Test
+  func dailyChartKeepsNewestThirtyRows() {
+    let rows = (1...35).map {
+      TokenBucket(key: "day-\($0)", label: "D\($0)", totalTokens: $0)
+    }
+
+    let visible = DailyUsageChartSupport.visibleRows(rows)
+
+    #expect(visible.count == 30)
+    #expect(visible.first?.key == "day-6")
+    #expect(visible.last?.key == "day-35")
+  }
+
+  @Test
+  func dailyChartHandlesEmptyAndSingleDayData() {
+    #expect(DailyUsageChartSupport.visibleRows([]).isEmpty)
+
+    let row = TokenBucket(key: "2026-07-21", label: "7/21", totalTokens: 12_345_678)
+    let visible = DailyUsageChartSupport.visibleRows([row])
+
+    #expect(visible == [row])
+    #expect(DailyUsageChartSupport.dateLabel(for: row) == "7/21")
+    #expect(DailyUsageChartSupport.compactTokens(for: row) == "12.35M")
   }
 
   @Test(arguments: [

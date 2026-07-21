@@ -7,8 +7,8 @@ EXECUTABLE_NAME="CodexSuanliMeter"
 WIDGET_EXECUTABLE_NAME="CodexSuanliWidgets"
 BUNDLE_ID="dev.codex.balance-dashboard.codex"
 WIDGET_BUNDLE_ID="$BUNDLE_ID.widgets"
-VERSION="2.9.0"
-BUILD_NUMBER="291"
+VERSION="2.10.0"
+BUILD_NUMBER="2101"
 MIN_SYSTEM_VERSION="14.0"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -21,10 +21,11 @@ APP_BINARY="$APP_MACOS/$EXECUTABLE_NAME"
 INFO_PLIST="$APP_CONTENTS/Info.plist"
 SUPPORT_DIR="${CODEX_PULSE_SUPPORT_DIR:-$HOME/Library/Application Support/CodexSuanliMeter}"
 BUILD_LOCK="$SUPPORT_DIR/build.lock"
+SWIFT_SCRATCH_PATH="${CODEX_PULSE_SWIFT_SCRATCH_PATH:-$ROOT_DIR/.build/swiftpm-$BUILD_NUMBER}"
 ICON_PATH="$ROOT_DIR/assets/AppIcon.icns"
 WIDGET_ENTITLEMENTS="$ROOT_DIR/config/CodexSuanliWidgets.entitlements"
 WIDGET_XCODE_PROJECT="$ROOT_DIR/xcode/CodexPulseWidgets.xcodeproj"
-WIDGET_DERIVED_DATA="$ROOT_DIR/.build/xcode-widget"
+WIDGET_DERIVED_DATA="$ROOT_DIR/.build/xcode-widget-$BUILD_NUMBER"
 CONFIGURATION="release"
 
 case "$MODE" in
@@ -47,8 +48,8 @@ if [[ "${OPEN_APP:-1}" != "0" ]]; then
 fi
 
 cd "$ROOT_DIR"
-swift build -c "$CONFIGURATION" --product "$EXECUTABLE_NAME"
-BUILD_DIR="$(swift build -c "$CONFIGURATION" --show-bin-path)"
+swift build -c "$CONFIGURATION" --scratch-path "$SWIFT_SCRATCH_PATH" --product "$EXECUTABLE_NAME"
+BUILD_DIR="$(swift build -c "$CONFIGURATION" --scratch-path "$SWIFT_SCRATCH_PATH" --show-bin-path)"
 BUILD_BINARY="$BUILD_DIR/$EXECUTABLE_NAME"
 if [[ "$CONFIGURATION" == "debug" ]]; then
   WIDGET_XCODE_CONFIGURATION="Debug"

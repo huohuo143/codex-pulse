@@ -28,94 +28,128 @@ enum HourlyTokenTooltipFormatter {
 }
 
 struct HourlyUsageChart: View {
-  let rows: [TokenBucket]
-  let tint: Color
+  let data: DeviceUsageTrendData
+  let palette: DashboardPalette
 
-  @State private var hoveredBucketID: TokenBucket.ID?
+  @State private var hoveredPointID: DeviceUsageTrendPoint.ID?
 
   private let chartHeight: CGFloat = 96
   private let barSpacing: CGFloat = 3
-  private let tooltipWidth: CGFloat = 172
+  private let tooltipWidth: CGFloat = 300
 
   var body: some View {
-    GeometryReader { proxy in
-      let maximum = max(1, rows.map(\.totalTokens).max() ?? 1)
+    VStack(alignment: .leading, spacing: 8) {
+      DeviceUsageLegend(data: data, palette: palette)
 
-      ZStack(alignment: .topLeading) {
-        HStack(alignment: .bottom, spacing: barSpacing) {
-          ForEach(rows) { row in
-            hourSlot(row, maximum: maximum, chartHeight: proxy.size.height)
+      GeometryReader { proxy in
+        let maximum = max(1, data.points.map(\.totalTokens).max() ?? 1)
+
+        ZStack(alignment: .topLeading) {
+          HStack(alignment: .bottom, spacing: barSpacing) {
+            ForEach(data.points) { point in
+              hourSlot(point, maximum: maximum, chartHeight: chartHeight)
+            }
+          }
+
+          if let selection = hoveredSelection {
+            DeviceUsageTrendTooltip(point: selection.point, palette: palette)
+              .frame(width: tooltipWidth)
+              .position(
+                x: tooltipCenterX(
+                  index: selection.index,
+                  count: data.points.count,
+                  chartWidth: proxy.size.width
+                ),
+                y: data.tooltipHeight / 2
+              )
+              .allowsHitTesting(false)
+              .transition(.opacity.combined(with: .scale(scale: 0.96)))
+              .zIndex(2)
           }
         }
-
-        if let selection = hoveredSelection {
-          HourlyUsageTooltip(row: selection.row, tint: tint)
-            .frame(width: tooltipWidth)
-            .position(
-              x: tooltipCenterX(
-                index: selection.index,
-                count: rows.count,
-                chartWidth: proxy.size.width
-              ),
-              y: 28
-            )
-            .allowsHitTesting(false)
-            .transition(.opacity.combined(with: .scale(scale: 0.96)))
-            .zIndex(2)
+        .contentShape(Rectangle())
+        .onContinuousHover { phase in
+          switch phase {
+          case .active(let location):
+            hoveredPointID = pointID(atX: location.x, chartWidth: proxy.size.width)
+          case .ended:
+            hoveredPointID = nil
+          }
         }
+        .animation(.easeOut(duration: 0.12), value: hoveredPointID)
       }
-      .contentShape(Rectangle())
-      .onContinuousHover { phase in
-        switch phase {
-        case .active(let location):
-          hoveredBucketID = bucketID(atX: location.x, chartWidth: proxy.size.width)
-        case .ended:
-          hoveredBucketID = nil
-        }
-      }
-      .animation(.easeOut(duration: 0.12), value: hoveredBucketID)
+      .frame(height: data.tooltipHeight + chartHeight)
     }
-    .frame(height: chartHeight)
   }
 
-  private func hourSlot(_ row: TokenBucket, maximum: Int, chartHeight: CGFloat) -> some View {
-    let isHovered = hoveredBucketID == row.id
-    let barHeight = max(3, chartHeight * CGFloat(row.totalTokens) / CGFloat(maximum))
+  private func hourSlot(
+    _ point: DeviceUsageTrendPoint,
+    maximum: Int,
+    chartHeight: CGFloat
+  ) -> some View {
+    let isHovered = hoveredPointID == point.id
+    let barHeight = point.totalTokens > 0
+      ? max(3, chartHeight * CGFloat(point.totalTokens) / CGFloat(maximum))
+      : 2
 
-    return ZStack(alignment: .bottom) {
-      Color.clear
-      RoundedRectangle(cornerRadius: 2, style: .continuous)
-        .fill(tint.opacity(row.totalTokens > 0 ? (isHovered ? 1 : 0.92) : (isHovered ? 0.34 : 0.16)))
-        .frame(height: barHeight)
-        .overlay {
-          if isHovered {
-            RoundedRectangle(cornerRadius: 2, style: .continuous)
-              .stroke(Color.primary.opacity(0.72), lineWidth: 1)
+    return VStack(spacing: 0) {
+      Spacer(minLength: data.tooltipHeight)
+      ZStack(alignment: .bottom) {
+        Color.clear
+        if point.totalTokens > 0 {
+          VStack(spacing: 0) {
+            ForEach(point.values) { value in
+              if let bucket = value.bucket, bucket.totalTokens > 0 {
+                DeviceUsageColorPalette.color(for: value.device.colorIndex, palette: palette)
+                  .opacity(isHovered ? 1 : 0.90)
+                  .frame(
+                    height: barHeight * CGFloat(bucket.totalTokens) / CGFloat(point.totalTokens)
+                  )
+              }
+            }
           }
+          .frame(height: barHeight, alignment: .bottom)
+          .clipShape(RoundedRectangle(cornerRadius: 2, style: .continuous))
+        } else {
+          RoundedRectangle(cornerRadius: 2, style: .continuous)
+            .fill(Color.primary.opacity(isHovered ? 0.24 : 0.12))
+            .frame(height: barHeight)
         }
-        .shadow(color: isHovered ? tint.opacity(0.42) : .clear, radius: 5, y: 1)
+      }
+      .frame(height: chartHeight, alignment: .bottom)
+      .overlay(alignment: .bottom) {
+        if isHovered {
+          RoundedRectangle(cornerRadius: 2, style: .continuous)
+            .stroke(Color.primary.opacity(0.72), lineWidth: 1)
+            .frame(height: barHeight)
+        }
+      }
+      .shadow(color: isHovered ? Color.primary.opacity(0.22) : .clear, radius: 5, y: 1)
     }
-    .frame(maxWidth: .infinity, minHeight: chartHeight, maxHeight: chartHeight, alignment: .bottom)
+    .frame(maxWidth: .infinity, minHeight: data.tooltipHeight + chartHeight, alignment: .bottom)
     .contentShape(Rectangle())
-    .help("\(row.label) · \(BalanceFormatters.exactNumber(row.totalTokens)) Token")
+    .help("\(point.label) · 合计 \(BalanceFormatters.exactNumber(point.totalTokens)) Token")
     .accessibilityElement(children: .ignore)
-    .accessibilityLabel(row.label)
-    .accessibilityValue("\(BalanceFormatters.exactNumber(row.totalTokens)) Token")
-    .accessibilityHint("悬停时显示紧凑单位和精确 Token 数")
+    .accessibilityLabel(point.label)
+    .accessibilityValue(DeviceUsageTrendAccessibility.value(for: point))
+    .accessibilityHint("悬停时显示多设备合计和各设备明细")
   }
 
-  private var hoveredSelection: (index: Int, row: TokenBucket)? {
-    guard let hoveredBucketID,
-          let index = rows.firstIndex(where: { $0.id == hoveredBucketID })
+  private var hoveredSelection: (index: Int, point: DeviceUsageTrendPoint)? {
+    guard let hoveredPointID,
+          let index = data.points.firstIndex(where: { $0.id == hoveredPointID })
     else { return nil }
-    return (index, rows[index])
+    return (index, data.points[index])
   }
 
-  private func bucketID(atX x: CGFloat, chartWidth: CGFloat) -> TokenBucket.ID? {
-    guard !rows.isEmpty, chartWidth > 0 else { return nil }
+  private func pointID(atX x: CGFloat, chartWidth: CGFloat) -> DeviceUsageTrendPoint.ID? {
+    guard !data.points.isEmpty, chartWidth > 0 else { return nil }
     let normalizedX = min(max(0, x), chartWidth.nextDown)
-    let index = min(rows.count - 1, Int(normalizedX / chartWidth * CGFloat(rows.count)))
-    return rows[index].id
+    let index = min(
+      data.points.count - 1,
+      Int(normalizedX / chartWidth * CGFloat(data.points.count))
+    )
+    return data.points[index].id
   }
 
   private func tooltipCenterX(index: Int, count: Int, chartWidth: CGFloat) -> CGFloat {
@@ -126,35 +160,5 @@ struct HourlyUsageChart: View {
     let edgeInset = tooltipWidth / 2 + 4
     guard chartWidth > edgeInset * 2 else { return chartWidth / 2 }
     return min(max(naturalCenter, edgeInset), chartWidth - edgeInset)
-  }
-}
-
-private struct HourlyUsageTooltip: View {
-  let row: TokenBucket
-  let tint: Color
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 2) {
-      Text(row.label)
-        .font(.system(size: 10, weight: .bold))
-        .foregroundStyle(.secondary)
-      Text("\(HourlyTokenTooltipFormatter.compact(row.totalTokens)) Token")
-        .font(.system(size: 13, weight: .heavy, design: .rounded))
-        .foregroundStyle(tint)
-        .monospacedDigit()
-      Text("精确值：\(BalanceFormatters.exactNumber(row.totalTokens))")
-        .font(.system(size: 9, weight: .semibold, design: .rounded))
-        .foregroundStyle(.primary.opacity(0.78))
-        .monospacedDigit()
-    }
-    .frame(maxWidth: .infinity, alignment: .leading)
-    .padding(.horizontal, 10)
-    .padding(.vertical, 7)
-    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-    .overlay {
-      RoundedRectangle(cornerRadius: 9, style: .continuous)
-        .stroke(tint.opacity(0.42), lineWidth: 1)
-    }
-    .shadow(color: Color.black.opacity(0.18), radius: 8, y: 4)
   }
 }

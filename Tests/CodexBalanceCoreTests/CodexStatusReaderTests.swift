@@ -51,6 +51,58 @@ struct CodexStatusReaderTests {
     #expect(status.tokenStats.monthTokens == 900)
     #expect(status.tokenStats.last7DaysTokens == 900)
     #expect(status.tokenStats.sampleCount == 2)
+    #expect(status.tokenStats.daily.count == 30)
+    #expect(status.tokenStats.daily.last?.key == "2026-05-19")
+  }
+
+  @Test
+  func dailyUsageCoversThirtyCalendarDaysAcrossYearBoundaryAndFillsGaps() throws {
+    let root = try makeTemporaryCodexHome()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let sessions = root.appendingPathComponent("sessions")
+    try FileManager.default.createDirectory(at: sessions, withIntermediateDirectories: true)
+
+    let now = try #require(makeDate("2026-01-01T10:00:00Z"))
+    let reset = now.addingTimeInterval(24 * 60 * 60)
+    let file = sessions.appendingPathComponent("thirty-days.jsonl")
+    let lines = [
+      tokenEventLine(
+        timestamp: "2025-12-03T09:00:00Z",
+        limitID: "codex",
+        primaryUsed: 10,
+        secondaryUsed: 20,
+        primaryReset: reset,
+        secondaryReset: reset,
+        totalTokens: 100,
+        lastTokens: 100
+      ),
+      tokenEventLine(
+        timestamp: "2026-01-01T09:00:00Z",
+        limitID: "codex",
+        primaryUsed: 11,
+        secondaryUsed: 21,
+        primaryReset: reset,
+        secondaryReset: reset,
+        totalTokens: 300,
+        lastTokens: 200
+      )
+    ].joined(separator: "\n")
+    try lines.write(to: file, atomically: true, encoding: .utf8)
+
+    let status = try CodexStatusReader(codexHome: root).read(now: now)
+    let daily = status.tokenStats.daily
+    let calendar = Calendar.current
+    let expectedKeys = (0..<30).compactMap { index -> String? in
+      guard let date = calendar.date(byAdding: .day, value: index - 29, to: now) else { return nil }
+      let parts = calendar.dateComponents([.year, .month, .day], from: date)
+      return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
+    }
+
+    #expect(daily.count == 30)
+    #expect(daily.map(\.key) == expectedKeys)
+    #expect(daily.first?.totalTokens == 100)
+    #expect(daily.last?.totalTokens == 200)
+    #expect(daily.dropFirst().dropLast().allSatisfy { $0.totalTokens == 0 && $0.calls == 0 })
   }
 
   @Test
@@ -646,7 +698,7 @@ struct CodexStatusReaderTests {
     #expect(status.scannedFiles == 0)
     #expect(status.eventCount == 0)
     #expect(status.main == nil)
-    #expect(status.tokenStats.daily.count > 0)
+    #expect(status.tokenStats.daily.count == 30)
     #expect(status.tokenStats.monthly.count > 0)
   }
 }
