@@ -153,10 +153,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
-				ARCHS = arm64;
+				ARCHS = "$(ARCHS_STANDARD)";
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGN_ENTITLEMENTS = ../config/CodexSuanliWidgets.entitlements;
-				CURRENT_PROJECT_VERSION = 2101;
+				CURRENT_PROJECT_VERSION = 2102;
 				DEFINES_MODULE = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ../config/CodexSuanliWidgets-Info.plist;
@@ -176,10 +176,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				APPLICATION_EXTENSION_API_ONLY = YES;
-				ARCHS = arm64;
+				ARCHS = "$(ARCHS_STANDARD)";
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGN_ENTITLEMENTS = ../config/CodexSuanliWidgets.entitlements;
-				CURRENT_PROJECT_VERSION = 2101;
+				CURRENT_PROJECT_VERSION = 2102;
 				DEFINES_MODULE = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ../config/CodexSuanliWidgets-Info.plist;

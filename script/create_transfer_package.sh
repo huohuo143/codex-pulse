@@ -4,18 +4,32 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_NAME="Codex 脉动"
 EXECUTABLE_NAME="CodexSuanliMeter"
-VERSION="2.10.0"
-BUILD_NUMBER="2101"
-DATE_TAG="20260721"
-ARCH="arm64"
+VERSION="${VERSION:-2.10.0}"
+BUILD_NUMBER="${BUILD_NUMBER:-2102}"
+DATE_TAG="${DATE_TAG:-$(/bin/date +%Y%m%d)}"
+ARCH="${ARCH:-$(uname -m)}"
+
+case "$ARCH" in
+  arm64)
+    ARCH_LABEL="Apple Silicon arm64"
+    ;;
+  x86_64)
+    ARCH_LABEL="Intel x86_64"
+    ;;
+  *)
+    echo "Unsupported architecture: $ARCH (expected arm64 or x86_64)" >&2
+    exit 2
+    ;;
+esac
+
 DIST_DIR="$ROOT_DIR/dist"
-APP_OUTPUT_DIR="$DIST_DIR/build-v$VERSION-build$BUILD_NUMBER"
+APP_OUTPUT_DIR="$DIST_DIR/build-v$VERSION-build$BUILD_NUMBER-$ARCH"
 APP_BUNDLE="$APP_OUTPUT_DIR/$APP_NAME.app"
 RELEASE_NAME="Codex-Pulse-v$VERSION-build$BUILD_NUMBER"
 DMG_PATH="$DIST_DIR/$RELEASE_NAME-$DATE_TAG-$ARCH.dmg"
 SHA_PATH="$DMG_PATH.sha256"
-NOTES_PATH="$DIST_DIR/$RELEASE_NAME-改版说明.md"
-STAGE_DIR="$ROOT_DIR/.build/dmg-stage-$VERSION-build$BUILD_NUMBER"
+NOTES_PATH="$DIST_DIR/$RELEASE_NAME-$ARCH-改版说明.md"
+STAGE_DIR="$ROOT_DIR/.build/dmg-stage-$VERSION-build$BUILD_NUMBER-$ARCH"
 
 cd "$ROOT_DIR"
 
@@ -24,7 +38,9 @@ if [[ -e "$DMG_PATH" || -e "$SHA_PATH" || -e "$NOTES_PATH" ]]; then
   exit 1
 fi
 
-APP_OUTPUT_DIR="$APP_OUTPUT_DIR" OPEN_APP=0 "$ROOT_DIR/script/build_and_run.sh"
+VERSION="$VERSION" BUILD_NUMBER="$BUILD_NUMBER" ARCH="$ARCH" \
+  APP_OUTPUT_DIR="$APP_OUTPUT_DIR" OPEN_APP=0 \
+  "$ROOT_DIR/script/build_and_run.sh"
 
 cat >"$NOTES_PATH" <<'NOTES'
 # Codex 脉动 2.10.0 改版说明
@@ -39,8 +55,9 @@ cat >"$NOTES_PATH" <<'NOTES'
 - 高级分析仍使用最近 14 天，Widget 的 `daily14` 也仍为 14 天，未改变 Widget schema。
 - 完整测试覆盖多设备对齐、缺失值、旧 schema、跨月、跨年、30 日上限和 14 日兼容性。
 
-本包为 arm64、ad-hoc 签名、未公证版本。首次打开可能出现 Gatekeeper 提示。
 NOTES
+/usr/bin/printf '\n本包为 %s、ad-hoc 签名、未公证版本。首次打开可能出现 Gatekeeper 提示。\n' \
+  "$ARCH_LABEL" >>"$NOTES_PATH"
 
 rm -rf "$STAGE_DIR"
 mkdir -p "$STAGE_DIR"

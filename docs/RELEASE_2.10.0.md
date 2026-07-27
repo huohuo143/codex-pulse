@@ -1,6 +1,6 @@
 # Codex 脉动 2.10.0 改版说明
 
-## build 2101：30 天趋势与多设备堆叠
+## build 2102：30 天趋势、多设备堆叠与 Intel Mac 支持
 
 - 趋势页新增“24 小时 / 按天”分段切换，默认继续显示原有最近 24 小时视图。
 - 按天视图展示包含今天在内的最近 30 个自然日，固定日柱宽度并支持横向滚动。
@@ -27,13 +27,17 @@
 - 多设备测试覆盖 bucket key 对齐、堆叠合计、设备顺序独立性、稳定颜色索引、0/缺失值区分、可变长日序列和旧 schema。
 - 回归测试确认高级分析仍使用 14 天，Widget 预览仍包含 14 个日点。
 - 包体验证检查主 App 与 Widget 的版本号、build、Bundle ID、签名、沙盒 entitlement 和 WidgetKit 生命周期入口。
+- 主 App 与 7 款 Widget 均已分别交叉编译并检查为 arm64 或 x86_64 Mach-O，两个架构使用独立 DMG。
 
 ## 交付文件
 
 ```text
-Codex-Pulse-v2.10.0-build2101-20260721-arm64.dmg
-Codex-Pulse-v2.10.0-build2101-20260721-arm64.dmg.sha256
-Codex-Pulse-v2.10.0-build2101-改版说明.md
+Codex-Pulse-v2.10.0-build2102-20260727-arm64.dmg
+Codex-Pulse-v2.10.0-build2102-20260727-arm64.dmg.sha256
+Codex-Pulse-v2.10.0-build2102-20260727-x86_64.dmg
+Codex-Pulse-v2.10.0-build2102-20260727-x86_64.dmg.sha256
+Codex-Pulse-v2.10.0-build2102-arm64-改版说明.md
+Codex-Pulse-v2.10.0-build2102-x86_64-改版说明.md
 ```
 
-本包为 Apple Silicon、ad-hoc 签名、未公证版本。
+两个安装包均为 ad-hoc 签名、未公证版本；要求 macOS 14 或更高版本。

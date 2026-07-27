@@ -7,9 +7,18 @@ EXECUTABLE_NAME="CodexSuanliMeter"
 WIDGET_EXECUTABLE_NAME="CodexSuanliWidgets"
 BUNDLE_ID="dev.codex.balance-dashboard.codex"
 WIDGET_BUNDLE_ID="$BUNDLE_ID.widgets"
-VERSION="2.10.0"
-BUILD_NUMBER="2101"
+VERSION="${VERSION:-2.10.0}"
+BUILD_NUMBER="${BUILD_NUMBER:-2102}"
+ARCH="${ARCH:-$(uname -m)}"
 MIN_SYSTEM_VERSION="14.0"
+
+case "$ARCH" in
+  arm64|x86_64) ;;
+  *)
+    echo "Unsupported architecture: $ARCH (expected arm64 or x86_64)" >&2
+    exit 2
+    ;;
+esac
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="${CODEX_PULSE_DIST_DIR:-$ROOT_DIR/dist}"
@@ -21,11 +30,11 @@ APP_BINARY="$APP_MACOS/$EXECUTABLE_NAME"
 INFO_PLIST="$APP_CONTENTS/Info.plist"
 SUPPORT_DIR="${CODEX_PULSE_SUPPORT_DIR:-$HOME/Library/Application Support/CodexSuanliMeter}"
 BUILD_LOCK="$SUPPORT_DIR/build.lock"
-SWIFT_SCRATCH_PATH="${CODEX_PULSE_SWIFT_SCRATCH_PATH:-$ROOT_DIR/.build/swiftpm-$BUILD_NUMBER}"
+SWIFT_SCRATCH_PATH="${CODEX_PULSE_SWIFT_SCRATCH_PATH:-$ROOT_DIR/.build/swiftpm-$BUILD_NUMBER-$ARCH}"
 ICON_PATH="$ROOT_DIR/assets/AppIcon.icns"
 WIDGET_ENTITLEMENTS="$ROOT_DIR/config/CodexSuanliWidgets.entitlements"
 WIDGET_XCODE_PROJECT="$ROOT_DIR/xcode/CodexPulseWidgets.xcodeproj"
-WIDGET_DERIVED_DATA="$ROOT_DIR/.build/xcode-widget-$BUILD_NUMBER"
+WIDGET_DERIVED_DATA="$ROOT_DIR/.build/xcode-widget-$BUILD_NUMBER-$ARCH"
 CONFIGURATION="release"
 
 case "$MODE" in
@@ -48,8 +57,8 @@ if [[ "${OPEN_APP:-1}" != "0" ]]; then
 fi
 
 cd "$ROOT_DIR"
-swift build -c "$CONFIGURATION" --scratch-path "$SWIFT_SCRATCH_PATH" --product "$EXECUTABLE_NAME"
-BUILD_DIR="$(swift build -c "$CONFIGURATION" --scratch-path "$SWIFT_SCRATCH_PATH" --show-bin-path)"
+swift build -c "$CONFIGURATION" --arch "$ARCH" --scratch-path "$SWIFT_SCRATCH_PATH" --product "$EXECUTABLE_NAME"
+BUILD_DIR="$(swift build -c "$CONFIGURATION" --arch "$ARCH" --scratch-path "$SWIFT_SCRATCH_PATH" --show-bin-path)"
 BUILD_BINARY="$BUILD_DIR/$EXECUTABLE_NAME"
 if [[ "$CONFIGURATION" == "debug" ]]; then
   WIDGET_XCODE_CONFIGURATION="Debug"
@@ -65,6 +74,8 @@ fi
   MARKETING_VERSION="$VERSION" \
   CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
   PRODUCT_BUNDLE_IDENTIFIER="$WIDGET_BUNDLE_ID" \
+  ARCHS="$ARCH" \
+  ONLY_ACTIVE_ARCH=YES \
   build >/dev/null
 WIDGET_XCODE_BUNDLE="$WIDGET_DERIVED_DATA/Build/Products/$WIDGET_XCODE_CONFIGURATION/$WIDGET_EXECUTABLE_NAME.appex"
 
@@ -147,7 +158,8 @@ if ! /usr/bin/codesign --force --sign - "$APP_BUNDLE" >/dev/null 2>&1 \
   WIDGET_BUNDLE="$APP_CONTENTS/PlugIns/$WIDGET_EXECUTABLE_NAME.appex"
 fi
 
-"$ROOT_DIR/script/verify_widget_bundle.sh" "$APP_BUNDLE"
+VERSION="$VERSION" BUILD_NUMBER="$BUILD_NUMBER" ARCH="$ARCH" \
+  "$ROOT_DIR/script/verify_widget_bundle.sh" "$APP_BUNDLE"
 
 open_app() {
   /usr/bin/open -n "$APP_BUNDLE"

@@ -11,14 +11,14 @@
 <p align="center">
   <img alt="Version" src="https://img.shields.io/badge/version-2.10.0-8b7cff">
   <img alt="macOS" src="https://img.shields.io/badge/macOS-14%2B-111827?logo=apple">
-  <img alt="Apple Silicon" src="https://img.shields.io/badge/Apple%20Silicon-arm64-111827">
+  <img alt="Mac architectures" src="https://img.shields.io/badge/Mac-arm64%20%7C%20x86__64-111827">
   <img alt="Swift" src="https://img.shields.io/badge/Swift-6.0-f05138?logo=swift&logoColor=white">
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-22c55e"></a>
 </p>
 
 `Codex 脉动` 将 Codex 的额度、Token 消耗、重置节奏和 Full reset 权益集中到一套原生 macOS 界面中。它既可以作为常驻悬浮框，也可以完全隐藏悬浮框，仅使用主窗口或 7 款桌面小组件。
 
-> 当前版本：`2.10.0`。安装包为 Apple Silicon、ad-hoc 签名、未公证版本，要求 macOS 14 或更高版本。
+> 当前版本：`2.10.0` build 2102。分别提供 Apple Silicon（arm64）与 Intel（x86_64）安装包；两者均为 ad-hoc 签名、未公证版本，要求 macOS 14 或更高版本。
 
 ## 当前版本界面
 
@@ -162,8 +162,10 @@ flowchart LR
 在 [Releases](https://github.com/huohuo143/codex-pulse/releases) 下载：
 
 ```text
-Codex-Pulse-v2.10.0-build2101-20260721-arm64.dmg
-Codex-Pulse-v2.10.0-build2101-20260721-arm64.dmg.sha256
+Codex-Pulse-v2.10.0-build2102-20260727-arm64.dmg
+Codex-Pulse-v2.10.0-build2102-20260727-arm64.dmg.sha256
+Codex-Pulse-v2.10.0-build2102-20260727-x86_64.dmg
+Codex-Pulse-v2.10.0-build2102-20260727-x86_64.dmg.sha256
 ```
 
 1. 打开 DMG。
@@ -198,7 +200,7 @@ Codex-Pulse-v2.10.0-build2101-20260721-arm64.dmg.sha256
 ### 环境要求
 
 - macOS 14+
-- Apple Silicon Mac
+- Apple Silicon 或 Intel Mac
 - Swift 6 / Xcode Command Line Tools
 - 完整 Xcode，用于构建原生 Widget App Extension
 
@@ -214,6 +216,14 @@ OPEN_APP=0 ./script/build_and_run.sh
 
 主程序由 SwiftPM 构建；Widget 扩展由 `xcode/CodexPulseWidgets.xcodeproj` 的原生 App Extension target 构建，以满足 WidgetKit 生命周期要求。
 
+默认构建当前 Mac 的架构。可显式生成 Intel 或 Apple Silicon 版本：
+
+```bash
+ARCH=x86_64 OPEN_APP=0 ./script/build_and_run.sh
+ARCH=x86_64 ./script/create_transfer_package.sh
+ARCH=arm64 ./script/create_transfer_package.sh
+```
+
 主要目录：
 
 | 路径 | 内容 |
@@ -227,7 +237,7 @@ OPEN_APP=0 ./script/build_and_run.sh
 
 ## 已知边界
 
-- 当前 DMG 仅支持 arm64，采用 ad-hoc 签名且尚未公证。
+- DMG 按架构分别发布为 arm64 与 x86_64；请下载与 Mac 处理器匹配的文件。安装包采用 ad-hoc 签名且尚未公证。
 - 本地 Token 统计来自 Codex 会话日志，不包含无法在本机日志中观察到的网页端用量。
 - 未知模型不会猜测价格，而会保持“未计价”。
 - WidgetKit 的实际刷新时刻仍受 macOS 桌面小组件预算控制。
