@@ -7,11 +7,11 @@ struct UsageAnalyticsTests {
   @Test
   func analyzerComparesSevenDayPeriodsAndComputesEfficiency() throws {
     let now = try #require(ISO8601DateFormatter().date(from: "2026-07-15T12:00:00Z"))
-    let daily = (0..<14).map { index in
+    let daily = (0..<30).map { index in
       TokenBucket(
-        key: String(format: "2026-07-%02d", index + 2),
-        label: "7/\(index + 2)",
-        totalTokens: index < 7 ? 100_000 : 150_000,
+        key: "day-\(index + 1)",
+        label: "D\(index + 1)",
+        totalTokens: index < 16 ? 9_000_000 : (index < 23 ? 100_000 : 150_000),
         calls: 2
       )
     }

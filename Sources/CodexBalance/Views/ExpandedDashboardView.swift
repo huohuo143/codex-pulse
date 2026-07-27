@@ -3,9 +3,44 @@ import CodexBalanceCore
 import SwiftUI
 
 struct ExpandedDashboardView: View {
+  private enum UsageTrendPeriod: String, CaseIterable, Identifiable {
+    case hourly
+    case daily
+
+    var id: String { rawValue }
+    var title: String { self == .hourly ? "24 小时" : "按天" }
+  }
+
   @EnvironmentObject private var store: DashboardStore
+  @State private var usageTrendPeriod: UsageTrendPeriod = .hourly
 
   private var stats: TokenStats { store.tokenStats }
+  private var currentDeviceID: String? { stats.deviceUsage.first?.deviceID }
+
+  private var orderedTrendDevices: [DeviceUsageTrendDevice] {
+    DeviceUsageTrendBuilder.orderedDevices(
+      from: stats.deviceUsage,
+      currentDeviceID: currentDeviceID
+    )
+  }
+
+  private var hourlyTrendData: DeviceUsageTrendData {
+    DeviceUsageTrendBuilder.make(
+      axisRows: stats.hourly,
+      snapshots: stats.deviceUsage,
+      currentDeviceID: currentDeviceID,
+      granularity: .hourly
+    )
+  }
+
+  private var dailyTrendData: DeviceUsageTrendData {
+    DeviceUsageTrendBuilder.make(
+      axisRows: DailyUsageChartSupport.visibleRows(stats.daily),
+      snapshots: stats.deviceUsage,
+      currentDeviceID: currentDeviceID,
+      granularity: .daily
+    )
+  }
 
   var body: some View {
     ZStack {
@@ -114,7 +149,7 @@ struct ExpandedDashboardView: View {
 
   private var trendsSection: some View {
     VStack(spacing: 16) {
-      hourlyPanel
+      usageTrendPanel
       modelPanel
       devicePanel
       disclaimerPanel
@@ -204,20 +239,55 @@ struct ExpandedDashboardView: View {
     )
   }
 
-  private var hourlyPanel: some View {
+  private var usageTrendPanel: some View {
     PanelCard {
       VStack(alignment: .leading, spacing: 12) {
-        sectionTitle("最近24小时", subtitle: "按本机时区显示；滚动值按精确时间戳计算")
-        HourlyUsageChart(rows: stats.hourly, tint: store.palette.usage24h)
-        HStack {
-          Text(stats.hourly.first?.label ?? "--")
+        HStack(alignment: .top, spacing: 12) {
+          sectionTitle(usageTrendTitle, subtitle: usageTrendSubtitle)
           Spacer()
-          Text(stats.hourly.last?.label ?? "--")
+          Picker("趋势粒度", selection: $usageTrendPeriod) {
+            ForEach(UsageTrendPeriod.allCases) { period in
+              Text(period.title).tag(period)
+            }
+          }
+          .labelsHidden()
+          .pickerStyle(.segmented)
+          .frame(width: 160)
+          .accessibilityLabel("趋势粒度")
         }
-        .font(.system(size: 10, weight: .medium))
-        .foregroundStyle(DashboardColors.subtleText)
+
+        if usageTrendPeriod == .hourly {
+          HourlyUsageChart(data: hourlyTrendData, palette: store.palette)
+          HStack {
+            Text(stats.hourly.first?.label ?? "--")
+            Spacer()
+            Text(stats.hourly.last?.label ?? "--")
+          }
+          .font(.system(size: 10, weight: .medium))
+          .foregroundStyle(DashboardColors.subtleText)
+        } else {
+          DailyUsageChart(data: dailyTrendData, palette: store.palette)
+        }
       }
     }
+    .animation(.easeInOut(duration: 0.18), value: usageTrendPeriod)
+  }
+
+  private var usageTrendTitle: String {
+    usageTrendPeriod == .hourly ? "最近24小时" : "最近30天"
+  }
+
+  private var usageTrendSubtitle: String {
+    if usageTrendPeriod == .hourly {
+      if hourlyTrendData.isMultiDevice {
+        return "按本机时区对齐 \(hourlyTrendData.devices.count) 台设备；滚动值按精确时间戳计算"
+      }
+      return "按本机时区显示；滚动值按精确时间戳计算"
+    }
+    if dailyTrendData.isMultiDevice {
+      return "按本机时区对齐 \(dailyTrendData.devices.count) 台设备；横向滚动查看完整月份"
+    }
+    return "按本机时区逐日汇总；横向滚动查看完整月份"
   }
 
   private var modelPanel: some View {
@@ -252,7 +322,7 @@ struct ExpandedDashboardView: View {
           ForEach(stats.deviceUsage) { device in
             HStack {
               Image(systemName: "desktopcomputer")
-                .foregroundStyle(device.deviceID == stats.deviceUsage.first?.deviceID ? store.palette.weekly : DashboardColors.subtleText)
+                .foregroundStyle(deviceColor(device.deviceID))
               VStack(alignment: .leading, spacing: 2) {
                 Text(device.deviceName).font(.system(size: 12, weight: .bold))
                 Text("schema \(device.schemaVersion) · \(device.updatedAt.formatted(date: .abbreviated, time: .shortened))")
@@ -312,6 +382,11 @@ struct ExpandedDashboardView: View {
   private func usd(_ value: Double) -> String { String(format: "$%.2f", value) }
   private func cny(_ estimate: CostEstimate) -> String {
     store.cnyValue(for: estimate).map { "¥\(String(format: "%.2f", $0))" } ?? "¥--"
+  }
+
+  private func deviceColor(_ deviceID: String) -> Color {
+    let colorIndex = orderedTrendDevices.first(where: { $0.deviceID == deviceID })?.colorIndex ?? 0
+    return DeviceUsageColorPalette.color(for: colorIndex, palette: store.palette)
   }
 
   private var modelTotals: [(name: String, tokens: Int)] {
