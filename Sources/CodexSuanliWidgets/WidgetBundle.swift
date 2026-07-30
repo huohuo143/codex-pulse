@@ -22,7 +22,7 @@ private struct CodexOverviewWidget: Widget {
       CodexOverviewWidgetView(entry: entry)
     }
     .configurationDisplayName("Codex 算力总览")
-    .description("复刻悬浮框核心信息：7 天额度、滚动 24h、重置概率与 Full reset。")
+    .description("复刻悬浮框核心信息；可选显示 7 天外环与 5 小时内环。")
     .supportedFamilies([.systemMedium, .systemLarge])
     .contentMarginsDisabled()
   }
@@ -35,8 +35,8 @@ private struct QuotaWidget: Widget {
     StaticConfiguration(kind: kind, provider: CodexTimelineProvider()) { entry in
       QuotaWidgetView(entry: entry)
     }
-    .configurationDisplayName("7 天额度")
-    .description("显示 7 天剩余额度、已用比例与重置倒计时。")
+    .configurationDisplayName("Codex 额度")
+    .description("显示 7 天额度外环；可在主 App 中开启 5 小时橙色内环。")
     .supportedFamilies([.systemSmall, .systemMedium])
     .contentMarginsDisabled()
   }

@@ -17,6 +17,10 @@ struct CompactDashboardView: View {
   private var activeQuotaMetrics: [FloatingPanelMetric] {
     [.weeklyQuota, .fiveHourQuota].filter(shows)
   }
+  private var pillMetrics: [FloatingPanelMetric] {
+    guard shows(.weeklyQuota), shows(.fiveHourQuota) else { return activeMetrics }
+    return activeMetrics.filter { $0 != .fiveHourQuota }
+  }
   private var primaryQuotaMetric: FloatingPanelMetric? { activeQuotaMetrics.first }
   private var secondaryQuotaMetric: FloatingPanelMetric? { activeQuotaMetrics.dropFirst().first }
   private var fiveHourTint: Color { .orange }
@@ -182,21 +186,14 @@ struct CompactDashboardView: View {
 
   private var horizontalRingLayout: some View {
     VStack(spacing: mini ? 6 : 8) {
-      if activeQuotaMetrics.count == 2 {
+      if !activeQuotaMetrics.isEmpty, shows(.rolling24Tokens) {
         HStack(spacing: mini ? 12 : 18) {
-          ForEach(activeQuotaMetrics) { metric in
-            quotaGauge(metric, size: mini ? 104 : 124, lineWidth: mini ? 10 : 12)
-          }
-        }
-        if shows(.rolling24Tokens) { verticalRollingUsage }
-      } else if let quotaMetric = primaryQuotaMetric, shows(.rolling24Tokens) {
-        HStack(spacing: mini ? 12 : 18) {
-          quotaGauge(quotaMetric, size: mini ? 116 : 148, lineWidth: mini ? 11 : 14)
+          concentricQuotaGauge(size: mini ? 116 : 148, lineWidth: mini ? 11 : 14)
           rollingUsage
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-      } else if let quotaMetric = primaryQuotaMetric {
-        quotaGauge(quotaMetric, size: mini ? 116 : 148, lineWidth: mini ? 11 : 14)
+      } else if !activeQuotaMetrics.isEmpty {
+        concentricQuotaGauge(size: mini ? 116 : 148, lineWidth: mini ? 11 : 14)
         .frame(maxWidth: .infinity)
       } else if shows(.rolling24Tokens) {
         rollingUsage
@@ -209,8 +206,8 @@ struct CompactDashboardView: View {
 
   private var verticalRingLayout: some View {
     VStack(spacing: mini ? 6 : 8) {
-      ForEach(activeQuotaMetrics) { metric in
-        quotaGauge(metric, size: mini ? 116 : 148, lineWidth: mini ? 11 : 14)
+      if !activeQuotaMetrics.isEmpty {
+        concentricQuotaGauge(size: mini ? 116 : 148, lineWidth: mini ? 11 : 14)
       }
       if shows(.rolling24Tokens) { verticalRollingUsage }
       if shows(.resetRadar) { resetRadarRow }
@@ -219,18 +216,37 @@ struct CompactDashboardView: View {
   }
 
   private var circleLayout: some View {
-    let progress = max(0.008, min(1, (quotaWindow(primaryQuotaMetric)?.remainingPercent ?? 0) / 100))
+    let weeklyProgress = max(0.008, min(1, (store.weekly?.remainingPercent ?? 0) / 100))
+    let fiveHourProgress = max(0.008, min(1, (store.fiveHour?.remainingPercent ?? 0) / 100))
+    let displaysBoth = shows(.weeklyQuota) && shows(.fiveHourQuota)
+    let ringWidth: CGFloat = mini ? 10 : 13
+    let diameter: CGFloat = mini ? 116 : 148
     return ZStack {
-      Circle()
-        .stroke(DashboardColors.track, lineWidth: mini ? 10 : 13)
-      if let primaryQuotaMetric {
+      if shows(.weeklyQuota) {
         Circle()
-          .trim(from: 0, to: progress)
-          .stroke(quotaTint(primaryQuotaMetric), style: StrokeStyle(lineWidth: mini ? 10 : 13, lineCap: .round))
+          .stroke(DashboardColors.track, lineWidth: ringWidth)
+        Circle()
+          .trim(from: 0, to: weeklyProgress)
+          .stroke(store.palette.weekly, style: StrokeStyle(lineWidth: ringWidth, lineCap: .round))
           .rotationEffect(.degrees(-90))
       }
+      if shows(.fiveHourQuota) {
+        let innerDiameter = displaysBoth ? diameter * 0.72 : diameter
+        let innerWidth = displaysBoth ? ringWidth * 0.72 : ringWidth
+        Circle()
+          .stroke(DashboardColors.track, lineWidth: innerWidth)
+          .frame(width: innerDiameter, height: innerDiameter)
+        Circle()
+          .trim(from: 0, to: fiveHourProgress)
+          .stroke(fiveHourTint, style: StrokeStyle(lineWidth: innerWidth, lineCap: .round))
+          .rotationEffect(.degrees(-90))
+          .frame(width: innerDiameter, height: innerDiameter)
+      }
       VStack(spacing: activeMetrics.count >= 4 ? 1 : (mini ? 2 : 4)) {
-        if let primaryQuotaMetric {
+        if displaysBoth {
+          circleMetric("7天", quotaPercentText(.weeklyQuota), tint: store.palette.weekly)
+          circleMetric("5h", quotaPercentText(.fiveHourQuota), tint: fiveHourTint)
+        } else if let primaryQuotaMetric {
           Text(quotaPercentText(primaryQuotaMetric))
             .font(.system(size: activeMetrics.count >= 3 ? (mini ? 24 : 30) : (mini ? 30 : 38), weight: .heavy, design: .rounded))
             .foregroundStyle(quotaTint(primaryQuotaMetric))
@@ -239,13 +255,6 @@ struct CompactDashboardView: View {
           Text(quotaShortTitle(primaryQuotaMetric))
             .font(.system(size: mini ? 8.5 : 10.5, weight: .bold))
             .foregroundStyle(DashboardColors.subtleText)
-        }
-        if let secondaryQuotaMetric {
-          circleMetric(
-            quotaBadgeTitle(secondaryQuotaMetric),
-            quotaPercentText(secondaryQuotaMetric),
-            tint: quotaTint(secondaryQuotaMetric)
-          )
         }
         if shows(.rolling24Tokens) {
           circleMetric("24h", BalanceFormatters.compactNumber(stats.rolling24HoursTokens), tint: store.palette.usage24h)
@@ -260,7 +269,8 @@ struct CompactDashboardView: View {
       .padding(.horizontal, mini ? 15 : 20)
     }
     .frame(width: mini ? 116 : 148, height: mini ? 116 : 148)
-    .animation(.smooth(duration: 0.32), value: progress)
+    .animation(.smooth(duration: 0.32), value: weeklyProgress)
+    .animation(.smooth(duration: 0.32), value: fiveHourProgress)
   }
 
   private var squareLayout: some View {
@@ -326,8 +336,8 @@ struct CompactDashboardView: View {
 
   private var pillLayout: some View {
     HStack(spacing: mini ? 7 : 9) {
-      ForEach(activeMetrics) { metric in
-        if metric != activeMetrics.first {
+      ForEach(pillMetrics) { metric in
+        if metric != pillMetrics.first {
           Divider()
             .frame(height: mini ? 25 : 31)
             .overlay(DashboardColors.separator)
@@ -358,21 +368,23 @@ struct CompactDashboardView: View {
     switch metric {
     case .weeklyQuota:
       HStack(spacing: mini ? 5 : 7) {
-        Circle()
-          .trim(from: 0, to: max(0.008, min(1, (store.weekly?.remainingPercent ?? 0) / 100)))
-          .stroke(store.palette.weekly, style: StrokeStyle(lineWidth: mini ? 4 : 5, lineCap: .round))
-          .rotationEffect(.degrees(-90))
-          .frame(width: mini ? 28 : 34, height: mini ? 28 : 34)
-          .overlay {
-            Text(store.weekly.map { "\(Int($0.remainingPercent.rounded()))" } ?? "--")
-              .font(.system(size: mini ? 8 : 10, weight: .heavy, design: .rounded))
-              .foregroundStyle(store.palette.weekly)
-          }
-        pillValue(
-          title: "7天剩余",
-          value: store.weekly.map { "\(Int($0.remainingPercent.rounded()))%" } ?? "--",
-          tint: store.palette.weekly
+        quotaPillRing(
+          weeklyValue: store.weekly?.remainingPercent,
+          fiveHourValue: store.fiveHour?.remainingPercent,
+          showsFiveHour: shows(.fiveHourQuota)
         )
+        if shows(.fiveHourQuota) {
+          VStack(alignment: .leading, spacing: 1) {
+            pillQuotaValue("7天", value: store.weekly?.remainingPercent, tint: store.palette.weekly)
+            pillQuotaValue("5h", value: store.fiveHour?.remainingPercent, tint: fiveHourTint)
+          }
+        } else {
+          pillValue(
+            title: "7天剩余",
+            value: store.weekly.map { "\(Int($0.remainingPercent.rounded()))%" } ?? "--",
+            tint: store.palette.weekly
+          )
+        }
       }
     case .fiveHourQuota:
       HStack(spacing: mini ? 5 : 7) {
@@ -416,6 +428,47 @@ struct CompactDashboardView: View {
         .monospacedDigit()
         .lineLimit(1)
     }
+  }
+
+  private func quotaPillRing(
+    weeklyValue: Double?,
+    fiveHourValue: Double?,
+    showsFiveHour: Bool
+  ) -> some View {
+    let size: CGFloat = mini ? 28 : 34
+    let outerWidth: CGFloat = mini ? 4 : 5
+    return ZStack {
+      Circle().stroke(DashboardColors.track, lineWidth: outerWidth)
+      Circle()
+        .trim(from: 0, to: max(0.008, min(1, (weeklyValue ?? 0) / 100)))
+        .stroke(store.palette.weekly, style: StrokeStyle(lineWidth: outerWidth, lineCap: .round))
+        .rotationEffect(.degrees(-90))
+      if showsFiveHour {
+        Circle()
+          .stroke(DashboardColors.track, lineWidth: outerWidth * 0.65)
+          .frame(width: size * 0.62, height: size * 0.62)
+        Circle()
+          .trim(from: 0, to: max(0.008, min(1, (fiveHourValue ?? 0) / 100)))
+          .stroke(fiveHourTint, style: StrokeStyle(lineWidth: outerWidth * 0.65, lineCap: .round))
+          .rotationEffect(.degrees(-90))
+          .frame(width: size * 0.62, height: size * 0.62)
+      } else {
+        Text(weeklyValue.map { "\(Int($0.rounded()))" } ?? "--")
+          .font(.system(size: mini ? 8 : 10, weight: .heavy, design: .rounded))
+          .foregroundStyle(store.palette.weekly)
+      }
+    }
+    .frame(width: size, height: size)
+  }
+
+  private func pillQuotaValue(_ label: String, value: Double?, tint: Color) -> some View {
+    HStack(spacing: 3) {
+      Text(label).foregroundStyle(DashboardColors.subtleText)
+      Text(value.map { "\(Int($0.rounded()))%" } ?? "--").foregroundStyle(tint)
+    }
+    .font(.system(size: mini ? 7.5 : 9, weight: .heavy, design: .rounded))
+    .monospacedDigit()
+    .lineLimit(1)
   }
 
   private func circleMetric(_ title: String, _ value: String, tint: Color) -> some View {
@@ -576,13 +629,16 @@ struct CompactDashboardView: View {
   }
 
   @ViewBuilder
-  private func quotaGauge(_ metric: FloatingPanelMetric, size: CGFloat, lineWidth: CGFloat) -> some View {
-    WeeklyGaugeView(
-      remainingPercent: quotaWindow(metric)?.remainingPercent,
-      tint: quotaTint(metric),
+  private func concentricQuotaGauge(size: CGFloat, lineWidth: CGFloat) -> some View {
+    ConcentricQuotaGaugeView(
+      weeklyRemainingPercent: store.weekly?.remainingPercent,
+      fiveHourRemainingPercent: store.fiveHour?.remainingPercent,
+      showsWeekly: shows(.weeklyQuota),
+      showsFiveHour: shows(.fiveHourQuota),
+      weeklyTint: store.palette.weekly,
+      fiveHourTint: fiveHourTint,
       size: size,
-      lineWidth: lineWidth,
-      label: quotaShortTitle(metric)
+      lineWidth: lineWidth
     )
   }
 

@@ -17,6 +17,10 @@ struct WidgetSnapshotTests {
       remainingPercent: 68,
       usedPercent: 32,
       resetsAt: updatedAt.addingTimeInterval(2 * 24 * 60 * 60),
+      fiveHourRemainingPercent: 84,
+      fiveHourUsedPercent: 16,
+      fiveHourResetsAt: updatedAt.addingTimeInterval(2 * 60 * 60),
+      showsFiveHourQuota: true,
       rolling24HoursTokens: 120_000,
       todayTokens: 90_000,
       last7DaysTokens: 840_000,
@@ -44,7 +48,9 @@ struct WidgetSnapshotTests {
     let json = try #require(String(data: Data(contentsOf: url), encoding: .utf8))
 
     #expect(decoded == snapshot)
-    #expect(decoded.schemaVersion == 1)
+    #expect(decoded.schemaVersion == 2)
+    #expect(decoded.displaysFiveHourQuota)
+    #expect(decoded.fiveHourRemainingPercent == 84)
     #expect(!json.contains("projectPath"))
     #expect(!json.contains("sourcePath"))
     #expect(!json.contains("access_token"))
@@ -56,6 +62,8 @@ struct WidgetSnapshotTests {
     let snapshot = CodexWidgetSnapshot.preview
 
     #expect(snapshot.remainingPercent != nil)
+    #expect(snapshot.fiveHourRemainingPercent != nil)
+    #expect(snapshot.displaysFiveHourQuota)
     #expect(snapshot.rolling24HoursTokens > 0)
     #expect(snapshot.resetProbability24h != nil)
     #expect(snapshot.resetCreditsAvailable != nil)
@@ -99,6 +107,12 @@ struct WidgetSnapshotTests {
     later.remainingPercent = 67
     #expect(!original.hasSameWidgetContent(as: later))
     later = original
+    later.fiveHourRemainingPercent = 84
+    #expect(!original.hasSameWidgetContent(as: later))
+    later = original
+    later.showsFiveHourQuota = true
+    #expect(!original.hasSameWidgetContent(as: later))
+    later = original
     later.rolling24HoursTokens += 1
     #expect(!original.hasSameWidgetContent(as: later))
     later = original
@@ -110,6 +124,37 @@ struct WidgetSnapshotTests {
     later = original
     later.topProjects[0].tokens += 1
     #expect(!original.hasSameWidgetContent(as: later))
+  }
+
+  @Test
+  func legacySnapshotWithoutFiveHourFieldsStillDecodes() throws {
+    let json = """
+      {
+        "schemaVersion": 1,
+        "updatedAt": 100,
+        "rolling24HoursTokens": 0,
+        "todayTokens": 0,
+        "last7DaysTokens": 0,
+        "monthTokens": 0,
+        "cost24HoursUSD": 0,
+        "cost7DaysUSD": 0,
+        "costMonthUSD": 0,
+        "resetCredits": [],
+        "sampleCount": 0,
+        "deviceCount": 0,
+        "hourly24": [],
+        "daily14": [],
+        "topProjects": [],
+        "topCategories": []
+      }
+      """
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .secondsSince1970
+    let snapshot = try decoder.decode(CodexWidgetSnapshot.self, from: Data(json.utf8))
+
+    #expect(snapshot.schemaVersion == 1)
+    #expect(snapshot.fiveHourRemainingPercent == nil)
+    #expect(!snapshot.displaysFiveHourQuota)
   }
 
   @Test

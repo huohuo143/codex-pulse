@@ -29,10 +29,8 @@ enum WindowConfigurator {
       if ringOrientation == .horizontal {
         if showsWeekly || showsFiveHour { heights.append(isMini ? 116 : 148) }
         else if showsRolling { heights.append(isMini ? 72 : 92) }
-        if showsWeekly && showsFiveHour && showsRolling { heights.append(isMini ? 44 : 54) }
       } else {
-        if showsWeekly { heights.append(isMini ? 116 : 148) }
-        if showsFiveHour { heights.append(isMini ? 116 : 148) }
+        if showsWeekly || showsFiveHour { heights.append(isMini ? 116 : 148) }
         if showsRolling { heights.append(isMini ? 44 : 54) }
       }
       if showsRadar { heights.append(isMini ? 24 : 28) }
@@ -44,7 +42,7 @@ enum WindowConfigurator {
       let width: CGFloat
       if ringOrientation == .vertical {
         width = isMini ? 204 : 236
-      } else if (showsWeekly && showsFiveHour) || ((showsWeekly || showsFiveHour) && showsRolling) {
+      } else if (showsWeekly || showsFiveHour) && showsRolling {
         width = isMini ? 248 : 300
       } else if showsWeekly || showsFiveHour {
         width = isMini ? 160 : 190
@@ -60,9 +58,10 @@ enum WindowConfigurator {
         : max(CGFloat(128), CGFloat(62 + metrics.count * 32))
       return NSSize(width: isMini ? 148 : 180, height: height)
     case .pill:
+      let metricCount = metrics.count - ((showsWeekly && showsFiveHour) ? 1 : 0)
       let width = isMini
-        ? max(CGFloat(168), CGFloat(70 + metrics.count * 57))
-        : max(CGFloat(198), CGFloat(82 + metrics.count * 66))
+        ? max(CGFloat(168), CGFloat(70 + metricCount * 57))
+        : max(CGFloat(198), CGFloat(82 + metricCount * 66))
       return NSSize(width: width, height: isMini ? 56 : 68)
     case .bars:
       let quotaProgressCount = [showsWeekly, showsFiveHour].filter { $0 }.count

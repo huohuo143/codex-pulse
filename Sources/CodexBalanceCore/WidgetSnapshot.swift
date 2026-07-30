@@ -39,6 +39,10 @@ public struct CodexWidgetSnapshot: Codable, Equatable, Sendable {
   public var remainingPercent: Double?
   public var usedPercent: Double?
   public var resetsAt: Date?
+  public var fiveHourRemainingPercent: Double?
+  public var fiveHourUsedPercent: Double?
+  public var fiveHourResetsAt: Date?
+  public var showsFiveHourQuota: Bool?
   public var rolling24HoursTokens: Int
   public var todayTokens: Int
   public var last7DaysTokens: Int
@@ -61,11 +65,15 @@ public struct CodexWidgetSnapshot: Codable, Equatable, Sendable {
   public var topCategories: [CodexWidgetMetric]
 
   public init(
-    schemaVersion: Int = 1,
+    schemaVersion: Int = 2,
     updatedAt: Date = Date(),
     remainingPercent: Double? = nil,
     usedPercent: Double? = nil,
     resetsAt: Date? = nil,
+    fiveHourRemainingPercent: Double? = nil,
+    fiveHourUsedPercent: Double? = nil,
+    fiveHourResetsAt: Date? = nil,
+    showsFiveHourQuota: Bool = false,
     rolling24HoursTokens: Int = 0,
     todayTokens: Int = 0,
     last7DaysTokens: Int = 0,
@@ -92,6 +100,10 @@ public struct CodexWidgetSnapshot: Codable, Equatable, Sendable {
     self.remainingPercent = remainingPercent
     self.usedPercent = usedPercent
     self.resetsAt = resetsAt
+    self.fiveHourRemainingPercent = fiveHourRemainingPercent
+    self.fiveHourUsedPercent = fiveHourUsedPercent
+    self.fiveHourResetsAt = fiveHourResetsAt
+    self.showsFiveHourQuota = showsFiveHourQuota
     self.rolling24HoursTokens = rolling24HoursTokens
     self.todayTokens = todayTokens
     self.last7DaysTokens = last7DaysTokens
@@ -118,6 +130,10 @@ public struct CodexWidgetSnapshot: Codable, Equatable, Sendable {
     CodexWidgetSnapshot(updatedAt: .distantPast)
   }
 
+  public var displaysFiveHourQuota: Bool {
+    showsFiveHourQuota == true
+  }
+
   public static var preview: CodexWidgetSnapshot {
     let now = Date()
     return CodexWidgetSnapshot(
@@ -125,6 +141,10 @@ public struct CodexWidgetSnapshot: Codable, Equatable, Sendable {
       remainingPercent: 68,
       usedPercent: 32,
       resetsAt: now.addingTimeInterval(3 * 24 * 60 * 60 + 8 * 60 * 60),
+      fiveHourRemainingPercent: 84,
+      fiveHourUsedPercent: 16,
+      fiveHourResetsAt: now.addingTimeInterval(2 * 60 * 60 + 20 * 60),
+      showsFiveHourQuota: true,
       rolling24HoursTokens: 1_286_000,
       todayTokens: 846_000,
       last7DaysTokens: 5_420_000,

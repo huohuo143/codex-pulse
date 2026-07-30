@@ -22,7 +22,11 @@ struct CodexTimelineProvider: TimelineProvider {
   func getTimeline(in context: Context, completion: @escaping (Timeline<CodexWidgetEntry>) -> Void) {
     let entry = loadEntry(usePreviewWhenMissing: false)
     let regularRefresh = Date().addingTimeInterval(15 * 60)
-    let resetRefresh = entry.snapshot.resetsAt.map { max(Date().addingTimeInterval(60), $0) }
+    let quotaResetDates = [
+      entry.snapshot.resetsAt,
+      entry.snapshot.displaysFiveHourQuota ? entry.snapshot.fiveHourResetsAt : nil
+    ].compactMap { $0 }
+    let resetRefresh = quotaResetDates.min().map { max(Date().addingTimeInterval(60), $0) }
     let nextRefresh = resetRefresh.map { min(regularRefresh, $0) } ?? regularRefresh
     completion(Timeline(entries: [entry], policy: .after(nextRefresh)))
   }
