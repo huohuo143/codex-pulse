@@ -337,6 +337,7 @@ final class DashboardStore: ObservableObject {
   var touchBarSupported: Bool { TouchBarStripController.shared.isSupported }
   var compactShowsResetCredits: Bool { floatingPanelMetrics.contains(.resetCredits) }
   var weekly: LimitWindow? { status?.main?.sevenDayWindow }
+  var fiveHour: LimitWindow? { status?.main?.fiveHourWindow }
   var rateLimitResetCredits: RateLimitResetCreditsSummary? { status?.rateLimitResetCredits }
   var tokenStats: TokenStats { status?.tokenStats ?? TokenStats() }
   var cnyAvailable: Bool { exchangeRate != nil }

@@ -48,7 +48,7 @@ struct ContentView: View {
     .onDisappear {
       store.endWindowDrag()
     }
-    .onChange(of: store.isCompact) { _, isCompact in
+    .onChange(of: store.isCompact) { isCompact in
       if let configuredWindow {
         WindowConfigurator.configure(
           configuredWindow,
@@ -63,7 +63,7 @@ struct ContentView: View {
         autoDodgeIfNeeded(force: true)
       }
     }
-    .onChange(of: store.compactSizeMode) { _, compactSizeMode in
+    .onChange(of: store.compactSizeMode) { compactSizeMode in
       if let configuredWindow, store.isCompact {
         WindowConfigurator.configure(
           configuredWindow,
@@ -77,7 +77,7 @@ struct ContentView: View {
         )
       }
     }
-    .onChange(of: store.compactStyle) { _, compactStyle in
+    .onChange(of: store.compactStyle) { compactStyle in
       if let configuredWindow, store.isCompact {
         WindowConfigurator.configure(
           configuredWindow,
@@ -91,7 +91,7 @@ struct ContentView: View {
         )
       }
     }
-    .onChange(of: store.enabledToolCount) { _, _ in
+    .onChange(of: store.enabledToolCount) { _ in
       if let configuredWindow, store.isCompact {
         WindowConfigurator.configure(
           configuredWindow,
@@ -105,7 +105,7 @@ struct ContentView: View {
         )
       }
     }
-    .onChange(of: store.compactRingOrientation) { _, ringOrientation in
+    .onChange(of: store.compactRingOrientation) { ringOrientation in
       if let configuredWindow, store.isCompact, store.compactStyle == .rings {
         WindowConfigurator.configure(
           configuredWindow,
@@ -119,7 +119,7 @@ struct ContentView: View {
         )
       }
     }
-    .onChange(of: store.floatingPanelMetrics) { _, metrics in
+    .onChange(of: store.floatingPanelMetrics) { metrics in
       if let configuredWindow, store.isCompact {
         WindowConfigurator.configure(
           configuredWindow,
@@ -133,7 +133,7 @@ struct ContentView: View {
         )
       }
     }
-    .onChange(of: store.autoDodgeEnabled) { _, enabled in
+    .onChange(of: store.autoDodgeEnabled) { enabled in
       if enabled { autoDodgeIfNeeded(force: true) }
     }
     .onReceive(NotificationCenter.default.publisher(for: .codexWindowManualDragBegan)) { notification in

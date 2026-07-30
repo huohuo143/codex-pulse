@@ -7,10 +7,14 @@ EXECUTABLE_NAME="CodexSuanliMeter"
 WIDGET_EXECUTABLE_NAME="CodexSuanliWidgets"
 BUNDLE_ID="dev.codex.balance-dashboard.codex"
 WIDGET_BUNDLE_ID="$BUNDLE_ID.widgets"
-VERSION="${VERSION:-2.10.0}"
-BUILD_NUMBER="${BUILD_NUMBER:-2102}"
+VERSION="${VERSION:-2.10.1}"
+BUILD_NUMBER="${BUILD_NUMBER:-2103}"
 ARCH="${ARCH:-$(uname -m)}"
-MIN_SYSTEM_VERSION="14.0"
+# macOS 13 可运行主应用；桌面小组件只在 macOS 14 及以后提供。发布完整
+# 小组件包时显式传入 INCLUDE_WIDGETS=1 MIN_SYSTEM_VERSION=14.0。
+MIN_SYSTEM_VERSION="${MIN_SYSTEM_VERSION:-14.0}"
+INCLUDE_WIDGETS="${INCLUDE_WIDGETS:-1}"
+CODE_SIGN_IDENTITY="${CODE_SIGN_IDENTITY:--}"
 
 case "$ARCH" in
   arm64|x86_64) ;;
@@ -19,6 +23,19 @@ case "$ARCH" in
     exit 2
     ;;
 esac
+
+case "$INCLUDE_WIDGETS" in
+  0|1) ;;
+  *)
+    echo "INCLUDE_WIDGETS must be 0 or 1." >&2
+    exit 2
+    ;;
+esac
+
+if [[ "$INCLUDE_WIDGETS" == "1" && "${MIN_SYSTEM_VERSION%%.*}" -lt 14 ]]; then
+  echo "The WidgetKit extension requires MIN_SYSTEM_VERSION=14.0 or later." >&2
+  exit 2
+fi
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="${CODEX_PULSE_DIST_DIR:-$ROOT_DIR/dist}"
@@ -36,6 +53,11 @@ WIDGET_ENTITLEMENTS="$ROOT_DIR/config/CodexSuanliWidgets.entitlements"
 WIDGET_XCODE_PROJECT="$ROOT_DIR/xcode/CodexPulseWidgets.xcodeproj"
 WIDGET_DERIVED_DATA="$ROOT_DIR/.build/xcode-widget-$BUILD_NUMBER-$ARCH"
 CONFIGURATION="release"
+
+codesign_args=(--force --sign "$CODE_SIGN_IDENTITY")
+if [[ "$CODE_SIGN_IDENTITY" != "-" ]]; then
+  codesign_args+=(--options runtime --timestamp)
+fi
 
 case "$MODE" in
   run|--logs|logs|--telemetry|telemetry|--verify|verify) ;;
@@ -60,43 +82,50 @@ cd "$ROOT_DIR"
 swift build -c "$CONFIGURATION" --arch "$ARCH" --scratch-path "$SWIFT_SCRATCH_PATH" --product "$EXECUTABLE_NAME"
 BUILD_DIR="$(swift build -c "$CONFIGURATION" --arch "$ARCH" --scratch-path "$SWIFT_SCRATCH_PATH" --show-bin-path)"
 BUILD_BINARY="$BUILD_DIR/$EXECUTABLE_NAME"
-if [[ "$CONFIGURATION" == "debug" ]]; then
-  WIDGET_XCODE_CONFIGURATION="Debug"
-else
-  WIDGET_XCODE_CONFIGURATION="Release"
+if [[ "$INCLUDE_WIDGETS" == "1" ]]; then
+  if [[ "$CONFIGURATION" == "debug" ]]; then
+    WIDGET_XCODE_CONFIGURATION="Debug"
+  else
+    WIDGET_XCODE_CONFIGURATION="Release"
+  fi
+  /usr/bin/xcodebuild \
+    -project "$WIDGET_XCODE_PROJECT" \
+    -scheme "$WIDGET_EXECUTABLE_NAME" \
+    -configuration "$WIDGET_XCODE_CONFIGURATION" \
+    -derivedDataPath "$WIDGET_DERIVED_DATA" \
+    CODE_SIGNING_ALLOWED=NO \
+    MARKETING_VERSION="$VERSION" \
+    CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+    PRODUCT_BUNDLE_IDENTIFIER="$WIDGET_BUNDLE_ID" \
+    ARCHS="$ARCH" \
+    ONLY_ACTIVE_ARCH=YES \
+    build >/dev/null
+  WIDGET_XCODE_BUNDLE="$WIDGET_DERIVED_DATA/Build/Products/$WIDGET_XCODE_CONFIGURATION/$WIDGET_EXECUTABLE_NAME.appex"
 fi
-/usr/bin/xcodebuild \
-  -project "$WIDGET_XCODE_PROJECT" \
-  -scheme "$WIDGET_EXECUTABLE_NAME" \
-  -configuration "$WIDGET_XCODE_CONFIGURATION" \
-  -derivedDataPath "$WIDGET_DERIVED_DATA" \
-  CODE_SIGNING_ALLOWED=NO \
-  MARKETING_VERSION="$VERSION" \
-  CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
-  PRODUCT_BUNDLE_IDENTIFIER="$WIDGET_BUNDLE_ID" \
-  ARCHS="$ARCH" \
-  ONLY_ACTIVE_ARCH=YES \
-  build >/dev/null
-WIDGET_XCODE_BUNDLE="$WIDGET_DERIVED_DATA/Build/Products/$WIDGET_XCODE_CONFIGURATION/$WIDGET_EXECUTABLE_NAME.appex"
 
 rm -rf "$APP_BUNDLE"
 mkdir -p "$APP_MACOS" "$APP_CONTENTS/Resources"
 cp "$BUILD_BINARY" "$APP_BINARY"
 chmod +x "$APP_BINARY"
 
-if [[ ! -f "$ICON_PATH" || ! -f "$WIDGET_ENTITLEMENTS" || ! -d "$WIDGET_XCODE_BUNDLE" ]]; then
-  echo "Missing AppIcon.icns, widget entitlements or Xcode widget build." >&2
+if [[ ! -f "$ICON_PATH" ]]; then
+  echo "Missing AppIcon.icns." >&2
   exit 1
 fi
 cp "$ICON_PATH" "$APP_CONTENTS/Resources/AppIcon.icns"
 
-WIDGET_BUNDLE="$APP_CONTENTS/PlugIns/$WIDGET_EXECUTABLE_NAME.appex"
-WIDGET_CONTENTS="$WIDGET_BUNDLE/Contents"
-WIDGET_MACOS="$WIDGET_CONTENTS/MacOS"
-mkdir -p "$APP_CONTENTS/PlugIns"
-/usr/bin/ditto --noextattr --norsrc "$WIDGET_XCODE_BUNDLE" "$WIDGET_BUNDLE"
-mkdir -p "$WIDGET_CONTENTS/Resources"
-cp "$ICON_PATH" "$WIDGET_CONTENTS/Resources/AppIcon.icns"
+if [[ "$INCLUDE_WIDGETS" == "1" ]]; then
+  if [[ ! -f "$WIDGET_ENTITLEMENTS" || ! -d "$WIDGET_XCODE_BUNDLE" ]]; then
+    echo "Missing widget entitlements or Xcode widget build." >&2
+    exit 1
+  fi
+  WIDGET_BUNDLE="$APP_CONTENTS/PlugIns/$WIDGET_EXECUTABLE_NAME.appex"
+  WIDGET_CONTENTS="$WIDGET_BUNDLE/Contents"
+  mkdir -p "$APP_CONTENTS/PlugIns"
+  /usr/bin/ditto --noextattr --norsrc "$WIDGET_XCODE_BUNDLE" "$WIDGET_BUNDLE"
+  mkdir -p "$WIDGET_CONTENTS/Resources"
+  cp "$ICON_PATH" "$WIDGET_CONTENTS/Resources/AppIcon.icns"
+fi
 
 cat >"$INFO_PLIST" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -133,32 +162,40 @@ cat >"$INFO_PLIST" <<PLIST
 </plist>
 PLIST
 
-plutil -lint "$INFO_PLIST" "$WIDGET_CONTENTS/Info.plist" >/dev/null
+if [[ "$INCLUDE_WIDGETS" == "1" ]]; then
+  plutil -lint "$INFO_PLIST" "$WIDGET_CONTENTS/Info.plist" >/dev/null
+else
+  plutil -lint "$INFO_PLIST" >/dev/null
+fi
 # NAS/iCloud-style filesystems can attach Finder/resource-fork metadata while
-# assembling the bundle. Ad-hoc signing rejects those attributes.
+# assembling the bundle. Signing rejects those attributes.
 xattr -cr "$APP_BUNDLE"
-/usr/bin/codesign --force --sign - --entitlements "$WIDGET_ENTITLEMENTS" "$WIDGET_BUNDLE" >/dev/null
-if ! /usr/bin/codesign --force --sign - "$APP_BUNDLE" >/dev/null 2>&1 \
+if [[ "$INCLUDE_WIDGETS" == "1" ]]; then
+  /usr/bin/codesign "${codesign_args[@]}" --entitlements "$WIDGET_ENTITLEMENTS" "$WIDGET_BUNDLE" >/dev/null
+fi
+if ! /usr/bin/codesign "${codesign_args[@]}" "$APP_BUNDLE" >/dev/null 2>&1 \
   || ! /usr/bin/codesign --verify --deep --strict "$APP_BUNDLE" >/dev/null 2>&1; then
   LOCAL_OUTPUT_DIR="$SUPPORT_DIR/build-output"
   LOCAL_APP_BUNDLE="$LOCAL_OUTPUT_DIR/$APP_NAME.app"
-  LOCAL_WIDGET_BUNDLE="$LOCAL_APP_BUNDLE/Contents/PlugIns/$WIDGET_EXECUTABLE_NAME.appex"
   rm -rf "$LOCAL_APP_BUNDLE"
   mkdir -p "$LOCAL_OUTPUT_DIR"
   /usr/bin/ditto --noextattr --norsrc "$APP_BUNDLE" "$LOCAL_APP_BUNDLE"
   xattr -cr "$LOCAL_APP_BUNDLE"
-  /usr/bin/codesign --force --sign - --entitlements "$WIDGET_ENTITLEMENTS" "$LOCAL_WIDGET_BUNDLE" >/dev/null
-  /usr/bin/codesign --force --sign - "$LOCAL_APP_BUNDLE" >/dev/null
+  if [[ "$INCLUDE_WIDGETS" == "1" ]]; then
+    LOCAL_WIDGET_BUNDLE="$LOCAL_APP_BUNDLE/Contents/PlugIns/$WIDGET_EXECUTABLE_NAME.appex"
+    /usr/bin/codesign "${codesign_args[@]}" --entitlements "$WIDGET_ENTITLEMENTS" "$LOCAL_WIDGET_BUNDLE" >/dev/null
+  fi
+  /usr/bin/codesign "${codesign_args[@]}" "$LOCAL_APP_BUNDLE" >/dev/null
   /usr/bin/codesign --verify --deep --strict "$LOCAL_APP_BUNDLE" >/dev/null
   APP_BUNDLE="$LOCAL_APP_BUNDLE"
   APP_CONTENTS="$APP_BUNDLE/Contents"
   APP_MACOS="$APP_CONTENTS/MacOS"
   APP_BINARY="$APP_MACOS/$EXECUTABLE_NAME"
   INFO_PLIST="$APP_CONTENTS/Info.plist"
-  WIDGET_BUNDLE="$APP_CONTENTS/PlugIns/$WIDGET_EXECUTABLE_NAME.appex"
 fi
 
 VERSION="$VERSION" BUILD_NUMBER="$BUILD_NUMBER" ARCH="$ARCH" \
+  MIN_SYSTEM_VERSION="$MIN_SYSTEM_VERSION" INCLUDE_WIDGETS="$INCLUDE_WIDGETS" \
   "$ROOT_DIR/script/verify_widget_bundle.sh" "$APP_BUNDLE"
 
 open_app() {

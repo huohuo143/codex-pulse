@@ -61,7 +61,7 @@ struct ExpandedDashboardView: View {
               .padding(.top, 14)
               .padding(.bottom, 20)
           }
-          .onChange(of: store.selectedSection) { _, _ in
+          .onChange(of: store.selectedSection) { _ in
             proxy.scrollTo("section-top", anchor: .top)
           }
         }

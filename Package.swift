@@ -21,7 +21,9 @@ let package = Package(
   name: "CodexSuanliMeter",
   defaultLocalization: "zh-Hans",
   platforms: [
-    .macOS(.v14)
+    // 主应用仅使用 macOS 13 可用的 AppKit / SwiftUI API。桌面小组件作为
+    // 独立的 App Extension，仍由 Xcode target 保持 macOS 14 部署目标。
+    .macOS(.v13)
   ],
   products: [
     .executable(name: "CodexSuanliMeter", targets: ["CodexBalance"]),

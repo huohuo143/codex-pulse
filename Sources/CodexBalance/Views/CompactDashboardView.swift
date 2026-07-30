@@ -14,6 +14,12 @@ struct CompactDashboardView: View {
   private func shows(_ metric: FloatingPanelMetric) -> Bool {
     store.floatingPanelMetrics.contains(metric)
   }
+  private var activeQuotaMetrics: [FloatingPanelMetric] {
+    [.weeklyQuota, .fiveHourQuota].filter(shows)
+  }
+  private var primaryQuotaMetric: FloatingPanelMetric? { activeQuotaMetrics.first }
+  private var secondaryQuotaMetric: FloatingPanelMetric? { activeQuotaMetrics.dropFirst().first }
+  private var fiveHourTint: Color { .orange }
   private var resetProbability: Int? { store.codexRadarSnapshot?.probability24hPercent }
   private var resetProbabilityText: String { resetProbability.map { "\($0)%" } ?? "--" }
   private var resetProbabilityTint: Color {
@@ -176,24 +182,21 @@ struct CompactDashboardView: View {
 
   private var horizontalRingLayout: some View {
     VStack(spacing: mini ? 6 : 8) {
-      if shows(.weeklyQuota), shows(.rolling24Tokens) {
+      if activeQuotaMetrics.count == 2 {
         HStack(spacing: mini ? 12 : 18) {
-          WeeklyGaugeView(
-            remainingPercent: store.weekly?.remainingPercent,
-            tint: store.palette.weekly,
-            size: mini ? 116 : 148,
-            lineWidth: mini ? 11 : 14
-          )
+          ForEach(activeQuotaMetrics) { metric in
+            quotaGauge(metric, size: mini ? 104 : 124, lineWidth: mini ? 10 : 12)
+          }
+        }
+        if shows(.rolling24Tokens) { verticalRollingUsage }
+      } else if let quotaMetric = primaryQuotaMetric, shows(.rolling24Tokens) {
+        HStack(spacing: mini ? 12 : 18) {
+          quotaGauge(quotaMetric, size: mini ? 116 : 148, lineWidth: mini ? 11 : 14)
           rollingUsage
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-      } else if shows(.weeklyQuota) {
-        WeeklyGaugeView(
-          remainingPercent: store.weekly?.remainingPercent,
-          tint: store.palette.weekly,
-          size: mini ? 116 : 148,
-          lineWidth: mini ? 11 : 14
-        )
+      } else if let quotaMetric = primaryQuotaMetric {
+        quotaGauge(quotaMetric, size: mini ? 116 : 148, lineWidth: mini ? 11 : 14)
         .frame(maxWidth: .infinity)
       } else if shows(.rolling24Tokens) {
         rollingUsage
@@ -206,13 +209,8 @@ struct CompactDashboardView: View {
 
   private var verticalRingLayout: some View {
     VStack(spacing: mini ? 6 : 8) {
-      if shows(.weeklyQuota) {
-        WeeklyGaugeView(
-          remainingPercent: store.weekly?.remainingPercent,
-          tint: store.palette.weekly,
-          size: mini ? 116 : 148,
-          lineWidth: mini ? 11 : 14
-        )
+      ForEach(activeQuotaMetrics) { metric in
+        quotaGauge(metric, size: mini ? 116 : 148, lineWidth: mini ? 11 : 14)
       }
       if shows(.rolling24Tokens) { verticalRollingUsage }
       if shows(.resetRadar) { resetRadarRow }
@@ -221,26 +219,33 @@ struct CompactDashboardView: View {
   }
 
   private var circleLayout: some View {
-    let progress = max(0.008, min(1, (store.weekly?.remainingPercent ?? 0) / 100))
+    let progress = max(0.008, min(1, (quotaWindow(primaryQuotaMetric)?.remainingPercent ?? 0) / 100))
     return ZStack {
       Circle()
         .stroke(DashboardColors.track, lineWidth: mini ? 10 : 13)
-      if shows(.weeklyQuota) {
+      if let primaryQuotaMetric {
         Circle()
           .trim(from: 0, to: progress)
-          .stroke(store.palette.weekly, style: StrokeStyle(lineWidth: mini ? 10 : 13, lineCap: .round))
+          .stroke(quotaTint(primaryQuotaMetric), style: StrokeStyle(lineWidth: mini ? 10 : 13, lineCap: .round))
           .rotationEffect(.degrees(-90))
       }
       VStack(spacing: activeMetrics.count >= 4 ? 1 : (mini ? 2 : 4)) {
-        if shows(.weeklyQuota) {
-          Text(store.weekly.map { "\(Int($0.remainingPercent.rounded()))%" } ?? "--")
+        if let primaryQuotaMetric {
+          Text(quotaPercentText(primaryQuotaMetric))
             .font(.system(size: activeMetrics.count >= 3 ? (mini ? 24 : 30) : (mini ? 30 : 38), weight: .heavy, design: .rounded))
-            .foregroundStyle(store.palette.weekly)
+            .foregroundStyle(quotaTint(primaryQuotaMetric))
             .monospacedDigit()
             .contentTransition(.numericText())
-          Text("7天剩余")
+          Text(quotaShortTitle(primaryQuotaMetric))
             .font(.system(size: mini ? 8.5 : 10.5, weight: .bold))
             .foregroundStyle(DashboardColors.subtleText)
+        }
+        if let secondaryQuotaMetric {
+          circleMetric(
+            quotaBadgeTitle(secondaryQuotaMetric),
+            quotaPercentText(secondaryQuotaMetric),
+            tint: quotaTint(secondaryQuotaMetric)
+          )
         }
         if shows(.rolling24Tokens) {
           circleMetric("24h", BalanceFormatters.compactNumber(stats.rolling24HoursTokens), tint: store.palette.usage24h)
@@ -260,17 +265,28 @@ struct CompactDashboardView: View {
 
   private var squareLayout: some View {
     VStack(alignment: .leading, spacing: mini ? 7 : 10) {
-      if shows(.weeklyQuota) {
-        Label("CODEX · 7天", systemImage: "bolt.fill")
+      if let primaryQuotaMetric {
+        Label("CODEX · \(quotaBadgeTitle(primaryQuotaMetric))", systemImage: primaryQuotaMetric.systemImage)
           .font(.system(size: mini ? 8.5 : 10, weight: .bold, design: .rounded))
           .foregroundStyle(DashboardColors.subtleText)
-        Text(store.weekly.map { "\(Int($0.remainingPercent.rounded()))%" } ?? "--")
+        Text(quotaPercentText(primaryQuotaMetric))
           .font(.system(size: mini ? 34 : 43, weight: .heavy, design: .rounded))
-          .foregroundStyle(store.palette.weekly)
+          .foregroundStyle(quotaTint(primaryQuotaMetric))
           .monospacedDigit()
           .contentTransition(.numericText())
-        ProgressView(value: (store.weekly?.remainingPercent ?? 0) / 100)
-          .tint(store.palette.weekly)
+        ProgressView(value: (quotaWindow(primaryQuotaMetric)?.remainingPercent ?? 0) / 100)
+          .tint(quotaTint(primaryQuotaMetric))
+      }
+      if let secondaryQuotaMetric {
+        HStack(spacing: 4) {
+          Image(systemName: secondaryQuotaMetric.systemImage)
+          Text(quotaShortTitle(secondaryQuotaMetric))
+          Spacer(minLength: 2)
+          Text(quotaPercentText(secondaryQuotaMetric))
+            .foregroundStyle(quotaTint(secondaryQuotaMetric))
+            .monospacedDigit()
+        }
+        .font(.system(size: mini ? 8.5 : 10, weight: .bold, design: .rounded))
       }
       if shows(.resetRadar) {
         HStack(spacing: 4) {
@@ -305,6 +321,7 @@ struct CompactDashboardView: View {
     }
     .foregroundStyle(DashboardColors.subtleText)
     .animation(.snappy(duration: 0.24), value: store.weekly?.remainingPercent)
+    .animation(.snappy(duration: 0.24), value: store.fiveHour?.remainingPercent)
   }
 
   private var pillLayout: some View {
@@ -321,6 +338,7 @@ struct CompactDashboardView: View {
     }
     .foregroundStyle(DashboardColors.text)
     .animation(.snappy(duration: 0.24), value: store.weekly?.remainingPercent)
+    .animation(.snappy(duration: 0.24), value: store.fiveHour?.remainingPercent)
   }
 
   @ViewBuilder
@@ -354,6 +372,24 @@ struct CompactDashboardView: View {
           title: "7天剩余",
           value: store.weekly.map { "\(Int($0.remainingPercent.rounded()))%" } ?? "--",
           tint: store.palette.weekly
+        )
+      }
+    case .fiveHourQuota:
+      HStack(spacing: mini ? 5 : 7) {
+        Circle()
+          .trim(from: 0, to: max(0.008, min(1, (store.fiveHour?.remainingPercent ?? 0) / 100)))
+          .stroke(fiveHourTint, style: StrokeStyle(lineWidth: mini ? 4 : 5, lineCap: .round))
+          .rotationEffect(.degrees(-90))
+          .frame(width: mini ? 28 : 34, height: mini ? 28 : 34)
+          .overlay {
+            Text(store.fiveHour.map { "\(Int($0.remainingPercent.rounded()))" } ?? "--")
+              .font(.system(size: mini ? 8 : 10, weight: .heavy, design: .rounded))
+              .foregroundStyle(fiveHourTint)
+          }
+        pillValue(
+          title: "5小时剩余",
+          value: quotaPercentText(.fiveHourQuota),
+          tint: fiveHourTint
         )
       }
     case .rolling24Tokens:
@@ -463,18 +499,8 @@ struct CompactDashboardView: View {
 
   private func barLayout(detailed: Bool) -> some View {
     VStack(alignment: .leading, spacing: detailed ? 10 : 7) {
-      if shows(.weeklyQuota) {
-        HStack {
-          Label("Codex · 7天剩余", systemImage: "bolt.fill")
-            .font(.system(size: mini ? 10 : 12, weight: .bold))
-          Spacer()
-          Text(store.weekly.map { "\(Int($0.remainingPercent.rounded()))%" } ?? "--")
-            .font(.system(size: mini ? 13 : 16, weight: .heavy, design: .rounded))
-            .foregroundStyle(store.palette.weekly)
-            .contentTransition(.numericText())
-        }
-        ProgressView(value: (store.weekly?.remainingPercent ?? 0) / 100)
-          .tint(store.palette.weekly)
+      ForEach(activeQuotaMetrics) { metric in
+        quotaBar(metric)
       }
       if shows(.rolling24Tokens) {
         HStack {
@@ -508,6 +534,7 @@ struct CompactDashboardView: View {
     }
     .foregroundStyle(DashboardColors.text)
     .animation(.snappy(duration: 0.26), value: store.weekly?.remainingPercent)
+    .animation(.snappy(duration: 0.26), value: store.fiveHour?.remainingPercent)
   }
 
   private func badgeLayout(detailed _: Bool) -> some View {
@@ -524,6 +551,7 @@ struct CompactDashboardView: View {
       Spacer(minLength: mini ? 16 : 20)
     }
     .animation(.snappy(duration: 0.26), value: store.weekly?.remainingPercent)
+    .animation(.snappy(duration: 0.26), value: store.fiveHour?.remainingPercent)
   }
 
   @ViewBuilder
@@ -532,6 +560,9 @@ struct CompactDashboardView: View {
     case .weeklyQuota:
       Text(store.weekly.map { "7天 \(Int($0.remainingPercent.rounded()))%" } ?? "7天 --")
         .foregroundStyle(store.palette.weekly)
+    case .fiveHourQuota:
+      Text(store.fiveHour.map { "5h \(Int($0.remainingPercent.rounded()))%" } ?? "5h --")
+        .foregroundStyle(fiveHourTint)
     case .rolling24Tokens:
       Text("24h \(BalanceFormatters.compactNumber(stats.rolling24HoursTokens))")
         .foregroundStyle(store.palette.usage24h)
@@ -542,6 +573,57 @@ struct CompactDashboardView: View {
       Text("Reset \(resetCreditsCountText)")
         .foregroundStyle(store.palette.weekly)
     }
+  }
+
+  @ViewBuilder
+  private func quotaGauge(_ metric: FloatingPanelMetric, size: CGFloat, lineWidth: CGFloat) -> some View {
+    WeeklyGaugeView(
+      remainingPercent: quotaWindow(metric)?.remainingPercent,
+      tint: quotaTint(metric),
+      size: size,
+      lineWidth: lineWidth,
+      label: quotaShortTitle(metric)
+    )
+  }
+
+  private func quotaBar(_ metric: FloatingPanelMetric) -> some View {
+    VStack(alignment: .leading, spacing: 5) {
+      HStack {
+        Label("Codex · \(quotaShortTitle(metric))", systemImage: metric.systemImage)
+          .font(.system(size: mini ? 10 : 12, weight: .bold))
+        Spacer()
+        Text(quotaPercentText(metric))
+          .font(.system(size: mini ? 13 : 16, weight: .heavy, design: .rounded))
+          .foregroundStyle(quotaTint(metric))
+          .contentTransition(.numericText())
+      }
+      ProgressView(value: (quotaWindow(metric)?.remainingPercent ?? 0) / 100)
+        .tint(quotaTint(metric))
+    }
+  }
+
+  private func quotaWindow(_ metric: FloatingPanelMetric?) -> LimitWindow? {
+    switch metric {
+    case .weeklyQuota: store.weekly
+    case .fiveHourQuota: store.fiveHour
+    case .rolling24Tokens, .resetRadar, .resetCredits, nil: nil
+    }
+  }
+
+  private func quotaTint(_ metric: FloatingPanelMetric) -> Color {
+    metric == .fiveHourQuota ? fiveHourTint : store.palette.weekly
+  }
+
+  private func quotaShortTitle(_ metric: FloatingPanelMetric) -> String {
+    metric == .fiveHourQuota ? "5小时剩余" : "7天剩余"
+  }
+
+  private func quotaBadgeTitle(_ metric: FloatingPanelMetric) -> String {
+    metric == .fiveHourQuota ? "5h" : "7天"
+  }
+
+  private func quotaPercentText(_ metric: FloatingPanelMetric) -> String {
+    quotaWindow(metric).map { "\(Int($0.remainingPercent.rounded()))%" } ?? "--"
   }
 
   private var resetRadarRow: some View {

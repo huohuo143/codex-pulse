@@ -4,9 +4,10 @@ import Testing
 @Suite
 struct FloatingPanelPreferencesTests {
   @Test
-  func defaultSelectionCoversEveryFloatingPanelInformationModule() {
-    #expect(FloatingPanelMetric.defaults == Set(FloatingPanelMetric.allCases))
+  func defaultSelectionPreservesExistingModulesAndLeavesFiveHourOptional() {
     #expect(FloatingPanelMetric.defaults.count == 4)
+    #expect(!FloatingPanelMetric.defaults.contains(.fiveHourQuota))
+    #expect(FloatingPanelMetric.allCases.count == 5)
     #expect(FloatingPanelMetric.allCases.allSatisfy {
       !$0.title.isEmpty && !$0.subtitle.isEmpty && !$0.systemImage.isEmpty
     })
@@ -39,8 +40,19 @@ struct FloatingPanelPreferencesTests {
   func emptySelectionPersistsAsSafeDefaults() {
     let rawValues = FloatingPanelMetric.persistedRawValues([])
 
-    #expect(Set(rawValues) == Set(FloatingPanelMetric.allCases.map(\.rawValue)))
+    #expect(Set(rawValues) == Set(FloatingPanelMetric.defaults.map(\.rawValue)))
     #expect(rawValues == rawValues.sorted())
+  }
+
+  @Test
+  func fiveHourQuotaCanBeSelectedAndPersisted() {
+    let rawValues = FloatingPanelMetric.persistedRawValues([.weeklyQuota, .fiveHourQuota])
+    let selection = FloatingPanelMetric.resolvedSelection(
+      rawValues: rawValues,
+      legacyShowsResetCredits: nil
+    )
+
+    #expect(selection == [.weeklyQuota, .fiveHourQuota])
   }
 
   @Test(arguments: [true, false])

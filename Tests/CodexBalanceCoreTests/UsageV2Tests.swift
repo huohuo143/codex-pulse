@@ -143,7 +143,7 @@ struct UsageV2Tests {
   }
 
   @Test
-  func sevenDayWindowSupportsNewPrimarySlotWithoutShowingFiveHourWindow() {
+  func quotaWindowsAreSelectedByDurationAcrossPrimaryAndSecondarySlots() {
     let fiveHours = LimitWindow(
       usedPercent: 20,
       remainingPercent: 80,
@@ -188,6 +188,9 @@ struct UsageV2Tests {
     #expect(current.sevenDayWindow?.remainingPercent == 62)
     #expect(legacy.sevenDayWindow?.remainingPercent == 62)
     #expect(fiveHourOnly.sevenDayWindow == nil)
+    #expect(current.fiveHourWindow == nil)
+    #expect(legacy.fiveHourWindow?.remainingPercent == 80)
+    #expect(fiveHourOnly.fiveHourWindow?.remainingPercent == 80)
   }
 
   @Test

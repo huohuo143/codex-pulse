@@ -3,11 +3,18 @@ import Foundation
 /// 可由用户自由组合的悬浮框信息模块。
 public enum FloatingPanelMetric: String, CaseIterable, Identifiable, Hashable, Sendable {
   case weeklyQuota
+  case fiveHourQuota
   case rolling24Tokens
   case resetRadar
   case resetCredits
 
-  public static let defaults = Set(allCases)
+  /// 新增的 5 小时额度保持可选且默认关闭，避免升级后改变现有悬浮框布局。
+  public static let defaults: Set<FloatingPanelMetric> = [
+    .weeklyQuota,
+    .rolling24Tokens,
+    .resetRadar,
+    .resetCredits
+  ]
   public static let userDefaultsKey = "floatingPanelMetrics"
 
   public var id: String { rawValue }
@@ -15,6 +22,7 @@ public enum FloatingPanelMetric: String, CaseIterable, Identifiable, Hashable, S
   public var title: String {
     switch self {
     case .weeklyQuota: "7 天额度"
+    case .fiveHourQuota: "5 小时额度"
     case .rolling24Tokens: "滚动 24h Token"
     case .resetRadar: "重置雷达"
     case .resetCredits: "Full reset 权益"
@@ -24,6 +32,7 @@ public enum FloatingPanelMetric: String, CaseIterable, Identifiable, Hashable, S
   public var subtitle: String {
     switch self {
     case .weeklyQuota: "官方 7 天窗口的剩余比例"
+    case .fiveHourQuota: "官方 5 小时窗口的剩余比例"
     case .rolling24Tokens: "最近 24 小时 Token 与金额预估"
     case .resetRadar: "Codex 24 小时重置概率"
     case .resetCredits: "可用次数与最近到期信息"
@@ -33,6 +42,7 @@ public enum FloatingPanelMetric: String, CaseIterable, Identifiable, Hashable, S
   public var systemImage: String {
     switch self {
     case .weeklyQuota: "gauge.with.dots.needle.50percent"
+    case .fiveHourQuota: "timer"
     case .rolling24Tokens: "clock.arrow.circlepath"
     case .resetRadar: "scope"
     case .resetCredits: "arrow.counterclockwise.circle.fill"

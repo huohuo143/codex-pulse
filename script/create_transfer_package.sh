@@ -4,8 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_NAME="Codex 脉动"
 EXECUTABLE_NAME="CodexSuanliMeter"
-VERSION="${VERSION:-2.10.0}"
-BUILD_NUMBER="${BUILD_NUMBER:-2102}"
+VERSION="${VERSION:-2.10.1}"
+BUILD_NUMBER="${BUILD_NUMBER:-2103}"
 DATE_TAG="${DATE_TAG:-$(/bin/date +%Y%m%d)}"
 ARCH="${ARCH:-$(uname -m)}"
 
@@ -43,17 +43,15 @@ VERSION="$VERSION" BUILD_NUMBER="$BUILD_NUMBER" ARCH="$ARCH" \
   "$ROOT_DIR/script/build_and_run.sh"
 
 cat >"$NOTES_PATH" <<'NOTES'
-# Codex 脉动 2.10.0 改版说明
+# Codex 脉动 2.10.1 改版说明
 
-- 趋势页新增“24 小时 / 按天”切换，默认保持原有 24 小时视图。
-- 按天视图展示包含今天在内的最近 30 个自然日，可横向滚动并默认定位到最新日期。
-- 每日柱支持悬停查看日期、精确 Token 数和调用次数；无调用日期按 0 保留。
-- 24 小时和按天视图使用本机时间轴对齐多台 iCloud 设备，并按设备稳定分色堆叠。
-- 图例与悬停气泡显示合计、各设备 Token、调用次数和快照更新时间。
-- 显式 0 Token 与缺少 bucket 分开处理；缺失值不参与合计，旧 schema 无趋势时不生成虚假数据。
-- 本地与 iCloud 设备日序列扩展为 30 天，schema 继续为 4，兼容旧设备的可变长度数组。
-- 高级分析仍使用最近 14 天，Widget 的 `daily14` 也仍为 14 天，未改变 Widget schema。
-- 完整测试覆盖多设备对齐、缺失值、旧 schema、跨月、跨年、30 日上限和 14 日兼容性。
+- “设置 → 悬浮框 → 悬浮框显示信息”新增“5 小时额度”选项，默认关闭。
+- 5 小时与 7 天额度按官方窗口时长识别，不依赖 primary / secondary 固定位置。
+- 全部八种悬浮框样式均支持单独显示 5 小时额度，或与 7 天额度、Token 等信息组合。
+- 官方暂未返回 5 小时窗口时显示 `--`，不会用其他窗口或本地 Token 推算。
+- 保留 7 天额度、趋势、重置雷达、Full reset、预测、提醒和 7 款 Widget 的原有行为。
+- 补齐主应用 macOS 13 的 SwiftUI 兼容写法；包含 Widget 的完整安装包仍要求 macOS 14 或更高版本。
+- 完整回归测试覆盖额度窗口识别、设置持久化和原有核心功能。
 
 NOTES
 /usr/bin/printf '\n本包为 %s、ad-hoc 签名、未公证版本。首次打开可能出现 Gatekeeper 提示。\n' \

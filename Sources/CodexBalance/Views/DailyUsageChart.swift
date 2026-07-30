@@ -53,7 +53,7 @@ struct DailyUsageChart: View {
         .onAppear {
           scrollToLatest(proxy: proxy, pointID: data.points.last?.id)
         }
-        .onChange(of: data.points.last?.id) { _, pointID in
+        .onChange(of: data.points.last?.id) { pointID in
           scrollToLatest(proxy: proxy, pointID: pointID)
         }
       }
