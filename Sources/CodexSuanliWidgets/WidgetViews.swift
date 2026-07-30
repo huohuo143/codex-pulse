@@ -63,9 +63,21 @@ struct QuotaWidgetView: View {
         HStack(spacing: 18) {
           QuotaRing(snapshot: entry.snapshot, size: 112)
           VStack(alignment: .leading, spacing: 8) {
-            WidgetHeader(title: "7 天额度", symbol: "gauge.with.dots.needle.50percent", tint: CodexWidgetTheme.weekly)
-            KeyValueRow(title: "剩余", value: BalanceFormatters.percent(entry.snapshot.remainingPercent), tint: CodexWidgetTheme.weekly)
-            KeyValueRow(title: "已用", value: BalanceFormatters.percent(entry.snapshot.usedPercent), tint: CodexWidgetTheme.usage)
+            WidgetHeader(
+              title: entry.snapshot.displaysFiveHourQuota ? "Codex 额度同心环" : "7 天额度",
+              symbol: "gauge.with.dots.needle.50percent",
+              tint: CodexWidgetTheme.weekly
+            )
+            KeyValueRow(title: "7 天剩余", value: BalanceFormatters.percent(entry.snapshot.remainingPercent), tint: CodexWidgetTheme.weekly)
+            if entry.snapshot.displaysFiveHourQuota {
+              KeyValueRow(
+                title: "5 小时剩余",
+                value: BalanceFormatters.percent(entry.snapshot.fiveHourRemainingPercent),
+                tint: CodexWidgetTheme.fiveHour
+              )
+            } else {
+              KeyValueRow(title: "7 天已用", value: BalanceFormatters.percent(entry.snapshot.usedPercent), tint: CodexWidgetTheme.usage)
+            }
             ResetText(snapshot: entry.snapshot)
             UpdatedText(entry: entry)
           }
@@ -263,26 +275,70 @@ private struct QuotaRing: View {
   let snapshot: CodexWidgetSnapshot
   let size: CGFloat
 
-  private var progress: Double { max(0, min(1, (snapshot.remainingPercent ?? 0) / 100)) }
+  private func progress(_ value: Double?) -> Double {
+    max(0.01, min(1, (value ?? 0) / 100))
+  }
 
   var body: some View {
     ZStack {
-      Circle().stroke(CodexWidgetTheme.track, lineWidth: size * 0.105)
-      Circle()
-        .trim(from: 0, to: max(0.01, progress))
-        .stroke(CodexWidgetTheme.weekly, style: StrokeStyle(lineWidth: size * 0.105, lineCap: .round))
-        .rotationEffect(.degrees(-90))
-      VStack(spacing: 1) {
-        Text(BalanceFormatters.percent(snapshot.remainingPercent))
-          .font(.system(size: size * 0.27, weight: .heavy, design: .rounded))
-          .foregroundStyle(CodexWidgetTheme.weekly)
-          .monospacedDigit()
-        Text("7 天剩余")
-          .font(.system(size: size * 0.085, weight: .bold))
-          .foregroundStyle(CodexWidgetTheme.subtle)
+      quotaCircle(
+        value: snapshot.remainingPercent,
+        tint: CodexWidgetTheme.weekly,
+        diameter: size,
+        width: size * 0.105
+      )
+      if snapshot.displaysFiveHourQuota {
+        quotaCircle(
+          value: snapshot.fiveHourRemainingPercent,
+          tint: CodexWidgetTheme.fiveHour,
+          diameter: size * 0.70,
+          width: size * 0.072
+        )
+      }
+      if snapshot.displaysFiveHourQuota {
+        VStack(spacing: max(1, size * 0.018)) {
+          quotaValue(label: "7天", value: snapshot.remainingPercent, tint: CodexWidgetTheme.weekly)
+          quotaValue(label: "5h", value: snapshot.fiveHourRemainingPercent, tint: CodexWidgetTheme.fiveHour)
+        }
+      } else {
+        VStack(spacing: 1) {
+          Text(BalanceFormatters.percent(snapshot.remainingPercent))
+            .font(.system(size: size * 0.27, weight: .heavy, design: .rounded))
+            .foregroundStyle(CodexWidgetTheme.weekly)
+            .monospacedDigit()
+          Text("7 天剩余")
+            .font(.system(size: size * 0.085, weight: .bold))
+            .foregroundStyle(CodexWidgetTheme.subtle)
+        }
       }
     }
     .frame(width: size, height: size)
+  }
+
+  private func quotaCircle(value: Double?, tint: Color, diameter: CGFloat, width: CGFloat) -> some View {
+    ZStack {
+      Circle().stroke(CodexWidgetTheme.track, lineWidth: width)
+      Circle()
+        .trim(from: 0, to: progress(value))
+        .stroke(tint, style: StrokeStyle(lineWidth: width, lineCap: .round))
+        .rotationEffect(.degrees(-90))
+    }
+    .frame(width: diameter, height: diameter)
+  }
+
+  private func quotaValue(label: String, value: Double?, tint: Color) -> some View {
+    HStack(spacing: max(2, size * 0.02)) {
+      Circle()
+        .fill(tint)
+        .frame(width: max(4, size * 0.04), height: max(4, size * 0.04))
+      Text(label)
+        .foregroundStyle(CodexWidgetTheme.subtle)
+      Text(BalanceFormatters.percent(value))
+        .foregroundStyle(tint)
+    }
+    .font(.system(size: max(7, size * 0.08), weight: .heavy, design: .rounded))
+    .monospacedDigit()
+    .lineLimit(1)
   }
 }
 

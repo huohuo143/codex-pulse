@@ -122,6 +122,98 @@ struct WeeklyGaugeView: View {
   }
 }
 
+struct ConcentricQuotaGaugeView: View {
+  var weeklyRemainingPercent: Double?
+  var fiveHourRemainingPercent: Double?
+  var showsWeekly: Bool
+  var showsFiveHour: Bool
+  var weeklyTint: Color
+  var fiveHourTint: Color
+  var size: CGFloat
+  var lineWidth: CGFloat
+
+  private func progress(_ value: Double?) -> Double {
+    max(0.008, min(1, (value ?? 0) / 100))
+  }
+
+  private func percentText(_ value: Double?) -> String {
+    value.map { "\(Int($0.rounded()))%" } ?? "--"
+  }
+
+  var body: some View {
+    let displaysBoth = showsWeekly && showsFiveHour
+    let primaryValue = showsWeekly ? weeklyRemainingPercent : fiveHourRemainingPercent
+    let primaryTint = showsWeekly ? weeklyTint : fiveHourTint
+    let primaryLabel = showsWeekly ? "7天剩余" : "5小时剩余"
+
+    ZStack {
+      if showsWeekly {
+        quotaCircle(
+          value: weeklyRemainingPercent,
+          tint: weeklyTint,
+          diameter: size,
+          width: lineWidth
+        )
+      }
+      if showsFiveHour {
+        quotaCircle(
+          value: fiveHourRemainingPercent,
+          tint: fiveHourTint,
+          diameter: displaysBoth ? size * 0.72 : size,
+          width: displaysBoth ? lineWidth * 0.72 : lineWidth
+        )
+      }
+
+      if displaysBoth {
+        VStack(spacing: max(2, size * 0.025)) {
+          quotaValue(label: "7天", value: weeklyRemainingPercent, tint: weeklyTint)
+          quotaValue(label: "5h", value: fiveHourRemainingPercent, tint: fiveHourTint)
+        }
+      } else {
+        VStack(spacing: 2) {
+          Text(percentText(primaryValue))
+            .font(.system(size: size * 0.25, weight: .heavy, design: .rounded))
+            .foregroundStyle(primaryTint)
+            .monospacedDigit()
+            .contentTransition(.numericText())
+          Text(primaryLabel)
+            .font(.system(size: max(8, size * 0.08), weight: .semibold))
+            .foregroundStyle(DashboardColors.subtleText)
+        }
+      }
+    }
+    .frame(width: size, height: size)
+    .animation(.smooth(duration: 0.42), value: weeklyRemainingPercent)
+    .animation(.smooth(duration: 0.42), value: fiveHourRemainingPercent)
+  }
+
+  private func quotaCircle(value: Double?, tint: Color, diameter: CGFloat, width: CGFloat) -> some View {
+    ZStack {
+      Circle().stroke(DashboardColors.track, lineWidth: width)
+      Circle()
+        .trim(from: 0, to: progress(value))
+        .stroke(tint, style: StrokeStyle(lineWidth: width, lineCap: .round))
+        .rotationEffect(.degrees(-90))
+    }
+    .frame(width: diameter, height: diameter)
+  }
+
+  private func quotaValue(label: String, value: Double?, tint: Color) -> some View {
+    HStack(spacing: max(3, size * 0.025)) {
+      Circle()
+        .fill(tint)
+        .frame(width: max(5, size * 0.045), height: max(5, size * 0.045))
+      Text(label)
+        .foregroundStyle(DashboardColors.subtleText)
+      Text(percentText(value))
+        .foregroundStyle(tint)
+    }
+    .font(.system(size: max(8, size * 0.085), weight: .heavy, design: .rounded))
+    .monospacedDigit()
+    .lineLimit(1)
+  }
+}
+
 struct MetricCard: View {
   @Environment(\.dashboardAppearance) private var appearance
   var title: String

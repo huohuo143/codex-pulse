@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-2.10.1-8b7cff">
+  <img alt="Version" src="https://img.shields.io/badge/version-2.10.2-8b7cff">
   <img alt="macOS" src="https://img.shields.io/badge/macOS-14%2B-111827?logo=apple">
   <img alt="Mac architectures" src="https://img.shields.io/badge/Mac-arm64%20%7C%20x86__64-111827">
   <img alt="Swift" src="https://img.shields.io/badge/Swift-6.0-f05138?logo=swift&logoColor=white">
@@ -18,11 +18,11 @@
 
 `Codex 脉动` 将 Codex 的额度、Token 消耗、重置节奏和 Full reset 权益集中到一套原生 macOS 界面中。它既可以作为常驻悬浮框，也可以完全隐藏悬浮框，仅使用主窗口或 7 款桌面小组件。
 
-> 当前版本：`2.10.1` build 2103。分别提供 Apple Silicon（arm64）与 Intel（x86_64）安装包；两者均为 ad-hoc 签名、未公证版本，完整小组件包要求 macOS 14 或更高版本。
+> 当前版本：`2.10.2` build 2104。分别提供 Apple Silicon（arm64）与 Intel（x86_64）安装包；两者均为 ad-hoc 签名、未公证版本，完整小组件包要求 macOS 14 或更高版本。
 
 ## 当前版本界面
 
-`Codex 脉动 2.10.1` 新增可选的 5 小时额度显示，并保留 2.10.0 的“24 小时 / 按天”多设备分色堆叠趋势。以下截图展示继续保留的自动版本更新检测。
+`Codex 脉动 2.10.2` 将 7 天和可选的 5 小时额度改为同心环：7 天为外环，5 小时为橙色内环，并同步更新悬浮框与桌面小组件。
 
 <p align="center">
   <img src="docs/screenshots/codex-pulse-update-v2.9.0.png" width="680" alt="Codex 脉动 2.9.0 版本更新检测">
@@ -47,7 +47,7 @@
 
 | 能力 | 展示内容 |
 | --- | --- |
-| 官方额度 | Codex 7 天剩余额度、已用比例和重置倒计时 |
+| 官方额度 | Codex 7 天额度外环、可选的 5 小时额度内环、已用比例和重置倒计时 |
 | 额度预测 | 本地记录官方额度百分点，估算消耗速度、耗尽区间、均衡日上限和风险等级 |
 | 原生提醒 | 用户主动开启后，按额度阈值、预测高风险和 Full reset 到期发送 macOS 通知 |
 | Token 统计 | 滚动 24 小时、最近 30 天按日趋势、多设备分色堆叠、今日、近 7 天、本月 Token，以及 input、cached input、output 和 model |
@@ -88,7 +88,7 @@
 悬浮框不是必选项。在“设置 → 悬浮框”中可以：
 
 - 开启或关闭悬浮框总开关；关闭后，小组件和普通主窗口仍可继续使用。
-- 分别选择是否显示 7 天额度、5 小时额度、滚动 24h Token、重置雷达和 Full reset 权益；5 小时额度默认关闭，可按需勾选。
+- 分别选择是否显示 7 天额度、5 小时额度、滚动 24h Token、重置雷达和 Full reset 权益；5 小时额度默认关闭，开启后与 7 天额度显示为不同颜色的同心环。
 - 在“额度环、圆形、方形、胶囊、横条、横条·详细、徽章、徽章·详细”八种样式间切换。
 - 选择额度环横向或竖向排列；样式会随所选信息自动调整尺寸。
 
@@ -98,8 +98,8 @@
 
 | 小组件 | 尺寸 | 主要信息 |
 | --- | --- | --- |
-| Codex 算力总览 | 中、大 | 7 天额度、滚动 24h、重置概率、Full reset；大号增加 Token 汇总、费用和趋势 |
-| 7 天额度 | 小、中 | 剩余额度环、已用比例和重置倒计时 |
+| Codex 算力总览 | 中、大 | 7 天额度外环、可选 5 小时内环、滚动 24h、重置概率、Full reset；大号增加 Token 汇总、费用和趋势 |
+| Codex 额度 | 小、中 | 7 天额度外环、可选 5 小时内环、已用比例和重置倒计时 |
 | Codex 重置雷达 | 小、中 | 24h 重置概率、研判、公开摘要和更新时间 |
 | Full reset 权益 | 小、中 | 可用次数和最多 3 次到期时间 |
 | Token 汇总 | 小、中 | 滚动 24h、今日、近 7 天、本月 Token 和金额预估 |
@@ -162,10 +162,10 @@ flowchart LR
 在 [Releases](https://github.com/huohuo143/codex-pulse/releases) 下载：
 
 ```text
-Codex-Pulse-v2.10.1-build2103-20260730-arm64.dmg
-Codex-Pulse-v2.10.1-build2103-20260730-arm64.dmg.sha256
-Codex-Pulse-v2.10.1-build2103-20260730-x86_64.dmg
-Codex-Pulse-v2.10.1-build2103-20260730-x86_64.dmg.sha256
+Codex-Pulse-v2.10.2-build2104-20260730-arm64.dmg
+Codex-Pulse-v2.10.2-build2104-20260730-arm64.dmg.sha256
+Codex-Pulse-v2.10.2-build2104-20260730-x86_64.dmg
+Codex-Pulse-v2.10.2-build2104-20260730-x86_64.dmg.sha256
 ```
 
 1. 打开 DMG。
@@ -177,7 +177,7 @@ Codex-Pulse-v2.10.1-build2103-20260730-x86_64.dmg.sha256
 
 ## 与旧版并行
 
-| 项目 | Codex 脉动 2.10.1 | 旧算力码表 0.1.0 |
+| 项目 | Codex 脉动 2.10.2 | 旧算力码表 0.1.0 |
 | --- | --- | --- |
 | App | `Codex 脉动.app` | `算力码表.app` |
 | Bundle ID | `dev.codex.balance-dashboard.codex` | `dev.codex.balance-dashboard` |
@@ -248,6 +248,8 @@ ARCH=arm64 ./script/create_transfer_package.sh
 - 版本检测依赖 GitHub Releases 可访问；断网时保留上次成功结果，不影响其他功能。
 
 ## 版本说明
+
+2.10.2 将 7 天与可选的 5 小时额度统一为不同颜色的同心环，并将独立的 5 小时显示开关扩展到总览和额度小组件。完整内容见 [2.10.2 改版说明](docs/RELEASE_2.10.2.md)。
 
 2.10.1 新增可选的 5 小时额度显示，按官方窗口时长识别数据，并适配全部八种悬浮框样式。完整内容见 [2.10.1 改版说明](docs/RELEASE_2.10.1.md)。
 

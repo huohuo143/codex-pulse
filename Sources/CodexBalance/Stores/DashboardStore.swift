@@ -280,6 +280,13 @@ final class DashboardStore: ObservableObject {
       save(floatingPanelMetrics.contains(.resetCredits), "compactShowsResetCredits")
     }
   }
+  @Published var widgetShowsFiveHourQuota: Bool {
+    didSet {
+      guard widgetShowsFiveHourQuota != oldValue else { return }
+      save(widgetShowsFiveHourQuota, "widgetShowsFiveHourQuota")
+      writeWidgetSnapshotFile()
+    }
+  }
   @Published var compactSizeMode: CompactSizeMode { didSet { save(compactSizeMode.rawValue, "compactSizeMode") } }
   @Published var compactStyle: CompactStyle { didSet { save(compactStyle.rawValue, "compactStyle") } }
   @Published var compactRingOrientation: CompactRingOrientation {
@@ -408,6 +415,7 @@ final class DashboardStore: ObservableObject {
       rawValues: defaults.stringArray(forKey: FloatingPanelMetric.userDefaultsKey),
       legacyShowsResetCredits: defaults.object(forKey: "compactShowsResetCredits") as? Bool
     )
+    widgetShowsFiveHourQuota = defaults.object(forKey: "widgetShowsFiveHourQuota") as? Bool ?? false
 
     compactSizeMode = defaults.string(forKey: "compactSizeMode").flatMap(CompactSizeMode.init) ?? .standard
     compactStyle = defaults.string(forKey: "compactStyle").flatMap(CompactStyle.init) ?? .rings
@@ -1205,6 +1213,10 @@ final class DashboardStore: ObservableObject {
       remainingPercent: weekly?.remainingPercent,
       usedPercent: weekly?.usedPercent,
       resetsAt: weekly?.resetsAt,
+      fiveHourRemainingPercent: fiveHour?.remainingPercent,
+      fiveHourUsedPercent: fiveHour?.usedPercent,
+      fiveHourResetsAt: fiveHour?.resetsAt,
+      showsFiveHourQuota: widgetShowsFiveHourQuota,
       rolling24HoursTokens: stats.rolling24HoursTokens,
       todayTokens: stats.todayTokens,
       last7DaysTokens: stats.last7DaysTokens,

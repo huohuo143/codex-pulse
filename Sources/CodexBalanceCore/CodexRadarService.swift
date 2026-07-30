@@ -102,7 +102,7 @@ public actor CodexRadarService {
     )
     request.httpMethod = "GET"
     request.setValue(accept, forHTTPHeaderField: "Accept")
-    request.setValue("CodexSuanliMeter/2.10.1 (personal-read-only-reset-radar)", forHTTPHeaderField: "User-Agent")
+    request.setValue("CodexSuanliMeter/2.10.2 (personal-read-only-reset-radar)", forHTTPHeaderField: "User-Agent")
     let (data, response) = try await URLSession.shared.data(for: request)
     guard let http = response as? HTTPURLResponse else { throw CodexRadarError.invalidPayload }
     switch http.statusCode {

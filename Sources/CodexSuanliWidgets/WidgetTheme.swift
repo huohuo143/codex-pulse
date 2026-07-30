@@ -2,6 +2,7 @@ import SwiftUI
 
 enum CodexWidgetTheme {
   static let weekly = Color(red: 0.18, green: 0.91, blue: 0.72)
+  static let fiveHour = Color(red: 1.0, green: 0.56, blue: 0.20)
   static let usage = Color(red: 0.39, green: 0.84, blue: 1.0)
   static let radar = Color(red: 0.72, green: 0.62, blue: 1.0)
   static let credit = Color(red: 1.0, green: 0.76, blue: 0.36)
