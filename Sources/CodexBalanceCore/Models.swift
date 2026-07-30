@@ -120,11 +120,17 @@ public struct RateLimitEvent: Identifiable, Equatable, Codable, Sendable {
   public var projectPath: String
 
   /// Codex has used both `secondary` and `primary` for the seven-day window.
-  /// Identify it by the official duration so a five-hour primary window never
-  /// leaks back into the Codex-only UI.
+  /// Identify each quota by its official duration because the API slot can
+  /// change between versions.
   public var sevenDayWindow: LimitWindow? {
-    let expectedMinutes = 7.0 * 24.0 * 60.0
-    let toleranceMinutes = 60.0
+    window(matching: 7.0 * 24.0 * 60.0, toleranceMinutes: 60.0)
+  }
+
+  public var fiveHourWindow: LimitWindow? {
+    window(matching: 5.0 * 60.0, toleranceMinutes: 15.0)
+  }
+
+  private func window(matching expectedMinutes: Double, toleranceMinutes: Double) -> LimitWindow? {
     return [secondary, primary]
       .compactMap { $0 }
       .filter { abs($0.windowMinutes - expectedMinutes) <= toleranceMinutes }

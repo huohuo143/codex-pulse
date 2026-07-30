@@ -18,6 +18,7 @@ enum WindowConfigurator {
     let metrics = metrics.isEmpty ? FloatingPanelMetric.defaults : metrics
     let isMini = mode == .mini
     let showsWeekly = metrics.contains(.weeklyQuota)
+    let showsFiveHour = metrics.contains(.fiveHourQuota)
     let showsRolling = metrics.contains(.rolling24Tokens)
     let showsRadar = metrics.contains(.resetRadar)
     let showsResetCredits = metrics.contains(.resetCredits)
@@ -26,11 +27,12 @@ enum WindowConfigurator {
     case .rings:
       var heights: [CGFloat] = []
       if ringOrientation == .horizontal {
-        if showsWeekly && showsRolling { heights.append(isMini ? 116 : 148) }
-        else if showsWeekly { heights.append(isMini ? 116 : 148) }
+        if showsWeekly || showsFiveHour { heights.append(isMini ? 116 : 148) }
         else if showsRolling { heights.append(isMini ? 72 : 92) }
+        if showsWeekly && showsFiveHour && showsRolling { heights.append(isMini ? 44 : 54) }
       } else {
         if showsWeekly { heights.append(isMini ? 116 : 148) }
+        if showsFiveHour { heights.append(isMini ? 116 : 148) }
         if showsRolling { heights.append(isMini ? 44 : 54) }
       }
       if showsRadar { heights.append(isMini ? 24 : 28) }
@@ -42,9 +44,9 @@ enum WindowConfigurator {
       let width: CGFloat
       if ringOrientation == .vertical {
         width = isMini ? 204 : 236
-      } else if showsWeekly && showsRolling {
+      } else if (showsWeekly && showsFiveHour) || ((showsWeekly || showsFiveHour) && showsRolling) {
         width = isMini ? 248 : 300
-      } else if showsWeekly {
+      } else if showsWeekly || showsFiveHour {
         width = isMini ? 160 : 190
       } else {
         width = isMini ? 218 : 260
@@ -63,14 +65,16 @@ enum WindowConfigurator {
         : max(CGFloat(198), CGFloat(82 + metrics.count * 66))
       return NSSize(width: width, height: isMini ? 56 : 68)
     case .bars:
+      let quotaProgressCount = [showsWeekly, showsFiveHour].filter { $0 }.count
       let height = isMini
-        ? max(CGFloat(64), CGFloat(30 + metrics.count * 21 + (showsWeekly ? 8 : 0)))
-        : max(CGFloat(78), CGFloat(34 + metrics.count * 25 + (showsWeekly ? 10 : 0)))
+        ? max(CGFloat(64), CGFloat(30 + metrics.count * 21 + quotaProgressCount * 8))
+        : max(CGFloat(78), CGFloat(34 + metrics.count * 25 + quotaProgressCount * 10))
       return NSSize(width: isMini ? 238 : 286, height: height)
     case .barsQuad:
+      let quotaProgressCount = [showsWeekly, showsFiveHour].filter { $0 }.count
       let height = isMini
-        ? max(CGFloat(76), CGFloat(32 + metrics.count * 24 + (showsWeekly ? 8 : 0)))
-        : max(CGFloat(92), CGFloat(38 + metrics.count * 29 + (showsWeekly ? 10 : 0)))
+        ? max(CGFloat(76), CGFloat(32 + metrics.count * 24 + quotaProgressCount * 8))
+        : max(CGFloat(92), CGFloat(38 + metrics.count * 29 + quotaProgressCount * 10))
       return NSSize(width: isMini ? 248 : 300, height: height)
     case .badge:
       let width = isMini

@@ -34,9 +34,14 @@ struct CodexWidgetBackground: View {
 }
 
 extension View {
+  @ViewBuilder
   func codexWidgetBackground() -> some View {
-    containerBackground(for: .widget) {
-      CodexWidgetBackground()
+    if #available(macOS 14.0, *) {
+      containerBackground(for: .widget) {
+        CodexWidgetBackground()
+      }
+    } else {
+      background(CodexWidgetBackground())
     }
   }
 }
