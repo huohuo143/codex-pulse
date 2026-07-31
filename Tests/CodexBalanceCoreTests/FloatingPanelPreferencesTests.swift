@@ -53,6 +53,12 @@ struct FloatingPanelPreferencesTests {
     )
 
     #expect(selection == [.weeklyQuota, .fiveHourQuota])
+    #expect(FloatingPanelMetric.showsFiveHourQuota(in: selection))
+  }
+
+  @Test
+  func overviewHidesFiveHourQuotaWhenSettingsSelectionIsOff() {
+    #expect(!FloatingPanelMetric.showsFiveHourQuota(in: [.weeklyQuota]))
   }
 
   @Test(arguments: [true, false])

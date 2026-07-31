@@ -343,6 +343,9 @@ final class DashboardStore: ObservableObject {
   var enabledToolCount: Int { 1 }
   var touchBarSupported: Bool { TouchBarStripController.shared.isSupported }
   var compactShowsResetCredits: Bool { floatingPanelMetrics.contains(.resetCredits) }
+  var overviewShowsFiveHourQuota: Bool {
+    FloatingPanelMetric.showsFiveHourQuota(in: floatingPanelMetrics)
+  }
   var weekly: LimitWindow? { status?.main?.sevenDayWindow }
   var fiveHour: LimitWindow? { status?.main?.fiveHourWindow }
   var rateLimitResetCredits: RateLimitResetCreditsSummary? { status?.rateLimitResetCredits }

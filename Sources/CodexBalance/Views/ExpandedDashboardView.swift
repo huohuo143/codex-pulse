@@ -183,9 +183,13 @@ struct ExpandedDashboardView: View {
   private var summaryPanel: some View {
     PanelCard {
       HStack(spacing: 28) {
-        WeeklyGaugeView(
-          remainingPercent: store.weekly?.remainingPercent,
-          tint: store.palette.weekly,
+        ConcentricQuotaGaugeView(
+          weeklyRemainingPercent: store.weekly?.remainingPercent,
+          fiveHourRemainingPercent: store.fiveHour?.remainingPercent,
+          showsWeekly: true,
+          showsFiveHour: store.overviewShowsFiveHourQuota,
+          weeklyTint: store.palette.weekly,
+          fiveHourTint: .orange,
           size: 190,
           lineWidth: 18
         )
@@ -206,20 +210,30 @@ struct ExpandedDashboardView: View {
             valuePair("USD", usd(stats.cost24Hours.usd))
             valuePair("CNY", cny(stats.cost24Hours))
           }
-          if let reset = store.weekly?.resetsAt {
-            Text("7天额度刷新：\(reset.formatted(date: .abbreviated, time: .shortened))")
-              .font(.caption)
-              .foregroundStyle(DashboardColors.subtleText)
-          } else {
-            Text("7天额度暂无官方窗口数据")
-              .font(.caption)
-              .foregroundStyle(DashboardColors.subtleText)
+          VStack(alignment: .leading, spacing: 4) {
+            quotaResetText(title: "7天", window: store.weekly)
+            if store.overviewShowsFiveHourQuota {
+              quotaResetText(title: "5小时", window: store.fiveHour)
+            }
           }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
       }
     }
     .animation(.snappy(duration: 0.28), value: stats.rolling24HoursTokens)
+    .animation(.snappy(duration: 0.28), value: store.overviewShowsFiveHourQuota)
+  }
+
+  private func quotaResetText(title: String, window: LimitWindow?) -> some View {
+    Group {
+      if let reset = window?.resetsAt {
+        Text("\(title)额度刷新：\(reset.formatted(date: .abbreviated, time: .shortened))")
+      } else {
+        Text("\(title)额度暂无官方窗口数据")
+      }
+    }
+    .font(.caption)
+    .foregroundStyle(DashboardColors.subtleText)
   }
 
   private var costCards: some View {

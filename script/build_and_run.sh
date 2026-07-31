@@ -7,8 +7,8 @@ EXECUTABLE_NAME="CodexSuanliMeter"
 WIDGET_EXECUTABLE_NAME="CodexSuanliWidgets"
 BUNDLE_ID="dev.codex.balance-dashboard.codex"
 WIDGET_BUNDLE_ID="$BUNDLE_ID.widgets"
-VERSION="${VERSION:-2.10.2}"
-BUILD_NUMBER="${BUILD_NUMBER:-2104}"
+VERSION="${VERSION:-2.10.3}"
+BUILD_NUMBER="${BUILD_NUMBER:-2106}"
 ARCH="${ARCH:-$(uname -m)}"
 # macOS 13 可运行主应用；桌面小组件只在 macOS 14 及以后提供。发布完整
 # 小组件包时显式传入 INCLUDE_WIDGETS=1 MIN_SYSTEM_VERSION=14.0。

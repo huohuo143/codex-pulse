@@ -4,8 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_NAME="Codex 脉动"
 EXECUTABLE_NAME="CodexSuanliMeter"
-VERSION="${VERSION:-2.10.2}"
-BUILD_NUMBER="${BUILD_NUMBER:-2104}"
+VERSION="${VERSION:-2.10.3}"
+BUILD_NUMBER="${BUILD_NUMBER:-2106}"
 DATE_TAG="${DATE_TAG:-$(/bin/date +%Y%m%d)}"
 ARCH="${ARCH:-$(uname -m)}"
 
@@ -43,15 +43,14 @@ VERSION="$VERSION" BUILD_NUMBER="$BUILD_NUMBER" ARCH="$ARCH" \
   "$ROOT_DIR/script/build_and_run.sh"
 
 cat >"$NOTES_PATH" <<'NOTES'
-# Codex 脉动 2.10.2 改版说明
+# Codex 脉动 2.10.3 改版说明
 
-- 悬浮框的 7 天额度与 5 小时额度改为同心环：7 天为外环，5 小时为橙色内环。
-- 5 小时内环继续作为可选显示项，默认关闭；仅开启任一额度时仍使用单环。
-- “Codex 算力总览”和“Codex 额度”两款桌面小组件同步支持同心额度环。
-- “设置 → macOS 桌面小组件”新增独立的“显示 5 小时额度内环”开关，默认关闭。
-- Widget 快照升级为 schema 2，并保持对缺少 5 小时字段的旧快照兼容。
+- 主窗口“概览”补齐 5 小时额度内环：7 天为主题色外环，5 小时为橙色内环。
+- 双环中心同时标注 7 天与 5 小时剩余比例，并分别显示官方重置时间。
+- “设置 → 悬浮框显示信息 → 5 小时额度”同步控制悬浮框和主窗口概览；取消勾选后概览恢复为单一 7 天额度环。
+- 桌面小组件继续保留独立显示偏好，升级不会改变原有小组件选择。
 - 官方暂未返回 5 小时窗口时显示 `--`，不会用其他窗口或本地 Token 推算。
-- 完整回归测试覆盖同心环数据、开关持久化、旧快照兼容和原有核心功能。
+- 完整回归测试覆盖额度读取、同心环、小组件快照与原有核心功能。
 
 NOTES
 /usr/bin/printf '\n本包为 %s、ad-hoc 签名、未公证版本。首次打开可能出现 Gatekeeper 提示。\n' \

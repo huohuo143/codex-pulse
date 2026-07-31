@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-2.10.2-8b7cff">
+  <img alt="Version" src="https://img.shields.io/badge/version-2.10.3-8b7cff">
   <img alt="macOS" src="https://img.shields.io/badge/macOS-14%2B-111827?logo=apple">
   <img alt="Mac architectures" src="https://img.shields.io/badge/Mac-arm64%20%7C%20x86__64-111827">
   <img alt="Swift" src="https://img.shields.io/badge/Swift-6.0-f05138?logo=swift&logoColor=white">
@@ -18,11 +18,11 @@
 
 `Codex 脉动` 将 Codex 的额度、Token 消耗、重置节奏和 Full reset 权益集中到一套原生 macOS 界面中。它既可以作为常驻悬浮框，也可以完全隐藏悬浮框，仅使用主窗口或 7 款桌面小组件。
 
-> 当前版本：`2.10.2` build 2104。分别提供 Apple Silicon（arm64）与 Intel（x86_64）安装包；两者均为 ad-hoc 签名、未公证版本，完整小组件包要求 macOS 14 或更高版本。
+> 当前版本：`2.10.3` build 2106。分别提供 Apple Silicon（arm64）与 Intel（x86_64）安装包；两者均为 ad-hoc 签名、未公证版本，完整小组件包要求 macOS 14 或更高版本。
 
 ## 当前版本界面
 
-`Codex 脉动 2.10.2` 将 7 天和可选的 5 小时额度改为同心环：7 天为外环，5 小时为橙色内环，并同步更新悬浮框与桌面小组件。
+`Codex 脉动 2.10.3` 在主窗口概览补齐 5 小时额度内环：7 天为外环、5 小时为橙色内环；是否显示 5 小时额度与“设置 → 悬浮框显示信息”中的同名选项保持同步。
 
 <p align="center">
   <img src="docs/screenshots/codex-pulse-update-v2.9.0.png" width="680" alt="Codex 脉动 2.9.0 版本更新检测">
@@ -70,7 +70,7 @@
 
 主窗口分为“概览、趋势、分析、设置”四个区域：
 
-- 概览：额度、Token 汇总、重置雷达、Full reset 权益和最近额度事件。
+- 概览：7 天额度外环与可选的 5 小时额度内环、Token 汇总、重置雷达、Full reset 权益和最近额度事件；5 小时内环与设置中的“5 小时额度”选项同步。
 - 趋势：24 小时逐时视图、可横向滚动的最近 30 天按日视图、多设备分色堆叠与悬停明细，以及模型构成。
 - 分析：同期对比、月末推演、稳健异常检测、缓存/模型/项目集中度、项目预算和最近调用。
 - 设置：刷新频率、额度提醒、可靠性/自动化、版本更新、悬浮框、主题、Touch Bar 和桌面小组件。
@@ -162,10 +162,10 @@ flowchart LR
 在 [Releases](https://github.com/huohuo143/codex-pulse/releases) 下载：
 
 ```text
-Codex-Pulse-v2.10.2-build2104-20260730-arm64.dmg
-Codex-Pulse-v2.10.2-build2104-20260730-arm64.dmg.sha256
-Codex-Pulse-v2.10.2-build2104-20260730-x86_64.dmg
-Codex-Pulse-v2.10.2-build2104-20260730-x86_64.dmg.sha256
+Codex-Pulse-v2.10.3-build2106-20260731-arm64.dmg
+Codex-Pulse-v2.10.3-build2106-20260731-arm64.dmg.sha256
+Codex-Pulse-v2.10.3-build2106-20260731-x86_64.dmg
+Codex-Pulse-v2.10.3-build2106-20260731-x86_64.dmg.sha256
 ```
 
 1. 打开 DMG。
@@ -177,7 +177,7 @@ Codex-Pulse-v2.10.2-build2104-20260730-x86_64.dmg.sha256
 
 ## 与旧版并行
 
-| 项目 | Codex 脉动 2.10.2 | 旧算力码表 0.1.0 |
+| 项目 | Codex 脉动 2.10.3 | 旧算力码表 0.1.0 |
 | --- | --- | --- |
 | App | `Codex 脉动.app` | `算力码表.app` |
 | Bundle ID | `dev.codex.balance-dashboard.codex` | `dev.codex.balance-dashboard` |
@@ -248,6 +248,8 @@ ARCH=arm64 ./script/create_transfer_package.sh
 - 版本检测依赖 GitHub Releases 可访问；断网时保留上次成功结果，不影响其他功能。
 
 ## 版本说明
+
+2.10.3 在主窗口概览补齐 5 小时额度内环，并让它与设置中的“5 小时额度”选项保持同步；桌面小组件继续保留独立偏好。完整内容见 [2.10.3 改版说明](docs/RELEASE_2.10.3.md)。
 
 2.10.2 将 7 天与可选的 5 小时额度统一为不同颜色的同心环，并将独立的 5 小时显示开关扩展到总览和额度小组件。完整内容见 [2.10.2 改版说明](docs/RELEASE_2.10.2.md)。
 

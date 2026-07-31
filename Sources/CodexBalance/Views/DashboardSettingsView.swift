@@ -50,7 +50,7 @@ struct DashboardSettingsView: View {
         Text("悬浮框显示信息")
           .font(.system(size: 12.5, weight: .bold))
         FloatingPanelMetricPicker()
-        Text("可自由组合以上信息；为避免空白悬浮框，至少保留一项。Full reset 没有官方明细时会显示暂无可用数据。")
+        Text("“5 小时额度”同时控制主窗口概览的橙色内环；为避免空白悬浮框，至少保留一项。Full reset 没有官方明细时会显示暂无可用数据。")
           .font(.caption)
           .foregroundStyle(DashboardColors.subtleText)
 
