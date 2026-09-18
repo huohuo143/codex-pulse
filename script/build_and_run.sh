@@ -5,14 +5,14 @@ MODE="${1:-run}"
 APP_NAME="Codex 脉动"
 EXECUTABLE_NAME="CodexSuanliMeter"
 WIDGET_EXECUTABLE_NAME="CodexSuanliWidgets"
-BUNDLE_ID="dev.codex.balance-dashboard.codex"
+BUNDLE_ID="${CODEX_PULSE_BUNDLE_ID:-dev.codex.balance-dashboard.codex}"
 WIDGET_BUNDLE_ID="$BUNDLE_ID.widgets"
-VERSION="${VERSION:-2.10.2}"
-BUILD_NUMBER="${BUILD_NUMBER:-2104}"
+VERSION="${VERSION:-2.11.0}"
+BUILD_NUMBER="${BUILD_NUMBER:-2118}"
 ARCH="${ARCH:-$(uname -m)}"
 # macOS 13 可运行主应用；桌面小组件只在 macOS 14 及以后提供。发布完整
-# 小组件包时显式传入 INCLUDE_WIDGETS=1 MIN_SYSTEM_VERSION=14.0。
-MIN_SYSTEM_VERSION="${MIN_SYSTEM_VERSION:-14.0}"
+# 小组件扩展的独立部署目标保持 macOS 14，不抬高主应用要求。
+MIN_SYSTEM_VERSION="${MIN_SYSTEM_VERSION:-13.0}"
 INCLUDE_WIDGETS="${INCLUDE_WIDGETS:-1}"
 CODE_SIGN_IDENTITY="${CODE_SIGN_IDENTITY:--}"
 
@@ -32,10 +32,6 @@ case "$INCLUDE_WIDGETS" in
     ;;
 esac
 
-if [[ "$INCLUDE_WIDGETS" == "1" && "${MIN_SYSTEM_VERSION%%.*}" -lt 14 ]]; then
-  echo "The WidgetKit extension requires MIN_SYSTEM_VERSION=14.0 or later." >&2
-  exit 2
-fi
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="${CODEX_PULSE_DIST_DIR:-$ROOT_DIR/dist}"
@@ -51,7 +47,7 @@ SWIFT_SCRATCH_PATH="${CODEX_PULSE_SWIFT_SCRATCH_PATH:-$ROOT_DIR/.build/swiftpm-$
 ICON_PATH="$ROOT_DIR/assets/AppIcon.icns"
 WIDGET_ENTITLEMENTS="$ROOT_DIR/config/CodexSuanliWidgets.entitlements"
 WIDGET_XCODE_PROJECT="$ROOT_DIR/xcode/CodexPulseWidgets.xcodeproj"
-WIDGET_DERIVED_DATA="$ROOT_DIR/.build/xcode-widget-$BUILD_NUMBER-$ARCH"
+WIDGET_DERIVED_DATA="${CODEX_PULSE_WIDGET_DERIVED_DATA:-$ROOT_DIR/.build/xcode-widget-$BUILD_NUMBER-$ARCH}"
 CONFIGURATION="release"
 
 codesign_args=(--force --sign "$CODE_SIGN_IDENTITY")
@@ -79,7 +75,7 @@ if [[ "${OPEN_APP:-1}" != "0" ]]; then
 fi
 
 cd "$ROOT_DIR"
-swift build -c "$CONFIGURATION" --arch "$ARCH" --scratch-path "$SWIFT_SCRATCH_PATH" --product "$EXECUTABLE_NAME"
+swift build -j 1 --disable-index-store -c "$CONFIGURATION" --arch "$ARCH" --scratch-path "$SWIFT_SCRATCH_PATH" --product "$EXECUTABLE_NAME"
 BUILD_DIR="$(swift build -c "$CONFIGURATION" --arch "$ARCH" --scratch-path "$SWIFT_SCRATCH_PATH" --show-bin-path)"
 BUILD_BINARY="$BUILD_DIR/$EXECUTABLE_NAME"
 if [[ "$INCLUDE_WIDGETS" == "1" ]]; then
@@ -113,6 +109,7 @@ if [[ ! -f "$ICON_PATH" ]]; then
   exit 1
 fi
 cp "$ICON_PATH" "$APP_CONTENTS/Resources/AppIcon.icns"
+cp "$ROOT_DIR/Sources/CodexBalanceCore/Resources/model-prices-v1.json" "$APP_CONTENTS/Resources/model-prices-v1.json"
 
 if [[ "$INCLUDE_WIDGETS" == "1" ]]; then
   if [[ ! -f "$WIDGET_ENTITLEMENTS" || ! -d "$WIDGET_XCODE_BUNDLE" ]]; then
@@ -194,7 +191,7 @@ if ! /usr/bin/codesign "${codesign_args[@]}" "$APP_BUNDLE" >/dev/null 2>&1 \
   INFO_PLIST="$APP_CONTENTS/Info.plist"
 fi
 
-VERSION="$VERSION" BUILD_NUMBER="$BUILD_NUMBER" ARCH="$ARCH" \
+CODEX_PULSE_BUNDLE_ID="$BUNDLE_ID" VERSION="$VERSION" BUILD_NUMBER="$BUILD_NUMBER" ARCH="$ARCH" \
   MIN_SYSTEM_VERSION="$MIN_SYSTEM_VERSION" INCLUDE_WIDGETS="$INCLUDE_WIDGETS" \
   "$ROOT_DIR/script/verify_widget_bundle.sh" "$APP_BUNDLE"
 

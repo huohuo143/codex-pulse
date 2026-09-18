@@ -1,3 +1,4 @@
+import CodexBalanceCore
 import AppKit
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -33,8 +34,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
   /// 用文件锁保证全局单实例（跨「不同路径的同一程序」也有效，比 bundleID 判断更稳）
   private static func acquireSingleInstanceLock() -> Bool {
-    let lockPath = NSHomeDirectory()
-      + "/Library/Application Support/CodexSuanliMeter/.instance.lock"
+    let lockPath = PulsePaths.support.appendingPathComponent(".instance.lock").path
     try? FileManager.default.createDirectory(
       atPath: (lockPath as NSString).deletingLastPathComponent,
       withIntermediateDirectories: true

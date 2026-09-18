@@ -4,8 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_NAME="Codex 脉动"
 EXECUTABLE_NAME="CodexSuanliMeter"
-VERSION="${VERSION:-2.10.2}"
-BUILD_NUMBER="${BUILD_NUMBER:-2104}"
+VERSION="${VERSION:-2.11.0}"
+BUILD_NUMBER="${BUILD_NUMBER:-2118}"
 DATE_TAG="${DATE_TAG:-$(/bin/date +%Y%m%d)}"
 ARCH="${ARCH:-$(uname -m)}"
 
@@ -22,7 +22,7 @@ case "$ARCH" in
     ;;
 esac
 
-DIST_DIR="$ROOT_DIR/dist"
+DIST_DIR="${CODEX_PULSE_DIST_DIR:-$ROOT_DIR/dist}"
 APP_OUTPUT_DIR="$DIST_DIR/build-v$VERSION-build$BUILD_NUMBER-$ARCH"
 APP_BUNDLE="$APP_OUTPUT_DIR/$APP_NAME.app"
 RELEASE_NAME="Codex-Pulse-v$VERSION-build$BUILD_NUMBER"
@@ -42,18 +42,7 @@ VERSION="$VERSION" BUILD_NUMBER="$BUILD_NUMBER" ARCH="$ARCH" \
   APP_OUTPUT_DIR="$APP_OUTPUT_DIR" OPEN_APP=0 \
   "$ROOT_DIR/script/build_and_run.sh"
 
-cat >"$NOTES_PATH" <<'NOTES'
-# Codex 脉动 2.10.2 改版说明
-
-- 悬浮框的 7 天额度与 5 小时额度改为同心环：7 天为外环，5 小时为橙色内环。
-- 5 小时内环继续作为可选显示项，默认关闭；仅开启任一额度时仍使用单环。
-- “Codex 算力总览”和“Codex 额度”两款桌面小组件同步支持同心额度环。
-- “设置 → macOS 桌面小组件”新增独立的“显示 5 小时额度内环”开关，默认关闭。
-- Widget 快照升级为 schema 2，并保持对缺少 5 小时字段的旧快照兼容。
-- 官方暂未返回 5 小时窗口时显示 `--`，不会用其他窗口或本地 Token 推算。
-- 完整回归测试覆盖同心环数据、开关持久化、旧快照兼容和原有核心功能。
-
-NOTES
+cp "$ROOT_DIR/docs/RELEASE_$VERSION.md" "$NOTES_PATH"
 /usr/bin/printf '\n本包为 %s、ad-hoc 签名、未公证版本。首次打开可能出现 Gatekeeper 提示。\n' \
   "$ARCH_LABEL" >>"$NOTES_PATH"
 
@@ -63,123 +52,8 @@ mkdir -p "$STAGE_DIR"
 ln -s /Applications "$STAGE_DIR/Applications"
 cp "$NOTES_PATH" "$STAGE_DIR/改版说明.md"
 
-cat >"$STAGE_DIR/安装并启用自动启动.command" <<'INSTALLER'
-#!/bin/zsh
-set -euo pipefail
-
-APP_NAME="Codex 脉动"
-EXECUTABLE_NAME="CodexSuanliMeter"
-WIDGET_EXECUTABLE_NAME="CodexSuanliWidgets"
-BUNDLE_ID="dev.codex.balance-dashboard.codex"
-WIDGET_BUNDLE_ID="dev.codex.balance-dashboard.codex.widgets"
-LABEL="dev.codex.balance-dashboard.codex.watch-codex"
-SOURCE_DIR="${0:A:h}"
-SOURCE_APP="$SOURCE_DIR/$APP_NAME.app"
-DEST_DIR="$HOME/Applications"
-DEST_APP="$DEST_DIR/$APP_NAME.app"
-LEGACY_APP="$DEST_DIR/Codex算力码表.app"
-SUPPORT_DIR="$HOME/Library/Application Support/CodexSuanliMeter"
-LEGACY_BACKUP_DIR="$SUPPORT_DIR/legacy-app-backups"
-WATCHER_SCRIPT="$SUPPORT_DIR/watch-codex.sh"
-PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
-LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
-
-if [[ ! -d "$SOURCE_APP" ]]; then
-  echo "找不到 $APP_NAME.app。请从 DMG 中直接运行本脚本。"
-  read -r "?按回车退出。"
-  exit 1
-fi
-
-mkdir -p "$DEST_DIR" "$SUPPORT_DIR" "$LEGACY_BACKUP_DIR" "$HOME/Library/LaunchAgents"
-/bin/launchctl bootout "gui/$(/usr/bin/id -u)" "$PLIST" >/dev/null 2>&1 || true
-/usr/bin/pkill -x "$EXECUTABLE_NAME" >/dev/null 2>&1 || true
-/usr/bin/pkill -x "$WIDGET_EXECUTABLE_NAME" >/dev/null 2>&1 || true
-
-# 只注销历史 Widget 注册，不删除任何历史 App 或构建文件。
-while IFS= read -r line; do
-  widget_path="${line##*$'\t'}"
-  [[ "$widget_path" == *.appex && -d "$widget_path" ]] || continue
-  /usr/bin/pluginkit -r "$widget_path" >/dev/null 2>&1 || true
-  host_app="${widget_path%%/Contents/PlugIns/*}"
-  [[ -d "$host_app" ]] && "$LSREGISTER" -u "$host_app" >/dev/null 2>&1 || true
-done < <(/usr/bin/pluginkit -m -A -D -v -i "$WIDGET_BUNDLE_ID" 2>/dev/null || true)
-
-if [[ -d "$DEST_APP" ]]; then
-  DEST_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$DEST_APP/Contents/Info.plist" 2>/dev/null || echo unknown)"
-  DEST_BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$DEST_APP/Contents/Info.plist" 2>/dev/null || echo unknown)"
-  DEST_BACKUP="$LEGACY_BACKUP_DIR/Codex脉动-v$DEST_VERSION-build$DEST_BUILD-$(/bin/date +%Y%m%d-%H%M%S).app"
-  /bin/mv "$DEST_APP" "$DEST_BACKUP"
-  echo "已备份已安装版本：$DEST_BACKUP"
-fi
-/usr/bin/ditto "$SOURCE_APP" "$DEST_APP"
-WIDGET_BUNDLE="$DEST_APP/Contents/PlugIns/CodexSuanliWidgets.appex"
-"$LSREGISTER" -f "$DEST_APP" >/dev/null 2>&1 || true
-/usr/bin/pluginkit -a "$WIDGET_BUNDLE" >/dev/null 2>&1 || true
-/usr/bin/pluginkit -e use -i "$WIDGET_BUNDLE_ID" >/dev/null 2>&1 || true
-WIDGET_REGISTERED=0
-for _ in {1..20}; do
-  if /usr/bin/pluginkit -m -A -D -v 2>/dev/null | /usr/bin/grep -F "$WIDGET_BUNDLE" >/dev/null; then
-    WIDGET_REGISTERED=1
-    break
-  fi
-  /bin/sleep 0.1
-done
-[[ "$WIDGET_REGISTERED" == "1" ]] || { echo "小组件扩展注册失败。"; exit 1; }
-
-# 清除安装前仍驻留的 WidgetKit 时间线缓存；不删除桌面布局或用户数据。
-/usr/bin/killall chronod >/dev/null 2>&1 || true
-/usr/bin/killall NotificationCenter >/dev/null 2>&1 || true
-/usr/bin/killall Dock >/dev/null 2>&1 || true
-/bin/sleep 2
-
-if [[ -d "$LEGACY_APP" ]]; then
-  LEGACY_BACKUP="$LEGACY_BACKUP_DIR/Codex算力码表-$(/bin/date +%Y%m%d-%H%M%S).app"
-  /bin/mv "$LEGACY_APP" "$LEGACY_BACKUP"
-  echo "旧名称 App 已备份：$LEGACY_BACKUP"
-fi
-
-cat >"$WATCHER_SCRIPT" <<'WATCHER'
-#!/bin/zsh
-set -u
-APP_PATH="$HOME/Applications/Codex 脉动.app"
-while true; do
-  if /usr/bin/pgrep -f "Codex.app/Contents/MacOS/Codex" >/dev/null 2>&1 ||
-     /usr/bin/pgrep -x "Codex" >/dev/null 2>&1 ||
-     /usr/bin/pgrep -f "Contents/Resources/codex app-server" >/dev/null 2>&1; then
-    if ! /usr/bin/pgrep -x "CodexSuanliMeter" >/dev/null 2>&1 && [[ -d "$APP_PATH" ]]; then
-      /usr/bin/open -g "$APP_PATH" --args --background
-    fi
-  fi
-  /bin/sleep 5
-done
-WATCHER
-chmod +x "$WATCHER_SCRIPT"
-
-cat >"$PLIST" <<PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "https://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key><string>$LABEL</string>
-  <key>ProgramArguments</key>
-  <array><string>/bin/zsh</string><string>$WATCHER_SCRIPT</string></array>
-  <key>RunAtLoad</key><true/>
-  <key>KeepAlive</key><true/>
-  <key>StandardOutPath</key><string>/tmp/$LABEL.out.log</string>
-  <key>StandardErrorPath</key><string>/tmp/$LABEL.err.log</string>
-</dict>
-</plist>
-PLIST
-
-/bin/launchctl bootstrap "gui/$(/usr/bin/id -u)" "$PLIST"
-/usr/bin/open "$DEST_APP"
-echo
-echo "安装完成：$DEST_APP"
-echo "已启用：打开 Codex 时自动启动 Codex 脉动。"
-echo "旧版 App 文件仍保留；自动启动已切换为 Codex 脉动。"
-read -r "?按回车退出。"
-INSTALLER
-chmod +x "$STAGE_DIR/安装并启用自动启动.command"
+cp "$ROOT_DIR/script/install_preserving_settings.command" "$STAGE_DIR/安装或更新（保留设置）.command"
+chmod +x "$STAGE_DIR/安装或更新（保留设置）.command"
 
 /usr/bin/hdiutil create \
   -volname "$APP_NAME $VERSION" \
@@ -188,7 +62,7 @@ chmod +x "$STAGE_DIR/安装并启用自动启动.command"
   -format UDZO \
   "$DMG_PATH" >/dev/null
 
-/usr/bin/shasum -a 256 "$DMG_PATH" >"$SHA_PATH"
+(cd "$DIST_DIR" && /usr/bin/shasum -a 256 "${DMG_PATH##*/}" >"$SHA_PATH")
 echo "DMG: $DMG_PATH"
 echo "SHA-256: $SHA_PATH"
 echo "Notes: $NOTES_PATH"

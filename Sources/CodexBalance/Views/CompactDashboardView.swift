@@ -46,6 +46,14 @@ struct CompactDashboardView: View {
       compactWindowControls
         .padding(mini ? 6 : 9)
     }
+    .overlay(alignment: .bottomLeading) {
+      if store.quotaState != .fresh {
+        Text(store.quotaState == .cached ? "缓存" : "待更新")
+          .font(.system(size: 8, weight: .semibold)).foregroundStyle(.orange)
+          .padding(4).allowsHitTesting(false)
+      }
+    }
+    .help(store.quotaStatusLabel + "\n按当前价格表折算 · " + stats.cost24Hours.coverageLabel + (stats.cost24Hours.unpricedModels.isEmpty ? "" : "\n未计价：" + stats.cost24Hours.unpricedModels.joined(separator: "、")))
     .contextMenu {
       Button("打开主界面", systemImage: "arrow.up.left.and.arrow.down.right", action: store.showDashboard)
       Button("复制用量摘要", systemImage: "doc.on.doc", action: store.copyUsageSummary)
@@ -257,7 +265,7 @@ struct CompactDashboardView: View {
             .foregroundStyle(DashboardColors.subtleText)
         }
         if shows(.rolling24Tokens) {
-          circleMetric("24h", BalanceFormatters.compactNumber(stats.rolling24HoursTokens), tint: store.palette.usage24h)
+          circleMetric("24h", BalanceFormatters.compactNumber(store.hasUsageData ? stats.rolling24HoursTokens : nil), tint: store.palette.usage24h)
         }
         if shows(.resetRadar) {
           circleMetric("重置", resetProbabilityText, tint: resetProbabilityTint)
@@ -314,7 +322,7 @@ struct CompactDashboardView: View {
           if shows(.rolling24Tokens) {
             VStack(alignment: .leading, spacing: 2) {
               Text("滚动24h")
-              Text(BalanceFormatters.compactNumber(stats.rolling24HoursTokens))
+              Text(BalanceFormatters.compactNumber(store.hasUsageData ? stats.rolling24HoursTokens : nil))
                 .foregroundStyle(store.palette.usage24h)
             }
           }
@@ -407,7 +415,7 @@ struct CompactDashboardView: View {
     case .rolling24Tokens:
       pillValue(
         title: "滚动24h",
-        value: BalanceFormatters.compactNumber(stats.rolling24HoursTokens),
+        value: BalanceFormatters.compactNumber(store.hasUsageData ? stats.rolling24HoursTokens : nil),
         tint: store.palette.usage24h
       )
     case .resetRadar:
@@ -469,6 +477,7 @@ struct CompactDashboardView: View {
     .font(.system(size: mini ? 7.5 : 9, weight: .heavy, design: .rounded))
     .monospacedDigit()
     .lineLimit(1)
+    .fixedSize(horizontal: true, vertical: false)
   }
 
   private func circleMetric(_ title: String, _ value: String, tint: Color) -> some View {
@@ -488,7 +497,7 @@ struct CompactDashboardView: View {
   }
 
   private var rollingUsage: some View {
-    let parts = BalanceFormatters.compactNumberParts(stats.rolling24HoursTokens)
+    let parts = BalanceFormatters.compactNumberParts(store.hasUsageData ? stats.rolling24HoursTokens : nil)
     return VStack(alignment: .leading, spacing: mini ? 4 : 7) {
       Label("滚动24h", systemImage: "clock.arrow.circlepath")
         .font(.system(size: mini ? 10.5 : 12.5, weight: .bold))
@@ -518,7 +527,7 @@ struct CompactDashboardView: View {
   }
 
   private var verticalRollingUsage: some View {
-    let parts = BalanceFormatters.compactNumberParts(stats.rolling24HoursTokens)
+    let parts = BalanceFormatters.compactNumberParts(store.hasUsageData ? stats.rolling24HoursTokens : nil)
     return VStack(alignment: .trailing, spacing: 2) {
       HStack(alignment: .center, spacing: mini ? 7 : 9) {
         Label("滚动24h", systemImage: "clock.arrow.circlepath")
@@ -557,7 +566,7 @@ struct CompactDashboardView: View {
       }
       if shows(.rolling24Tokens) {
         HStack {
-          Label("24h \(BalanceFormatters.compactNumber(stats.rolling24HoursTokens))", systemImage: "clock")
+          Label("24h \(BalanceFormatters.compactNumber(store.hasUsageData ? stats.rolling24HoursTokens : nil))", systemImage: "clock")
             .foregroundStyle(store.palette.usage24h)
           Spacer()
           if detailed { Text(costText).foregroundStyle(DashboardColors.text) }
@@ -585,6 +594,7 @@ struct CompactDashboardView: View {
         .font(.system(size: mini ? 9 : 11, weight: .bold, design: .rounded))
       }
     }
+    .padding(.top, mini ? 19 : 23)
     .foregroundStyle(DashboardColors.text)
     .animation(.snappy(duration: 0.26), value: store.weekly?.remainingPercent)
     .animation(.snappy(duration: 0.26), value: store.fiveHour?.remainingPercent)
@@ -617,7 +627,7 @@ struct CompactDashboardView: View {
       Text(store.fiveHour.map { "5h \(Int($0.remainingPercent.rounded()))%" } ?? "5h --")
         .foregroundStyle(fiveHourTint)
     case .rolling24Tokens:
-      Text("24h \(BalanceFormatters.compactNumber(stats.rolling24HoursTokens))")
+      Text("24h \(BalanceFormatters.compactNumber(store.hasUsageData ? stats.rolling24HoursTokens : nil))")
         .foregroundStyle(store.palette.usage24h)
     case .resetRadar:
       Text("重置 \(resetProbabilityText)")
@@ -726,8 +736,9 @@ struct CompactDashboardView: View {
   }
 
   private var costText: String {
-    let usd = stats.cost24Hours.usd
-    let usdText = String(format: "$%.2f", usd)
+    guard store.hasUsageData else { return "首次统计中…" }
+    guard stats.cost24Hours.hasEstimate else { return "暂无法估算" }
+    let usdText = stats.cost24Hours.displayUSD
     guard let cny = store.cnyValue(for: stats.cost24Hours) else { return "\(usdText) · ¥--" }
     return "\(usdText) · ¥\(String(format: "%.2f", cny))"
   }

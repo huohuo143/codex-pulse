@@ -284,6 +284,158 @@ struct CodexStatusReaderTests {
   }
 
   @Test
+  func restartSelectionPrefersNearbyOfficialLiveQuotaOverSessionLog() throws {
+    let now = try #require(makeDate("2026-08-25T04:05:00Z"))
+    let reset = try #require(makeDate("2026-08-31T00:42:24Z"))
+    let restartLogEvent = RateLimitEvent(
+      timestamp: now,
+      sourceName: "session.jsonl",
+      sourcePath: "/tmp/session.jsonl",
+      limitID: "codex",
+      limitName: "Codex",
+      primary: LimitWindow(
+        usedPercent: 23,
+        remainingPercent: 77,
+        windowMinutes: 10_080,
+        resetsAt: reset
+      )
+    )
+    let officialLiveEvent = RateLimitEvent(
+      timestamp: now.addingTimeInterval(5),
+      sourceName: "Codex app-server",
+      sourcePath: "account/rateLimits/read",
+      limitID: "codex",
+      limitName: "Codex",
+      primary: LimitWindow(
+        usedPercent: 24,
+        remainingPercent: 76,
+        windowMinutes: 10_080,
+        resetsAt: reset
+      )
+    )
+
+    let latest = CodexStatusReader.latestByLimit(from: [restartLogEvent, officialLiveEvent])
+
+    #expect(latest["codex"]?.sevenDayWindow?.remainingPercent == 76)
+    #expect(latest["codex"]?.sourceName == "Codex app-server")
+  }
+
+  @Test
+  func restartWaitsForOfficialQuotaInsteadOfPublishingSessionFallback() throws {
+    let now = try #require(makeDate("2026-08-25T04:05:00Z"))
+    let reset = try #require(makeDate("2026-08-31T00:42:24Z"))
+    let restartLogEvent = RateLimitEvent(
+      timestamp: now,
+      sourceName: "session.jsonl",
+      sourcePath: "/tmp/session.jsonl",
+      limitID: "codex",
+      limitName: "Codex",
+      primary: LimitWindow(
+        usedPercent: 23,
+        remainingPercent: 77,
+        windowMinutes: 10_080,
+        resetsAt: reset
+      )
+    )
+
+    let selection = CodexStatusReader.quotaSelectionEvents(
+      sessionEvents: [restartLogEvent],
+      liveEvents: [],
+      requiresOfficialLive: true
+    )
+
+    #expect(selection.isEmpty)
+  }
+
+  @Test
+  func liveProbeColdStartReadsOfficialSevenDayQuota() throws {
+    guard ProcessInfo.processInfo.environment["CODEX_LIVE_QUOTA_PROBE"] == "1" else {
+      return
+    }
+
+    // A new reader owns a new app-server process and has no in-memory cache,
+    // matching the important part of an App/computer cold start.
+    let status = try CodexStatusReader().readFast()
+    let event = try #require(status.main)
+    let window = try #require(event.sevenDayWindow)
+
+    #expect(event.sourceName == "Codex app-server")
+    #expect(event.sourcePath == "account/rateLimits/read")
+    #expect(abs(window.windowMinutes - 10_080) <= 60)
+    #expect((0...100).contains(window.remainingPercent))
+    #expect(window.resetsAt != nil)
+    print(
+      "LIVE_QUOTA source=official remaining=\(Int(window.remainingPercent.rounded())) " +
+      "reset=\(window.resetsAt?.timeIntervalSince1970 ?? 0)"
+    )
+  }
+
+  @Test
+  func appServerEnvironmentCopiesSystemBypassRulesWhenProxyIsDisabled() {
+    let environment = CodexAppServerProcessEnvironment.resolved(
+      baseEnvironment: ["HOME": "/Users/example"],
+      systemProxySettings: [
+        "HTTPEnable": 0,
+        "HTTPSEnable": 0,
+        "ExceptionsList": ["localhost", "*.chatgpt.com", "openai.com"]
+      ]
+    )
+
+    #expect(environment["HTTP_PROXY"] == nil)
+    #expect(environment["HTTPS_PROXY"] == nil)
+    #expect(environment["NO_PROXY"] == "localhost,.chatgpt.com,openai.com")
+    #expect(environment["no_proxy"] == environment["NO_PROXY"])
+  }
+
+  @Test
+  func appServerEnvironmentMirrorsEnabledSystemProxyWithoutOverwritingExistingValues() {
+    let environment = CodexAppServerProcessEnvironment.resolved(
+      baseEnvironment: [
+        "HTTPS_PROXY": "http://127.0.0.1:9000",
+        "NO_PROXY": "localhost,chatgpt.com"
+      ],
+      systemProxySettings: [
+        "HTTPEnable": 1,
+        "HTTPProxy": "127.0.0.1",
+        "HTTPPort": 7994,
+        "HTTPSEnable": 1,
+        "HTTPSProxy": "127.0.0.1",
+        "HTTPSPort": 7994,
+        "ExceptionsList": ["*.chatgpt.com", "openai.com"]
+      ]
+    )
+
+    #expect(environment["HTTP_PROXY"] == "http://127.0.0.1:7994")
+    #expect(environment["http_proxy"] == environment["HTTP_PROXY"])
+    #expect(environment["HTTPS_PROXY"] == "http://127.0.0.1:9000")
+    #expect(environment["https_proxy"] == environment["HTTPS_PROXY"])
+    #expect(environment["NO_PROXY"] == "localhost,chatgpt.com,.chatgpt.com,openai.com")
+    #expect(environment["no_proxy"] == environment["NO_PROXY"])
+  }
+
+  @Test
+  func appServerEnvironmentDirectFallbackBypassesChatGPTWithoutDroppingProxy() {
+    let environment = CodexAppServerProcessEnvironment.resolved(
+      baseEnvironment: [
+        "HTTP_PROXY": "http://127.0.0.1:7994",
+        "HTTPS_PROXY": "http://127.0.0.1:7994",
+        "NO_PROXY": "localhost"
+      ],
+      systemProxySettings: [
+        "HTTPEnable": 0,
+        "HTTPSEnable": 0,
+        "ExceptionsList": ["127.0.0.1"]
+      ],
+      bypassProxyForChatGPT: true
+    )
+
+    #expect(environment["HTTP_PROXY"] == "http://127.0.0.1:7994")
+    #expect(environment["HTTPS_PROXY"] == "http://127.0.0.1:7994")
+    #expect(environment["NO_PROXY"] == "localhost,127.0.0.1,chatgpt.com,.chatgpt.com")
+    #expect(environment["no_proxy"] == environment["NO_PROXY"])
+  }
+
+  @Test
   func tokenUsageCanBeGroupedByInferredWorkType() throws {
     let root = try makeTemporaryCodexHome()
     defer { try? FileManager.default.removeItem(at: root) }
@@ -661,12 +813,10 @@ struct CodexStatusReaderTests {
     #expect(try firstReader.read(now: now).tokenStats.todayTokens == 100)
     #expect(FileManager.default.fileExists(atPath: cacheURL.path))
 
-    // Replace the already parsed prefix with invalid bytes of the same length.
-    // A new reader can only preserve the first event by restoring the disk cache.
-    try Data(repeating: 0x20, count: Data(firstLine.utf8).count).write(to: file)
-    try FileManager.default.setAttributes([.modificationDate: now], ofItemAtPath: file.path)
+    // A fresh reader restores the persistent parse without touching unchanged log content.
     let secondReader = CodexStatusReader(codexHome: root, persistentEventCacheURL: cacheURL)
     #expect(try secondReader.read(now: now).tokenStats.todayTokens == 100)
+    #expect(secondReader.diagnostics.parsedFiles == 0)
 
     let secondLine = tokenEventLine(
       timestamp: "2026-05-19T09:56:00Z",

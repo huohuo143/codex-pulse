@@ -14,8 +14,10 @@ final class TouchBarStripController: NSObject, NSTouchBarDelegate {
     var color7d: NSColor
     var percent7d: Double?
     var reset7d: Date?
-    var tokens24h: Int
+    var tokens24h: Int?
     var cost24hUSD: Double
+    var quotaStatus: String = ""
+    var costText: String = ""
   }
 
   private typealias SetPresenceFunc = @convention(c) (CFString, DarwinBoolean) -> Void
@@ -69,7 +71,7 @@ final class TouchBarStripController: NSObject, NSTouchBarDelegate {
     guard installed else { return }
     panelView.data = codex
     let percent = codex?.percent7d.map { "\(Int($0.rounded()))%" } ?? "--"
-    let text = "C \(percent) · 24h \(compact(codex?.tokens24h ?? 0))"
+    let text = "C \(percent)\(codex?.quotaStatus ?? "") · 24h \(codex?.tokens24h.map(compact) ?? "--")"
     trayButton.attributedTitle = NSAttributedString(string: text, attributes: [
       .font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .heavy),
       .foregroundColor: codex?.color7d ?? NSColor.secondaryLabelColor
@@ -190,13 +192,13 @@ private final class CodexTouchBarView: NSView {
     case .barsQuad:
       drawText("7天 \(percent)", x: x, color: data.color7d); x += 72
       drawBar(x: x, width: 110, value: data.percent7d, color: data.color7d); x += 124
-      drawText("24h \(compact(data.tokens24h))", x: x, color: data.color24h); x += 105
-      drawText(String(format: "$%.2f", data.cost24hUSD), x: x, color: .white); x += 68
+      drawText("24h \(data.tokens24h.map(compact) ?? "--")", x: x, color: data.color24h); x += 105
+      drawText(data.costText.isEmpty ? "--" : data.costText, x: x, color: .white); x += 68
     case .bars:
       drawText("7天 \(percent)", x: x, color: data.color7d); x += 72
       drawBar(x: x, width: 180, value: data.percent7d, color: data.color7d); x += 194
     case .badgeQuad:
-      drawText("7天 \(percent)   24h \(compact(data.tokens24h))", x: x, color: data.color7d, size: 16); x += 230
+      drawText("7天 \(percent)   24h \(data.tokens24h.map(compact) ?? "--")", x: x, color: data.color7d, size: 16); x += 230
     case .badge:
       drawText("7天 \(percent)", x: x, color: data.color7d, size: 18); x += 105
     }

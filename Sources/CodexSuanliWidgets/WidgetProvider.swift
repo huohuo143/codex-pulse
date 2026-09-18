@@ -16,26 +16,28 @@ struct CodexTimelineProvider: TimelineProvider {
   }
 
   func getSnapshot(in context: Context, completion: @escaping (CodexWidgetEntry) -> Void) {
-    completion(loadEntry(usePreviewWhenMissing: context.isPreview))
+    let entry = loadEntry(usePreviewWhenMissing: context.isPreview)
+    completion(CodexWidgetEntry(date: entry.date, snapshot: entry.snapshot.effective(at: entry.date), hasLiveData: entry.hasLiveData))
   }
 
   func getTimeline(in context: Context, completion: @escaping (Timeline<CodexWidgetEntry>) -> Void) {
     let entry = loadEntry(usePreviewWhenMissing: false)
-    let regularRefresh = Date().addingTimeInterval(15 * 60)
-    let quotaResetDates = [
-      entry.snapshot.resetsAt,
-      entry.snapshot.displaysFiveHourQuota ? entry.snapshot.fiveHourResetsAt : nil
-    ].compactMap { $0 }
-    let resetRefresh = quotaResetDates.min().map { max(Date().addingTimeInterval(60), $0) }
-    let nextRefresh = resetRefresh.map { min(regularRefresh, $0) } ?? regularRefresh
-    completion(Timeline(entries: [entry], policy: .after(nextRefresh)))
+    let now = entry.date
+    let entries = entry.snapshot.timelineDates(after: now).map {
+      CodexWidgetEntry(date: $0, snapshot: entry.snapshot.effective(at: $0), hasLiveData: entry.hasLiveData)
+    }
+    completion(Timeline(entries: entries, policy: .after(now.addingTimeInterval(entry.hasLiveData ? 300 : 60))))
   }
 
   private func loadEntry(usePreviewWhenMissing: Bool) -> CodexWidgetEntry {
     if let snapshot = try? CodexWidgetSnapshotStore.load(
       from: CodexWidgetSnapshotStore.sandboxedWidgetURL()
     ) {
-      return CodexWidgetEntry(date: Date(), snapshot: snapshot, hasLiveData: true)
+      let now = Date()
+      if CodexWidgetSnapshotFreshness.isFromCurrentBoot(snapshot, now: now) {
+        return CodexWidgetEntry(date: now, snapshot: snapshot, hasLiveData: snapshot.schemaVersion >= 4)
+      }
+      return CodexWidgetEntry(date: now, snapshot: .empty, hasLiveData: false)
     }
     return CodexWidgetEntry(
       date: Date(),

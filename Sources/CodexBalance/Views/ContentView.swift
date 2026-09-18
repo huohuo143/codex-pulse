@@ -18,7 +18,8 @@ struct ContentView: View {
           )
       } else {
         ExpandedDashboardView()
-          .frame(width: WindowConfigurator.expandedSize.width, height: WindowConfigurator.expandedSize.height)
+          .frame(minWidth: 640, idealWidth: WindowConfigurator.expandedSize.width, maxWidth: .infinity,
+                 minHeight: 760, idealHeight: WindowConfigurator.expandedSize.height, maxHeight: .infinity)
       }
     }
     .background(WindowAccessor { window in

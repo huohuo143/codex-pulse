@@ -24,3 +24,6 @@ docs/screenshots/*
 !docs/screenshots/style-badge.png
 !docs/screenshots/touchbar-live.png
 !docs/screenshots/touchbar-photo.jpg
+
+# 本机验收产物、运行日志和账户相关记录不入库
+analysis_results/

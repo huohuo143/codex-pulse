@@ -1,3 +1,4 @@
+import CodexBalanceCore
 import SwiftUI
 
 @main
@@ -9,9 +10,17 @@ struct CodexBalanceApp: App {
     WindowGroup(AppInfo.appName, id: "main") {
       ContentView()
         .environmentObject(store)
+        .defaultAppStorage(PulsePreferences.shared)
     }
     .windowResizability(.contentSize)
     .commands {
+      if PulsePreferences.isIsolated {
+        CommandMenu("运行验收") {
+          Button("模拟休眠后恢复") {
+            NSWorkspace.shared.notificationCenter.post(name: NSWorkspace.didWakeNotification, object: nil)
+          }
+        }
+      }
       CommandGroup(replacing: .newItem) {}
       CommandGroup(replacing: .appSettings) {
         Button("设置…") {

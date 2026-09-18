@@ -297,8 +297,59 @@ public struct RateLimitResetCreditsSummary: Equatable, Decodable, Sendable {
       }
   }
 
+  public func effective(at now: Date) -> RateLimitResetCreditsSummary {
+    let expired = (credits ?? []).filter { $0.isAvailable && $0.expiresAt.map({ $0 <= now }) == true }
+    var result = self
+    result.availableCount = max(0, availableCount - expired.count)
+    result.credits = credits?.map { row in
+      var row = row
+      if row.isAvailable, row.expiresAt.map({ $0 <= now }) == true { row.status = "expired" }
+      return row
+    }
+    return result
+  }
+
   public var missingDetailCount: Int {
     max(0, availableCount - availableCredits.count)
+  }
+}
+
+/// Flexible-use credits attached to the signed-in ChatGPT/Codex account.
+/// The account endpoint returns the balance in Codex credits; the product UI
+/// presents 25 credits as US$1.
+public struct CodexFlexibleCreditBalance: Equatable, Decodable, Sendable {
+  public var hasCredits: Bool
+  public var unlimited: Bool
+  public var balanceCredits: Double?
+
+  public init(hasCredits: Bool, unlimited: Bool = false, balanceCredits: Double? = nil) {
+    self.hasCredits = hasCredits
+    self.unlimited = unlimited
+    self.balanceCredits = balanceCredits
+  }
+
+  public var amountUSD: Double? {
+    guard let balanceCredits, balanceCredits.isFinite, balanceCredits >= 0 else { return nil }
+    return balanceCredits / 25
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case hasCredits
+    case unlimited
+    case balance
+  }
+
+  public init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    hasCredits = try container.decodeIfPresent(Bool.self, forKey: .hasCredits) ?? false
+    unlimited = try container.decodeIfPresent(Bool.self, forKey: .unlimited) ?? false
+    if let number = try? container.decode(Double.self, forKey: .balance) {
+      balanceCredits = number
+    } else if let text = try? container.decode(String.self, forKey: .balance) {
+      balanceCredits = Double(text)
+    } else {
+      balanceCredits = nil
+    }
   }
 }
 
@@ -571,91 +622,6 @@ public struct CodexDeviceTokenUsage: Identifiable, Equatable, Codable, Sendable 
   }
 }
 
-public struct ModelPricing: Equatable, Sendable {
-  public var inputPerMillionUSD: Double
-  public var cachedInputPerMillionUSD: Double
-  public var outputPerMillionUSD: Double
-  public var longContextThresholdInputTokens: Int?
-  public var longContextInputMultiplier: Double
-  public var longContextOutputMultiplier: Double
-
-  public init(
-    input: Double,
-    cachedInput: Double,
-    output: Double,
-    longContextThresholdInputTokens: Int? = nil,
-    longContextInputMultiplier: Double = 1,
-    longContextOutputMultiplier: Double = 1
-  ) {
-    inputPerMillionUSD = input
-    cachedInputPerMillionUSD = cachedInput
-    outputPerMillionUSD = output
-    self.longContextThresholdInputTokens = longContextThresholdInputTokens
-    self.longContextInputMultiplier = longContextInputMultiplier
-    self.longContextOutputMultiplier = longContextOutputMultiplier
-  }
-}
-
-public struct CostEstimate: Equatable, Sendable {
-  public var usd: Double
-  public var pricedTokens: Int
-  public var unpricedTokens: Int
-  public var unpricedModels: [String]
-
-  public init(usd: Double = 0, pricedTokens: Int = 0, unpricedTokens: Int = 0, unpricedModels: [String] = []) {
-    self.usd = usd
-    self.pricedTokens = pricedTokens
-    self.unpricedTokens = unpricedTokens
-    self.unpricedModels = unpricedModels
-  }
-
-  public var isPartial: Bool { unpricedTokens > 0 }
-}
-
-public struct ModelPricingCatalog: Sendable {
-  public static let current = ModelPricingCatalog()
-  public let rates: [String: ModelPricing]
-
-  public init(rates: [String: ModelPricing] = [
-    "gpt-5.6-sol": ModelPricing(input: 5, cachedInput: 0.50, output: 30, longContextThresholdInputTokens: 272_000, longContextInputMultiplier: 2, longContextOutputMultiplier: 1.5),
-    "gpt-5.6": ModelPricing(input: 5, cachedInput: 0.50, output: 30, longContextThresholdInputTokens: 272_000, longContextInputMultiplier: 2, longContextOutputMultiplier: 1.5),
-    "gpt-5.6-terra": ModelPricing(input: 2.50, cachedInput: 0.25, output: 15, longContextThresholdInputTokens: 272_000, longContextInputMultiplier: 2, longContextOutputMultiplier: 1.5),
-    "gpt-5.6-luna": ModelPricing(input: 1, cachedInput: 0.10, output: 6),
-    "gpt-5.5": ModelPricing(input: 5, cachedInput: 0.50, output: 30, longContextThresholdInputTokens: 272_000, longContextInputMultiplier: 2, longContextOutputMultiplier: 1.5),
-    "gpt-5.4": ModelPricing(input: 2.50, cachedInput: 0.25, output: 15, longContextThresholdInputTokens: 272_000, longContextInputMultiplier: 2, longContextOutputMultiplier: 1.5),
-    "gpt-5.4-pro": ModelPricing(input: 30, cachedInput: 30, output: 180, longContextThresholdInputTokens: 272_000, longContextInputMultiplier: 2, longContextOutputMultiplier: 1.5),
-    "gpt-5.4-mini": ModelPricing(input: 0.75, cachedInput: 0.075, output: 4.50),
-    "gpt-5.3-codex": ModelPricing(input: 1.75, cachedInput: 0.175, output: 14),
-    "gpt-5.2": ModelPricing(input: 1.75, cachedInput: 0.175, output: 14)
-  ]) {
-    self.rates = rates
-  }
-
-  public func estimate(events: [TokenUsageEvent]) -> CostEstimate {
-    var result = CostEstimate()
-    var unknown = Set<String>()
-    for event in events {
-      let model = event.model.lowercased()
-      guard let rate = rates[model] else {
-        result.unpricedTokens += event.totalTokens
-        unknown.insert(event.model.isEmpty ? "unknown" : event.model)
-        continue
-      }
-      let cached = min(max(0, event.cachedInputTokens), max(0, event.inputTokens))
-      let uncached = max(0, event.inputTokens - cached)
-      let isLongContext = rate.longContextThresholdInputTokens.map { event.inputTokens > $0 } ?? false
-      let inputMultiplier = isLongContext ? rate.longContextInputMultiplier : 1
-      let outputMultiplier = isLongContext ? rate.longContextOutputMultiplier : 1
-      result.usd += Double(uncached) / 1_000_000 * rate.inputPerMillionUSD * inputMultiplier
-      result.usd += Double(cached) / 1_000_000 * rate.cachedInputPerMillionUSD * inputMultiplier
-      result.usd += Double(max(0, event.outputTokens)) / 1_000_000 * rate.outputPerMillionUSD * outputMultiplier
-      result.pricedTokens += event.totalTokens
-    }
-    result.unpricedModels = unknown.sorted()
-    return result
-  }
-}
-
 public struct ExchangeRateSnapshot: Equatable, Codable, Sendable {
   public var base: String
   public var quote: String
@@ -743,8 +709,16 @@ public struct CodexStatus: Equatable, Sendable {
   public var limits: [RateLimitEvent]
   public var trend: [RateLimitEvent]
   public var rateLimitResetCredits: RateLimitResetCreditsSummary?
+  public var flexibleCreditBalance: CodexFlexibleCreditBalance?
   public var tokenStats: TokenStats
   public var recentEvents: [RateLimitEvent]
+  public var quotaRead: SourceReadMetadata? = nil
+  public var flexibleCreditRead: SourceReadMetadata? = nil
+  public var resetCreditsRead: SourceReadMetadata? = nil
+  public var accountScope: String? = nil
+  public var lastSessionActivity: Date? = nil
+  public var usageValidUntil: Date? = nil
+  public var readerDiagnostics: SessionReadDiagnostics? = nil
 
   public init(
     generatedAt: Date = Date(),
@@ -756,6 +730,7 @@ public struct CodexStatus: Equatable, Sendable {
     limits: [RateLimitEvent] = [],
     trend: [RateLimitEvent] = [],
     rateLimitResetCredits: RateLimitResetCreditsSummary? = nil,
+    flexibleCreditBalance: CodexFlexibleCreditBalance? = nil,
     tokenStats: TokenStats = TokenStats(),
     recentEvents: [RateLimitEvent] = []
   ) {
@@ -768,6 +743,7 @@ public struct CodexStatus: Equatable, Sendable {
     self.limits = limits
     self.trend = trend
     self.rateLimitResetCredits = rateLimitResetCredits
+    self.flexibleCreditBalance = flexibleCreditBalance
     self.tokenStats = tokenStats
     self.recentEvents = recentEvents
   }

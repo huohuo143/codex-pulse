@@ -46,6 +46,30 @@ public struct QuotaForecast: Equatable, Sendable {
   public var ratePerDay: Double? { ratePerHour.map { $0 * 24 } }
   public var isUsable: Bool { ratePerHour != nil && estimatedExhaustion != nil }
 
+  public var sustainabilitySummary: String {
+    guard isUsable, let estimatedExhaustion, let resetsAt else { return "暂时无法判断能否撑到重置" }
+    if estimatedExhaustion < resetsAt { return "按当前节奏，额度可能撑不到重置" }
+    if (currentRemainingPercent ?? 100) <= 15 { return "按当前节奏可撑到重置，但剩余额度较低" }
+    return "按当前节奏，额度预计可撑到重置"
+  }
+
+  public var riskExplanation: String {
+    guard isUsable, let estimatedExhaustion, let resetsAt else { return reason ?? "等待更多官方额度样本" }
+    var reasons: [String] = []
+    if let remaining = currentRemainingPercent, remaining <= 15 {
+      reasons.append(String(format: "剩余 %.0f%%，已进入 %@ 提醒阈值", remaining, remaining <= 5 ? "5% 紧急" : "15% 关注"))
+    }
+    if estimatedExhaustion < resetsAt {
+      reasons.append(String(format: "当前速度对应的耗尽时间比重置早 %.1f 小时", resetsAt.timeIntervalSince(estimatedExhaustion) / 3600))
+    }
+    if let earliestExhaustion, let latestExhaustion, earliestExhaustion <= resetsAt, latestExhaustion >= resetsAt {
+      reasons.append("近期较快消耗情形可能提前耗尽，预测区间跨过重置时间")
+    } else if let earliestExhaustion, earliestExhaustion > resetsAt {
+      reasons.append("近期较快消耗情形下，预计仍可维持到重置")
+    }
+    return reasons.isEmpty ? "近期消耗波动较大，需要继续观察预测区间" : reasons.joined(separator: "；")
+  }
+
   public init(
     generatedAt: Date,
     currentRemainingPercent: Double? = nil,
@@ -87,10 +111,10 @@ private struct QuotaHistoryEnvelope: Codable {
 
 public final class QuotaHistoryStore: @unchecked Sendable {
   public static let expectedWindowMinutes = 7.0 * 24.0 * 60.0
-  public static let defaultURL = FileManager.default.homeDirectoryForCurrentUser
-    .appendingPathComponent("Library/Application Support/CodexSuanliMeter/quota-history-v1.json")
+  public static let defaultURL = PulsePaths.support.appendingPathComponent("quota-history-v1.json")
 
   private let url: URL
+  public var storageURL: URL { url }
   private let fileManager: FileManager
   private let lock = NSLock()
   private var loaded = false

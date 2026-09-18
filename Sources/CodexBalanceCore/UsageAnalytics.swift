@@ -358,8 +358,7 @@ public enum UsageAnalyzer {
 }
 
 public final class ProjectBudgetStore: @unchecked Sendable {
-  public static let defaultURL = FileManager.default.homeDirectoryForCurrentUser
-    .appendingPathComponent("Library/Application Support/CodexSuanliMeter/project-budgets-v1.json")
+  public static let defaultURL = PulsePaths.support.appendingPathComponent("project-budgets-v1.json")
 
   private struct Payload: Codable {
     var schemaVersion: Int

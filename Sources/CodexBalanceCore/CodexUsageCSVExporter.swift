@@ -11,7 +11,7 @@ public enum CodexUsageCSVExporter {
       ["生成时间", ISO8601DateFormatter().string(from: generatedAt)],
       ["说明", "金额为 API 等价预估，不是 ChatGPT/Codex 订阅实际账单"],
       [],
-      ["汇总", "Token", "USD", "CNY"],
+      ["汇总", "Token", "USD", "CNY", "计价覆盖率(%)", "未计价模型", "价格口径"],
       summaryRow("滚动24小时", tokens: stats.rolling24HoursTokens, estimate: stats.cost24Hours, cnyRate: cnyRate),
       summaryRow("近7天", tokens: stats.last7DaysTokens, estimate: stats.cost7Days, cnyRate: cnyRate),
       summaryRow("本月", tokens: stats.monthTokens, estimate: stats.costMonth, cnyRate: cnyRate),
@@ -95,8 +95,11 @@ public enum CodexUsageCSVExporter {
     [
       label,
       String(tokens),
-      String(format: "%.6f", estimate.usd),
-      cnyRate.map { String(format: "%.6f", estimate.usd * $0) } ?? ""
+      estimate.hasEstimate ? String(format: "%.6f", estimate.usd) : "",
+      estimate.hasEstimate ? (cnyRate.map { String(format: "%.6f", estimate.usd * $0) } ?? "") : "",
+      String(format: "%.2f", estimate.coveragePercent),
+      estimate.unpricedModels.joined(separator: "; "),
+      "按当前价格表折算"
     ]
   }
 

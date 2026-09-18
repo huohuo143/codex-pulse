@@ -9,8 +9,8 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-2.10.2-8b7cff">
-  <img alt="macOS" src="https://img.shields.io/badge/macOS-14%2B-111827?logo=apple">
+  <img alt="Version" src="https://img.shields.io/badge/version-2.11.0-8b7cff">
+  <img alt="macOS" src="https://img.shields.io/badge/macOS-13%2B-111827?logo=apple">
   <img alt="Mac architectures" src="https://img.shields.io/badge/Mac-arm64%20%7C%20x86__64-111827">
   <img alt="Swift" src="https://img.shields.io/badge/Swift-6.0-f05138?logo=swift&logoColor=white">
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-22c55e"></a>
@@ -18,11 +18,11 @@
 
 `Codex 脉动` 将 Codex 的额度、Token 消耗、重置节奏和 Full reset 权益集中到一套原生 macOS 界面中。它既可以作为常驻悬浮框，也可以完全隐藏悬浮框，仅使用主窗口或 7 款桌面小组件。
 
-> 当前版本：`2.10.2` build 2104。分别提供 Apple Silicon（arm64）与 Intel（x86_64）安装包；两者均为 ad-hoc 签名、未公证版本，完整小组件包要求 macOS 14 或更高版本。
+> 当前发行版本：`2.11.0` build 2118。主应用兼容 macOS 13；桌面小组件要求 macOS 14 或更高版本；本地构建为 ad-hoc 签名、未公证版本。
 
 ## 当前版本界面
 
-`Codex 脉动 2.10.2` 将 7 天和可选的 5 小时额度改为同心环：7 天为外环，5 小时为橙色内环，并同步更新悬浮框与桌面小组件。
+`Codex 脉动 2.11.0` 延续已经验证的雷达规则，并统一数据有效期、价格覆盖和增量统计。上一版修复了 24h 重置雷达概率停滞：Tibo 公开动态每 30 分钟抓取，本地概率每 5 分钟重评并按证据时效衰减；抓取失败显示缓存/重试状态，超过 90 分钟则停止展示旧概率。BANKED reset、产品上线和无明确近时语义的标签不计入全局硬重置。不读取 X Cookie、登录态或关注列表。
 
 <p align="center">
   <img src="docs/screenshots/codex-pulse-update-v2.9.0.png" width="680" alt="Codex 脉动 2.9.0 版本更新检测">
@@ -70,7 +70,7 @@
 
 主窗口分为“概览、趋势、分析、设置”四个区域：
 
-- 概览：额度、Token 汇总、重置雷达、Full reset 权益和最近额度事件。
+- 概览：7 天额度外环与可选的 5 小时额度内环、Token 汇总、重置雷达、Full reset 权益和最近额度事件；5 小时内环与设置中的“5 小时额度”选项同步。
 - 趋势：24 小时逐时视图、可横向滚动的最近 30 天按日视图、多设备分色堆叠与悬停明细，以及模型构成。
 - 分析：同期对比、月末推演、稳健异常检测、缓存/模型/项目集中度、项目预算和最近调用。
 - 设置：刷新频率、额度提醒、可靠性/自动化、版本更新、悬浮框、主题、Touch Bar 和桌面小组件。
@@ -138,7 +138,8 @@ flowchart LR
 - 项目预算保存于 `~/Library/Application Support/CodexSuanliMeter/project-budgets-v1.json`，高级分析只使用已有本机聚合结果。
 - 可靠性事件位于 `reliability-events-v1.json`；备份和每日摘要位于 `~/Library/Application Support/CodexSuanliMeter/automation/`。
 - Codex 额度和 Full reset 权益通过只读方式获取；Full reset 不提供兑换或消耗入口。
-- 重置雷达读取小程序实际使用的公开 `/radar-api/dashboard` 数据，无需 API Key，每 30 分钟自动同步。
+- 重置雷达每 30 分钟读取 Codex Radar 首页收录的 Tibo 公开动态，校验 Post ID、作者与 `x.com/thsottiaux/status/<id>` 链接一致性；`current.json` 只作重置窗口锚点，不再提供概率。
+- 本地概率每 5 分钟依据已存证据重评；一般信号前 6 小时保持、随后线性衰减并在 24 小时归零，“tomorrow/明天”按 PT 目标日生效和过期。
 - USD/CNY 汇率来自 Frankfurter；网络失败时使用上次成功缓存。
 - 版本更新只读取项目公开 GitHub Release 标签、时间、说明和下载链接。
 - iCloud 仅同步小时、日、月聚合 Token 与模型名，使用 schema 4 的 `设备-codex-v2.json`。
@@ -148,9 +149,9 @@ flowchart LR
 - Codex 会话日志只在本机只读解析，不上传原始消息。
 - Full reset 凭据和原始响应只在内存中短暂使用；缓存不保存 token、完整账户 ID、后台权益 ID 或原始响应。
 - Widget 快照只包含额度、公开雷达、权益到期时间和聚合 Token，不包含会话内容、项目路径、账户凭据、API Key 或兑换 ID。
-- 重置雷达公开数据采用 30 分钟内存缓存，不写入 iCloud。
+- 重置雷达公开数据采用 30 分钟抓取节奏，失败时仅保留本机 `Application Support` 内的上次证据并继续衰减；连续 90 分钟未检查成功则不展示缓存概率。
 - 会话解析缓存位于独立 Application Support 目录，只保存增量聚合所需结果。
-- 额度历史位于 `~/Library/Application Support/CodexSuanliMeter/quota-history-v1.json`，不包含对话、项目路径或账户凭据。
+- 额度历史按本机匿名账户标识分开保存在 `~/Library/Application Support/CodexSuanliMeter/quota-history-<匿名标识>.json`（旧文件保留），不包含对话、项目路径或账户凭据。
 - 项目预算只保存项目识别名/本地路径和用户设定的 Token 上限，不上传、不写入 iCloud 或 Widget 快照。
 - 自动化备份仅复制额度历史和项目预算；每日摘要不包含对话正文或项目路径。
 - 脱敏诊断报告不包含账号、对话、项目路径、凭据或 API Key。
@@ -162,14 +163,14 @@ flowchart LR
 在 [Releases](https://github.com/huohuo143/codex-pulse/releases) 下载：
 
 ```text
-Codex-Pulse-v2.10.2-build2104-20260730-arm64.dmg
-Codex-Pulse-v2.10.2-build2104-20260730-arm64.dmg.sha256
-Codex-Pulse-v2.10.2-build2104-20260730-x86_64.dmg
-Codex-Pulse-v2.10.2-build2104-20260730-x86_64.dmg.sha256
+Codex-Pulse-v2.11.0-build2118-20260906-arm64.dmg
+Codex-Pulse-v2.11.0-build2118-20260906-arm64.dmg.sha256
 ```
 
+本次 2.11.0 提供 Apple Silicon（arm64）安装包；Intel Mac 可从源码构建，或在历史 Releases 中选择对应的 x86_64 包。
+
 1. 打开 DMG。
-2. 将 `Codex 脉动.app` 拖入 Applications；也可以运行 DMG 内的“安装并启用自动启动”脚本。
+2. 将 `Codex 脉动.app` 拖入 Applications；也可以运行 DMG 内的“安装或更新（保留设置）.command”，备份旧版本并保留原有设置。
 3. 首次打开若被 Gatekeeper 拦截，在“系统设置 → 隐私与安全性”中选择“仍要打开”。
 4. 打开一次 App，等待首次历史数据解析完成。
 
@@ -177,7 +178,7 @@ Codex-Pulse-v2.10.2-build2104-20260730-x86_64.dmg.sha256
 
 ## 与旧版并行
 
-| 项目 | Codex 脉动 2.10.2 | 旧算力码表 0.1.0 |
+| 项目 | Codex 脉动 2.11.0 | 旧算力码表 0.1.0 |
 | --- | --- | --- |
 | App | `Codex 脉动.app` | `算力码表.app` |
 | Bundle ID | `dev.codex.balance-dashboard.codex` | `dev.codex.balance-dashboard` |
@@ -237,7 +238,7 @@ ARCH=arm64 ./script/create_transfer_package.sh
 
 ## 已知边界
 
-- DMG 按架构分别发布为 arm64 与 x86_64；请下载与 Mac 处理器匹配的文件。安装包采用 ad-hoc 签名且尚未公证。
+- 当前 2.11.0 安装包为 Apple Silicon arm64；历史版本包含 x86_64 包。请下载与 Mac 处理器匹配的文件。安装包采用 ad-hoc 签名且尚未公证。
 - 本地 Token 统计来自 Codex 会话日志，不包含无法在本机日志中观察到的网页端用量。
 - 未知模型不会猜测价格，而会保持“未计价”。
 - WidgetKit 的实际刷新时刻仍受 macOS 桌面小组件预算控制。
@@ -248,6 +249,24 @@ ARCH=arm64 ./script/create_transfer_package.sh
 - 版本检测依赖 GitHub Releases 可访问；断网时保留上次成功结果，不影响其他功能。
 
 ## 版本说明
+
+2.11.0 统一官方数据来源与有效期、金额计价覆盖率、到期记录和账户确认；日志采用目录索引、追加读取和分块解析，小组件按内容刷新，新增雷达预测归档与已核实结果评分。详见 [2.11.0 改版说明](docs/RELEASE_2.11.0.md) 和 [本地验收与维护](docs/VALIDATION_2.11.0.md)。
+
+2.10.10 修复 24h 雷达概率停滞、失败被误报成功和无关来源遮蔽 Tibo 数据的问题，新增时效衰减、退避重试、过期停显与主 App/Widget 同步状态。完整内容见 [2.10.10 改版说明](docs/RELEASE_2.10.10.md)。
+
+2.10.9 修复“完成本轮重置 + 庆祝延期至明天”的跨周期状态被误清空问题，并以 75% 保守估算显示为高概率。完整内容见 [2.10.9 改版说明](docs/RELEASE_2.10.9.md)。
+
+2.10.8 修复旧本地代理失效时官方额度读取无法自愈的问题。完整内容见 [2.10.8 改版说明](docs/RELEASE_2.10.8.md)。
+
+2.10.7 补充“reset button + tomorrow”的 24h 概率测算，同时保留非官方边界。完整内容见 [2.10.7 改版说明](docs/RELEASE_2.10.7.md)。
+
+2.10.6 修复图形会话下内部 Codex 进程继承 macOS 代理设置的问题，避免 Finder 或开机启动时 7 天额度空白。完整内容见 [2.10.6 改版说明](docs/RELEASE_2.10.6.md)。
+
+2.10.5 将重置评分窗口改为“上次重置后累计、下次重置时清零”，持久保留当前周期的相关 Tibo 状态；面板只展示参与评分的状态，并把“too cheap to meter + Tomorrow we ship again”独立 Post 识别为组合强信号。完整内容见 [2.10.5 改版说明](docs/RELEASE_2.10.5.md)。
+
+2.10.4 将 Tibo 最新 Posts / Replies、本地可解释重置估算、站长推荐和智力效率同步到 App 概览，并切换到无需登录的公共只读源。完整内容见 [2.10.4 改版说明](docs/RELEASE_2.10.4.md)。
+
+2.10.3 在主窗口概览补齐 5 小时额度内环，并让它与设置中的“5 小时额度”选项保持同步；桌面小组件继续保留独立偏好。完整内容见 [2.10.3 改版说明](docs/RELEASE_2.10.3.md)。
 
 2.10.2 将 7 天与可选的 5 小时额度统一为不同颜色的同心环，并将独立的 5 小时显示开关扩展到总览和额度小组件。完整内容见 [2.10.2 改版说明](docs/RELEASE_2.10.2.md)。
 

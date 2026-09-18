@@ -18,16 +18,28 @@ final class CodexResetCreditsSource: @unchecked Sendable {
   private var refreshInFlight = false
   private var failedUntil: Date?
   private var lastFailure: String?
+  private var metadata = SourceReadMetadata(source: "Full reset 官方接口")
 
   init(codexHome: URL, fileManager: FileManager = .default) {
     self.codexHome = codexHome
     self.fileManager = fileManager
   }
 
+  private var accountScope: String?
+  func anonymousAccountScope() -> String? {
+    AnonymousAccountScope.make(accountID: loadCredential()?.accountID, salt: AnonymousAccountScope.localSalt)
+  }
+  func useAccount(_ scope: String?) {
+    lock.lock(); defer { lock.unlock() }
+    if accountScope != scope {
+      accountScope = scope; cachedSummary = nil; cachedAt = nil; failedUntil = nil; lastFailure = nil
+      metadata = SourceReadMetadata(source: "Full reset 官方接口")
+    }
+  }
+
   func cached(now: Date, maxAge: TimeInterval = 300) -> RateLimitResetCreditsSummary? {
     lock.lock()
     defer { lock.unlock() }
-    guard let cachedAt, now.timeIntervalSince(cachedAt) <= maxAge else { return nil }
     return cachedSummary
   }
 
@@ -38,17 +50,18 @@ final class CodexResetCreditsSource: @unchecked Sendable {
       lock.unlock()
       return summary
     }
-    if refreshInFlight || (failedUntil.map { $0 > now } ?? false) {
+    if refreshInFlight || (maxAge > 0 && (failedUntil.map { $0 > now } ?? false)) {
       let summary = cachedSummary
       lock.unlock()
       return summary
     }
     refreshInFlight = true
+    let scope = accountScope
     lock.unlock()
 
-    let summary = fetchSummary()
-    finishRefresh(summary)
-    return summary ?? cachedValue()
+    let summary = fetchSummary(expectedScope: scope)
+    finishRefresh(summary, scope: scope)
+    return cachedValue()
   }
 
   func refreshInBackground() {
@@ -63,12 +76,18 @@ final class CodexResetCreditsSource: @unchecked Sendable {
       return
     }
     refreshInFlight = true
+    let scope = accountScope
     lock.unlock()
 
     DispatchQueue.global(qos: .utility).async { [weak self] in
       guard let self else { return }
-      self.finishRefresh(self.fetchSummary())
+      self.finishRefresh(self.fetchSummary(expectedScope: scope), scope: scope)
     }
+  }
+
+  func readMetadata() -> SourceReadMetadata {
+    lock.lock(); defer { lock.unlock() }
+    return metadata
   }
 
   func diagnosticFailure() -> String? {
@@ -83,24 +102,32 @@ final class CodexResetCreditsSource: @unchecked Sendable {
     return cachedSummary
   }
 
-  private func finishRefresh(_ summary: RateLimitResetCreditsSummary?) {
+  private func finishRefresh(_ summary: RateLimitResetCreditsSummary?, scope: String?) {
     lock.lock()
+    guard scope == accountScope else { refreshInFlight = false; lock.unlock(); return }
     if let summary {
       cachedSummary = summary
       cachedAt = Date()
+      metadata.succeed(at: Date())
       failedUntil = nil
       lastFailure = nil
     } else {
       // Avoid repeatedly hitting the login/backend path when Codex is signed out or rate-limited.
+      metadata.fail(at: Date(), reason: lastFailure ?? "official_credits_unavailable")
       failedUntil = Date().addingTimeInterval(60)
     }
     refreshInFlight = false
     lock.unlock()
   }
 
-  private func fetchSummary() -> RateLimitResetCreditsSummary? {
+  private func fetchSummary(expectedScope: String?) -> RateLimitResetCreditsSummary? {
     guard let credential = loadCredential() else {
       recordFailure("missing_auth")
+      return nil
+    }
+
+    guard AnonymousAccountScope.make(accountID: credential.accountID, salt: AnonymousAccountScope.localSalt) == expectedScope else {
+      recordFailure("account_changed")
       return nil
     }
 

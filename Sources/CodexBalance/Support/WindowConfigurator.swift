@@ -62,19 +62,19 @@ enum WindowConfigurator {
       let width = isMini
         ? max(CGFloat(168), CGFloat(70 + metricCount * 57))
         : max(CGFloat(198), CGFloat(82 + metricCount * 66))
-      return NSSize(width: width, height: isMini ? 56 : 68)
+      return NSSize(width: width + (showsWeekly && showsFiveHour ? 40 : 0), height: isMini ? 56 : 68)
     case .bars:
       let quotaProgressCount = [showsWeekly, showsFiveHour].filter { $0 }.count
       let height = isMini
         ? max(CGFloat(64), CGFloat(30 + metrics.count * 21 + quotaProgressCount * 8))
         : max(CGFloat(78), CGFloat(34 + metrics.count * 25 + quotaProgressCount * 10))
-      return NSSize(width: isMini ? 238 : 286, height: height)
+      return NSSize(width: isMini ? 238 : 286, height: height + (isMini ? 19 : 23))
     case .barsQuad:
       let quotaProgressCount = [showsWeekly, showsFiveHour].filter { $0 }.count
       let height = isMini
         ? max(CGFloat(76), CGFloat(32 + metrics.count * 24 + quotaProgressCount * 8))
         : max(CGFloat(92), CGFloat(38 + metrics.count * 29 + quotaProgressCount * 10))
-      return NSSize(width: isMini ? 248 : 300, height: height)
+      return NSSize(width: isMini ? 248 : 300, height: height + (isMini ? 19 : 23))
     case .badge:
       let width = isMini
         ? max(CGFloat(138), CGFloat(55 + metrics.count * 75))

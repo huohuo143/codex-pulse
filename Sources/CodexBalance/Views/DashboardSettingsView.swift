@@ -50,7 +50,7 @@ struct DashboardSettingsView: View {
         Text("悬浮框显示信息")
           .font(.system(size: 12.5, weight: .bold))
         FloatingPanelMetricPicker()
-        Text("可自由组合以上信息；为避免空白悬浮框，至少保留一项。Full reset 没有官方明细时会显示暂无可用数据。")
+        Text("“5 小时额度”同时控制主窗口概览的橙色内环；为避免空白悬浮框，至少保留一项。Full reset 没有官方明细时会显示暂无可用数据。")
           .font(.caption)
           .foregroundStyle(DashboardColors.subtleText)
 
@@ -75,11 +75,20 @@ struct DashboardSettingsView: View {
         Toggle("自动避让其他窗口", isOn: $store.autoDodgeEnabled)
       }
 
+      CreditExpirySettingsView(record: store.creditExpiry, account: store.status?.accountScope, message: store.expiryMessage, save: store.saveCreditExpiry)
+
+      settingsSection("模型价格与金额估算") {
+        Text(store.pricingMessage).font(.caption).foregroundStyle(DashboardColors.subtleText)
+        Text("按当前价格表折算 API 等价金额；缺少价格的模型单独列出。导入配置将先显示差异，不改变 Token 统计。")
+          .font(.caption)
+        Button("导入价格表…", systemImage: "square.and.arrow.down") { store.importModelPrices() }
+      }
+
       settingsSection("刷新与快捷操作") {
         Picker("本地额度刷新间隔", selection: $store.refreshIntervalOption) {
           ForEach(RefreshIntervalOption.allCases) { Text($0.title).tag($0) }
         }
-        Text("建议使用 30s，避免频繁扫描本地日志影响滚动；Token 完整汇总自动节流到 5 分钟。Codex 雷达使用独立的固定 30 分钟同步，不受这里影响。")
+        Text("额度独立刷新，会话用量随新活动更新。窗口隐藏且连续 5 分钟无会话活动时，额度检查自动降至 120 秒；恢复活动或手动刷新后立即检查。雷达每 30 分钟独立同步。")
           .font(.caption)
           .foregroundStyle(DashboardColors.subtleText)
         HStack {
@@ -154,7 +163,7 @@ struct DashboardSettingsView: View {
       }
 
       settingsSection("Codex 重置雷达") {
-        Text("直接读取“重置雷达”微信小程序使用的公开 dashboard 数据，只映射 Codex 的 24 小时概率、研判和 Tibo 动态；按数据时间戳防止旧结果覆盖新结果。不接入 Claude Code，不需要 API Key。")
+        Text("读取 Codex Radar 首页收录的 Tibo 公开 Posts / Replies，由 App 本地规则估算 Codex 24 小时全局硬重置概率。BANKED reset 是可储存权益，与全局硬重置分开判定；过期的远程百分比不再展示。不需要 API Key 或 X Cookie。")
           .font(.caption)
           .foregroundStyle(DashboardColors.subtleText)
         HStack {

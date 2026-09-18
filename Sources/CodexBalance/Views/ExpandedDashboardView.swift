@@ -134,13 +134,16 @@ struct ExpandedDashboardView: View {
   private var overviewSection: some View {
     VStack(spacing: 16) {
       summaryPanel
-      QuotaForecastCard(forecast: store.quotaForecast, tint: store.palette.weekly)
-      CodexRadarView()
-      ExpandedResetCreditsView(
-        summary: store.rateLimitResetCredits,
+      FlexibleCreditsView(
+        balance: store.flexibleCreditBalance,
         isLoading: store.isLoading,
-        tint: store.palette.weekly
+        tint: store.palette.weekly,
+        expiryLabel: store.creditExpiry.label(account: store.status?.accountScope),
+        metadata: store.status?.flexibleCreditRead
       )
+      QuotaForecastCard(forecast: store.quotaForecast, tint: store.palette.weekly)
+      CodexRadarView(snapshot: store.codexRadarSnapshot, palette: store.palette, isLoading: store.codexRadarIsLoading, nextSyncAt: store.codexRadarNextSyncAt, statusMessage: store.codexRadarStatusMessage, refresh: { store.refreshCodexRadar(force: true) })
+      RadarEvaluationView(summary: store.radarEvaluation, message: store.radarEvaluationMessage, save: store.saveRadarOutcome)
       costCards
       disclaimerPanel
       errorPanel
@@ -166,7 +169,7 @@ struct ExpandedDashboardView: View {
 
   private var refreshStatusText: String {
     if let exportMessage = store.exportMessage { return exportMessage }
-    if store.isFullRefreshing { return "正在增量汇总本月日志" }
+    if store.isFullRefreshing { return "正在汇总会话用量" }
     if store.isLoading { return "正在读取最新额度" }
     if let date = store.lastFullRefresh {
       return "完整统计更新于 \(date.formatted(date: .omitted, time: .shortened))"
@@ -183,18 +186,22 @@ struct ExpandedDashboardView: View {
   private var summaryPanel: some View {
     PanelCard {
       HStack(spacing: 28) {
-        WeeklyGaugeView(
-          remainingPercent: store.weekly?.remainingPercent,
-          tint: store.palette.weekly,
-          size: 190,
-          lineWidth: 18
+        ConcentricQuotaGaugeView(
+          weeklyRemainingPercent: store.weekly?.remainingPercent,
+          fiveHourRemainingPercent: store.fiveHour?.remainingPercent,
+          showsWeekly: true,
+          showsFiveHour: store.overviewShowsFiveHourQuota,
+          weeklyTint: store.palette.weekly,
+          fiveHourTint: .orange,
+          size: 164,
+          lineWidth: 16
         )
         VStack(alignment: .leading, spacing: 12) {
           Label("滚动24小时消耗", systemImage: "clock.arrow.circlepath")
             .font(.system(size: 14, weight: .bold))
             .foregroundStyle(DashboardColors.subtleText)
-          Text(BalanceFormatters.compactNumber(stats.rolling24HoursTokens))
-            .font(.system(size: 46, weight: .heavy, design: .rounded))
+          Text(BalanceFormatters.compactNumber(store.hasUsageData ? stats.rolling24HoursTokens : nil))
+            .font(.system(size: 38, weight: .heavy, design: .rounded))
             .foregroundStyle(store.palette.usage24h)
             .monospacedDigit()
             .contentTransition(.numericText())
@@ -203,23 +210,46 @@ struct ExpandedDashboardView: View {
             .foregroundStyle(DashboardColors.subtleText)
           Divider().overlay(DashboardColors.separator)
           HStack(spacing: 18) {
-            valuePair("USD", usd(stats.cost24Hours.usd))
-            valuePair("CNY", cny(stats.cost24Hours))
+            valuePair("USD", store.hasUsageData ? stats.cost24Hours.displayUSD : "--")
+            valuePair("CNY", store.hasUsageData && stats.cost24Hours.hasEstimate ? cny(stats.cost24Hours) : "--")
           }
-          if let reset = store.weekly?.resetsAt {
-            Text("7天额度刷新：\(reset.formatted(date: .abbreviated, time: .shortened))")
-              .font(.caption)
-              .foregroundStyle(DashboardColors.subtleText)
-          } else {
-            Text("7天额度暂无官方窗口数据")
-              .font(.caption)
-              .foregroundStyle(DashboardColors.subtleText)
+          Text(store.hasUsageData ? "按当前价格表折算 · \(stats.cost24Hours.coverageLabel)" : "首次统计中，金额暂未就绪")
+            .font(.caption).foregroundStyle(DashboardColors.subtleText)
+          if !stats.cost24Hours.unpricedModels.isEmpty {
+            Text("未计价：" + stats.cost24Hours.unpricedModels.joined(separator: "、")).font(.caption2).foregroundStyle(.orange).lineLimit(2)
+          }
+          SourceStatusLabel(metadata: store.status?.quotaRead, resetAt: store.status?.main?.sevenDayWindow?.resetsAt)
+          HStack {
+            Label("Full reset \(store.rateLimitResetCredits.map { String($0.availableCount) } ?? "--") 次", systemImage: "arrow.counterclockwise.circle")
+            SourceStatusLabel(metadata: store.status?.resetCreditsRead, compact: true)
+          }.font(.caption)
+          VStack(alignment: .leading, spacing: 4) {
+            quotaResetText(title: "7天", window: store.weekly)
+            if store.overviewShowsFiveHourQuota {
+              quotaResetText(title: "5小时", window: store.fiveHour)
+            }
           }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
       }
     }
     .animation(.snappy(duration: 0.28), value: stats.rolling24HoursTokens)
+    .animation(.snappy(duration: 0.28), value: store.overviewShowsFiveHourQuota)
+  }
+
+  private func quotaResetText(title: String, window: LimitWindow?) -> some View {
+    Group {
+      if let reset = window?.resetsAt {
+        HStack(spacing: 4) {
+          Text("\(title)重置倒计时")
+          Text(reset, style: .relative).monospacedDigit()
+        }.help(reset.formatted(date: .abbreviated, time: .shortened))
+      } else {
+        Text("\(title)额度暂无官方窗口数据")
+      }
+    }
+    .font(.caption)
+    .foregroundStyle(DashboardColors.subtleText)
   }
 
   private var costCards: some View {
@@ -233,8 +263,8 @@ struct ExpandedDashboardView: View {
   private func costCard(_ title: String, tokens: Int, estimate: CostEstimate, tint: Color) -> some View {
     MetricCard(
       title: title,
-      value: BalanceFormatters.compactNumber(tokens),
-      detail: "\(usd(estimate.usd)) · \(cny(estimate))\(estimate.isPartial ? " *" : "")",
+      value: BalanceFormatters.compactNumber(store.hasUsageData ? tokens : nil),
+      detail: store.hasUsageData ? "\(estimate.displayUSD) · \(estimate.coverageLabel)" : "首次统计中…",
       tint: tint
     )
   }

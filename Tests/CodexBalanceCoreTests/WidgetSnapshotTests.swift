@@ -33,6 +33,16 @@ struct WidgetSnapshotTests {
       radarLevel: "高概率",
       radarSummary: "公开雷达摘要",
       radarUpdatedAt: updatedAt,
+      radarCheckedAt: updatedAt.addingTimeInterval(60),
+      radarLastSuccessAt: updatedAt.addingTimeInterval(30),
+      radarSourceUpdatedAt: updatedAt.addingTimeInterval(-120),
+      radarEvidenceUpdatedAt: updatedAt.addingTimeInterval(-300),
+      radarEvaluatedAt: updatedAt.addingTimeInterval(60),
+      radarValidUntil: updatedAt.addingTimeInterval(86_400),
+      radarSyncStatus: "同步正常",
+      radarConsecutiveFailures: 0,
+      radarIsUsingCachedFeed: false,
+      radarIsStale: false,
       resetCreditsAvailable: 1,
       resetCredits: [CodexWidgetResetCredit(title: "Full reset", expiresAt: updatedAt.addingTimeInterval(86_400))],
       sampleCount: 48,
@@ -48,7 +58,14 @@ struct WidgetSnapshotTests {
     let json = try #require(String(data: Data(contentsOf: url), encoding: .utf8))
 
     #expect(decoded == snapshot)
-    #expect(decoded.schemaVersion == 2)
+    #expect(decoded.schemaVersion == 4)
+    #expect(decoded.radarCheckedAt == updatedAt.addingTimeInterval(60))
+    #expect(decoded.radarLastSuccessAt == updatedAt.addingTimeInterval(30))
+    #expect(decoded.radarValidUntil == updatedAt.addingTimeInterval(86_400))
+    #expect(decoded.radarSyncStatus == "同步正常")
+    #expect(decoded.radarConsecutiveFailures == 0)
+    #expect(decoded.radarIsUsingCachedFeed == false)
+    #expect(decoded.radarIsStale == false)
     #expect(decoded.displaysFiveHourQuota)
     #expect(decoded.fiveHourRemainingPercent == 84)
     #expect(!json.contains("projectPath"))
@@ -90,6 +107,54 @@ struct WidgetSnapshotTests {
   }
 
   @Test
+  func snapshotFromPreviousSystemBootIsNotPresentedAsLiveQuota() {
+    let now = Date(timeIntervalSince1970: 10_000)
+    let snapshot = CodexWidgetSnapshot(
+      updatedAt: now.addingTimeInterval(-30),
+      remainingPercent: 77,
+      resetsAt: now.addingTimeInterval(86_400)
+    )
+
+    #expect(!CodexWidgetSnapshotFreshness.isFresh(
+      snapshot,
+      now: now,
+      systemUptime: 20
+    ))
+  }
+
+  @Test
+  func recentSnapshotFromCurrentSystemBootRemainsLiveAcrossAppRestart() {
+    let now = Date(timeIntervalSince1970: 10_000)
+    let snapshot = CodexWidgetSnapshot(
+      updatedAt: now.addingTimeInterval(-30),
+      remainingPercent: 76,
+      resetsAt: now.addingTimeInterval(86_400)
+    )
+
+    #expect(CodexWidgetSnapshotFreshness.isFresh(
+      snapshot,
+      now: now,
+      systemUptime: 3_600
+    ))
+  }
+
+  @Test
+  func oldSnapshotFromCurrentBootExpiresInsteadOfMasqueradingAsLive() {
+    let now = Date(timeIntervalSince1970: 10_000)
+    let snapshot = CodexWidgetSnapshot(
+      updatedAt: now.addingTimeInterval(-(CodexWidgetSnapshotFreshness.maximumLiveAge + 1)),
+      remainingPercent: 76,
+      resetsAt: now.addingTimeInterval(86_400)
+    )
+
+    #expect(!CodexWidgetSnapshotFreshness.isFresh(
+      snapshot,
+      now: now,
+      systemUptime: 3_600
+    ))
+  }
+
+  @Test
   func contentComparisonIgnoresOnlyRefreshTimestamp() {
     let original = CodexWidgetSnapshot(
       updatedAt: Date(timeIntervalSince1970: 100),
@@ -117,6 +182,12 @@ struct WidgetSnapshotTests {
     #expect(!original.hasSameWidgetContent(as: later))
     later = original
     later.resetProbability24h = 71
+    #expect(!original.hasSameWidgetContent(as: later))
+    later = original
+    later.radarEvaluatedAt = Date(timeIntervalSince1970: 300)
+    #expect(!original.hasSameWidgetContent(as: later))
+    later = original
+    later.radarValidUntil = Date(timeIntervalSince1970: 400)
     #expect(!original.hasSameWidgetContent(as: later))
     later = original
     later.hourly24[0].tokens += 1
@@ -155,6 +226,13 @@ struct WidgetSnapshotTests {
     #expect(snapshot.schemaVersion == 1)
     #expect(snapshot.fiveHourRemainingPercent == nil)
     #expect(!snapshot.displaysFiveHourQuota)
+    #expect(snapshot.radarCheckedAt == nil)
+    #expect(snapshot.radarLastSuccessAt == nil)
+    #expect(snapshot.radarValidUntil == nil)
+    #expect(snapshot.radarSyncStatus == nil)
+    #expect(snapshot.radarConsecutiveFailures == nil)
+    #expect(snapshot.radarIsUsingCachedFeed == nil)
+    #expect(snapshot.radarIsStale == nil)
   }
 
   @Test

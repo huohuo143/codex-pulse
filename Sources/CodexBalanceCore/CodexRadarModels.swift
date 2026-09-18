@@ -14,22 +14,51 @@ public struct CodexRadarSnapshot: Equatable, Decodable, Sendable {
   public var tiboPresence: CodexRadarTiboPresence?
   public var links: CodexRadarLinks?
   public var publicJudgement: CodexRadarPublicJudgement?
+  public var tiboFeed: CodexRadarTiboFeed?
+  public var localResetEstimate: CodexRadarResetEstimate?
+  public var stationInsights: CodexRadarStationInsights?
+  public var efficiency: CodexRadarEfficiencySnapshot?
+  public var syncState: CodexRadarSyncState? = nil
 
   public var probability24hPercent: Int? {
-    prediction?.probability24h.map { Int((min(1, max(0, $0)) * 100).rounded()) }
+    if syncState?.isStale == true { return nil }
+    if let localResetEstimate {
+      return localResetEstimate.probability24hPercent
+    }
+    return prediction?.probability24h.map { Int((min(1, max(0, $0)) * 100).rounded()) }
+  }
+
+  public var displayProbability24h: Double? {
+    if syncState?.isStale == true { return nil }
+    return localResetEstimate?.probability24h ?? prediction?.probability24h
   }
 
   public var latestUpdate: Date? {
-    [publicJudgement?.updatedAt, prediction?.updatedAt, monitoredAt]
+    [
+      localResetEstimate?.updatedAt,
+      tiboFeed?.updatedAt,
+      stationInsights?.sourceUpdatedAt,
+      efficiency?.sourceUpdatedAt,
+      publicJudgement?.updatedAt,
+      prediction?.updatedAt,
+      monitoredAt
+    ]
       .compactMap { $0 }
       .max()
   }
 
   public var probabilityUpdate: Date? {
-    prediction?.updatedAt ?? monitoredAt
+    localResetEstimate?.evaluatedAt
+      ?? localResetEstimate?.updatedAt
+      ?? prediction?.updatedAt
+      ?? monitoredAt
   }
 
   public var latestLevelLabel: String {
+    if syncState?.isStale == true { return "数据过期" }
+    if let localResetEstimate {
+      return localResetEstimate.levelLabel
+    }
     if publicJudgementIsNewer, let label = publicJudgement?.levelLabel {
       return label
     }
@@ -37,6 +66,12 @@ public struct CodexRadarSnapshot: Equatable, Decodable, Sendable {
   }
 
   public var latestSummary: String? {
+    if syncState?.isStale == true {
+      return "Tibo 公开源已连续 90 分钟未成功同步，已停止展示缓存概率。"
+    }
+    if let localResetEstimate {
+      return localResetEstimate.summary
+    }
     if publicJudgementIsNewer, let summary = publicJudgement?.summary {
       return summary
     }
@@ -51,6 +86,40 @@ public struct CodexRadarSnapshot: Equatable, Decodable, Sendable {
 
   public static func decode(from data: Data) throws -> CodexRadarSnapshot {
     try CodexRadarCodec.decode(data)
+  }
+}
+
+public struct CodexRadarSyncState: Equatable, Codable, Sendable {
+  public var lastAttemptAt: Date?
+  public var lastSuccessAt: Date?
+  public var feedUpdatedAt: Date?
+  public var consecutiveFailures: Int
+  public var isUsingCachedFeed: Bool
+  public var isStale: Bool
+  public var failureMessage: String?
+
+  public init(
+    lastAttemptAt: Date? = nil,
+    lastSuccessAt: Date? = nil,
+    feedUpdatedAt: Date? = nil,
+    consecutiveFailures: Int = 0,
+    isUsingCachedFeed: Bool = false,
+    isStale: Bool = false,
+    failureMessage: String? = nil
+  ) {
+    self.lastAttemptAt = lastAttemptAt
+    self.lastSuccessAt = lastSuccessAt
+    self.feedUpdatedAt = feedUpdatedAt
+    self.consecutiveFailures = consecutiveFailures
+    self.isUsingCachedFeed = isUsingCachedFeed
+    self.isStale = isStale
+    self.failureMessage = failureMessage
+  }
+
+  public var statusLabel: String {
+    if isStale { return "数据过期" }
+    if isUsingCachedFeed { return "使用缓存·自动重试中" }
+    return "同步正常"
   }
 }
 
@@ -255,7 +324,11 @@ enum CodexRadarCodec {
         rss: nil,
         fullAPI: nil
       ),
-      publicJudgement: nil
+      publicJudgement: nil,
+      tiboFeed: nil,
+      localResetEstimate: nil,
+      stationInsights: nil,
+      efficiency: nil
     )
   }
 

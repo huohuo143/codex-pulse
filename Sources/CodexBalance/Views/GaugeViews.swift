@@ -1,3 +1,4 @@
+import CodexBalanceCore
 import SwiftUI
 
 enum DashboardPalette: String, CaseIterable, Identifiable {
@@ -72,7 +73,7 @@ enum DashboardPalette: String, CaseIterable, Identifiable {
 
 enum DashboardColors {
   static var selectedPalette: DashboardPalette {
-    UserDefaults.standard.string(forKey: DashboardPalette.userDefaultsKey)
+    PulsePreferences.shared.string(forKey: DashboardPalette.userDefaultsKey)
       .flatMap(DashboardPalette.init) ?? .mintDawn
   }
   static var usage24h: Color { selectedPalette.usage24h }

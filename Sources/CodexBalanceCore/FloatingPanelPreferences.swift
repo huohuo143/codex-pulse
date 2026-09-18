@@ -68,6 +68,11 @@ public enum FloatingPanelMetric: String, CaseIterable, Identifiable, Hashable, S
     let safeSelection = selection.isEmpty ? defaults : selection
     return safeSelection.map(\.rawValue).sorted()
   }
+
+  /// 主窗口概览与悬浮框共用同一项 5 小时额度偏好，避免两个开关状态分叉。
+  public static func showsFiveHourQuota(in selection: Set<FloatingPanelMetric>) -> Bool {
+    selection.contains(.fiveHourQuota)
+  }
 }
 
 /// 区分用户手动打开与 Codex watcher 后台唤起，避免关闭悬浮框后弹出完整主窗口。

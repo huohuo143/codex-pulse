@@ -21,6 +21,10 @@ struct QuotaForecastCard: View {
           statusBadge
         }
 
+        Text(forecast?.sustainabilitySummary ?? "暂时无法判断能否撑到重置")
+          .font(.system(size: 14, weight: .bold))
+        Text(forecast?.riskExplanation ?? "等待官方额度数据")
+          .font(.caption).foregroundStyle(DashboardColors.subtleText)
         if let forecast, forecast.isUsable {
           HStack(spacing: 12) {
             forecastMetric(
@@ -184,6 +188,7 @@ struct MenuBarStatusView: View {
       }
 
       VStack(alignment: .leading, spacing: 5) {
+        SourceStatusLabel(metadata: store.status?.quotaRead, resetAt: store.status?.main?.sevenDayWindow?.resetsAt)
         Label(resetText, systemImage: "arrow.counterclockwise.circle")
         Label(exhaustionText, systemImage: "hourglass")
       }

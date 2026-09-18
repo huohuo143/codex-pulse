@@ -1,10 +1,16 @@
 import Foundation
+#if canImport(CFNetwork)
+import CFNetwork
+#endif
 #if canImport(Darwin)
 import Darwin
 #endif
 
-private struct ParsedFileCache: Codable {
+struct ParsedFileCache: Codable {
   var modified: Date
+  var identity: String?
+  var prefix: Data?
+  var pendingBytes: Data? = nil
   var fileSize: Int
   var pendingScores: [TokenUsageCategory: Int]
   var pendingProjectName: String
@@ -15,231 +21,56 @@ private struct ParsedFileCache: Codable {
   var events: [RateLimitEvent]
 }
 
-private struct PersistentEventCache: Codable {
+struct PersistentEventCache: Codable {
   // v5 invalidates caches produced before cumulative-total deduplication.
-  static let currentSchemaVersion = 5
+  static let currentSchemaVersion = 6
 
   var schemaVersion: Int
   var files: [String: ParsedFileCache]
 }
 
-private struct TokenStatsCache {
+struct TokenStatsCache {
   var signature: String
-  var dayKey: String
+  var validUntil: Date
   var stats: TokenStats
 }
 
-private struct UsageKeywordRule {
-  var bytes: [UInt8]
-  var weight: Int
-
-  init(_ keyword: String, _ weight: Int) {
-    bytes = Array(keyword.utf8)
-    self.weight = weight
-  }
-}
-
-private let tokenCountNeedle = Array(#""type":"token_count""#.utf8)
-private let developerRoleNeedle = Array(#""role":"developer""#.utf8)
-private let systemRoleNeedle = Array(#""role":"system""#.utf8)
-private let turnContextNeedle = Array(#""type":"turn_context""#.utf8)
-private let sessionMetaNeedle = Array(#""type":"session_meta""#.utf8)
-private let functionOutputNeedle = Array(#""type":"function_call_output""#.utf8)
-private let cwdNeedle = Array(#""cwd""#.utf8)
-private let userRoleNeedle = Array(#""role":"user""#.utf8)
-private let assistantRoleNeedle = Array(#""role":"assistant""#.utf8)
-private let userMessageNeedle = Array(#""type":"user_message""#.utf8)
-private let functionCallNeedle = Array(#""type":"function_call""#.utf8)
-private let presentationKeywordRules = [
-  UsageKeywordRule("pptx", 10),
-  UsageKeywordRule("powerpoint", 10),
-  UsageKeywordRule("演示文稿", 10),
-  UsageKeywordRule("幻灯片", 10),
-  UsageKeywordRule("slide deck", 9),
-  UsageKeywordRule("presentation deck", 9),
-  UsageKeywordRule("slides", 7),
-  UsageKeywordRule("slide", 5),
-  UsageKeywordRule("presentations:", 7),
-  UsageKeywordRule("presentations", 6),
-  UsageKeywordRule("generate_deck", 7),
-  UsageKeywordRule("powerpoint:", 7),
-  UsageKeywordRule("ppt", 4)
-]
-private let imageKeywordRules = [
-  UsageKeywordRule("imagegen", 10),
-  UsageKeywordRule("生成图片", 9),
-  UsageKeywordRule("做图", 9),
-  UsageKeywordRule("图片", 5),
-  UsageKeywordRule("图像", 5),
-  UsageKeywordRule("海报", 5),
-  UsageKeywordRule("插画", 5),
-  UsageKeywordRule("视觉", 4),
-  UsageKeywordRule("figma", 6),
-  UsageKeywordRule("canva", 6),
-  UsageKeywordRule("png", 3),
-  UsageKeywordRule("jpg", 3)
-]
-private let documentKeywordRules = [
-  UsageKeywordRule("docx", 10),
-  UsageKeywordRule("word", 7),
-  UsageKeywordRule("申请表", 9),
-  UsageKeywordRule("文档", 5),
-  UsageKeywordRule("表格", 5),
-  UsageKeywordRule("填写", 4),
-  UsageKeywordRule("documents", 6),
-  UsageKeywordRule("render_docx", 8),
-  UsageKeywordRule("xlsx", 7),
-  UsageKeywordRule("spreadsheet", 6),
-  UsageKeywordRule("excel", 6)
-]
-private let codingKeywordRules = [
-  UsageKeywordRule("apply_patch", 10),
-  UsageKeywordRule("swift test", 8),
-  UsageKeywordRule("npm run", 7),
-  UsageKeywordRule("package.swift", 6),
-  UsageKeywordRule(".swift", 4),
-  UsageKeywordRule(".jsx", 4),
-  UsageKeywordRule(".tsx", 4),
-  UsageKeywordRule("代码", 5),
-  UsageKeywordRule("编程", 6),
-  UsageKeywordRule("修复", 3),
-  UsageKeywordRule("bug", 4),
-  UsageKeywordRule("构建", 3),
-  UsageKeywordRule("git diff", 5)
-]
-private let researchKeywordRules = [
-  UsageKeywordRule("search_query", 8),
-  UsageKeywordRule("web.run", 8),
-  UsageKeywordRule("pubmed", 10),
-  UsageKeywordRule("zotero", 9),
-  UsageKeywordRule("doi", 7),
-  UsageKeywordRule("literature", 8),
-  UsageKeywordRule("文献", 9),
-  UsageKeywordRule("检索", 8),
-  UsageKeywordRule("browse", 5),
-  UsageKeywordRule("搜索", 5),
-  UsageKeywordRule("调研", 6),
-  UsageKeywordRule("引用", 4),
-  UsageKeywordRule("citations", 5),
-  UsageKeywordRule("sourceurl", 4),
-  UsageKeywordRule("联网", 4)
-]
-private let videoKeywordRules = [
-  UsageKeywordRule("剪映", 10),
-  UsageKeywordRule("jianying", 10),
-  UsageKeywordRule("premiere", 10),
-  UsageKeywordRule("after effects", 10),
-  UsageKeywordRule("视频制作", 10),
-  UsageKeywordRule("生成视频", 9),
-  UsageKeywordRule("字幕", 7),
-  UsageKeywordRule("配音", 7),
-  UsageKeywordRule("video", 5),
-  UsageKeywordRule("mp4", 5)
-]
-private let manuscriptKeywordRules = [
-  UsageKeywordRule("manuscript", 10),
-  UsageKeywordRule("response letter", 10),
-  UsageKeywordRule("reviewer", 8),
-  UsageKeywordRule("abstract", 8),
-  UsageKeywordRule("discussion", 7),
-  UsageKeywordRule("润色", 10),
-  UsageKeywordRule("改写", 8),
-  UsageKeywordRule("论文", 8),
-  UsageKeywordRule("综述", 9),
-  UsageKeywordRule("摘要", 8),
-  UsageKeywordRule("审稿", 9),
-  UsageKeywordRule("基金", 7),
-  UsageKeywordRule("申请书", 8),
-  UsageKeywordRule("翻译", 6)
-]
-private let dataAnalysisKeywordRules = [
-  UsageKeywordRule("pandas", 10),
-  UsageKeywordRule("numpy", 9),
-  UsageKeywordRule("matplotlib", 9),
-  UsageKeywordRule("scipy", 9),
-  UsageKeywordRule("jupyter", 8),
-  UsageKeywordRule("heatmap", 8),
-  UsageKeywordRule("volcano", 8),
-  UsageKeywordRule("pca", 7),
-  UsageKeywordRule("统计分析", 10),
-  UsageKeywordRule("数据分析", 10),
-  UsageKeywordRule("数据清洗", 9),
-  UsageKeywordRule("可视化", 6),
-  UsageKeywordRule("作图", 5),
-  UsageKeywordRule("绘图", 5)
-]
-private let lifeScienceKeywordRules = [
-  UsageKeywordRule("rna-seq", 10),
-  UsageKeywordRule("single-cell", 10),
-  UsageKeywordRule("transcriptome", 9),
-  UsageKeywordRule("proteome", 9),
-  UsageKeywordRule("metabolome", 9),
-  UsageKeywordRule("fasta", 8),
-  UsageKeywordRule("gff", 8),
-  UsageKeywordRule("vcf", 8),
-  UsageKeywordRule("kegg", 8),
-  UsageKeywordRule("bioinformatics", 10),
-  UsageKeywordRule("水稻", 10),
-  UsageKeywordRule("褐飞虱", 10),
-  UsageKeywordRule("病毒", 8),
-  UsageKeywordRule("基因", 7),
-  UsageKeywordRule("蛋白", 7),
-  UsageKeywordRule("转录组", 9),
-  UsageKeywordRule("代谢组", 9),
-  UsageKeywordRule("组学", 8),
-  UsageKeywordRule("生物信息", 10)
-]
-private let webDevelopmentKeywordRules = [
-  UsageKeywordRule("astro", 10),
-  UsageKeywordRule("next.js", 10),
-  UsageKeywordRule("react", 8),
-  UsageKeywordRule("cloudflare", 9),
-  UsageKeywordRule("website", 8),
-  UsageKeywordRule("网页", 9),
-  UsageKeywordRule("网站", 9),
-  UsageKeywordRule("部署", 7),
-  UsageKeywordRule("路由", 6),
-  UsageKeywordRule("css", 6),
-  UsageKeywordRule("html", 6)
-]
-private let systemOperationsKeywordRules = [
-  UsageKeywordRule("launchagent", 10),
-  UsageKeywordRule("launchctl", 10),
-  UsageKeywordRule("synology", 10),
-  UsageKeywordRule("cloudflare tunnel", 10),
-  UsageKeywordRule("dns", 8),
-  UsageKeywordRule("nas920", 8),
-  UsageKeywordRule("terminal", 6),
-  UsageKeywordRule("群晖", 10),
-  UsageKeywordRule("内网穿透", 10),
-  UsageKeywordRule("网络问题", 9),
-  UsageKeywordRule("电脑维护", 9),
-  UsageKeywordRule("服务器", 7),
-  UsageKeywordRule("自动启动", 7),
-  UsageKeywordRule("安装", 5),
-  UsageKeywordRule("权限", 5)
-]
-
 public final class CodexStatusReader: @unchecked Sendable {
-  private let fileManager: FileManager
-  private let codexHome: URL
-  private let sessionRoots: [URL]
-  private let maxSessionFiles: Int
-  private let liveRateLimitSource: CodexAppServerRateLimitSource?
-  private let resetCreditsSource: CodexResetCreditsSource?
-  private let accountUsageSource: CodexProfileUsageSource?
-  private let usageSyncStore: CodexUsageSyncStore?
-  private let persistentEventCacheURL: URL?
-  private var eventCache: [String: ParsedFileCache] = [:]
-  private var tokenStatsCache: TokenStatsCache?
-  private var workspaceRootLabels: [String: String] = [:]
-  private var didLoadPersistentEventCache = false
-  private var persistentEventCacheDirty = false
+  let clock: @Sendable () -> Date
+  let officialRead: (@Sendable (Date) throws -> CodexStatus)?
+  let fileManager: FileManager
+  let codexHome: URL
+  let sessionRoots: [URL]
+  var injectedFileIndex: SessionFileIndex?
+  lazy var fileIndex = injectedFileIndex ?? SessionFileIndex(roots: sessionRoots,
+    reconciliationInterval: liveRateLimitSource == nil ? 0 : 300, watch: liveRateLimitSource != nil)
+  var lastSyncAt: Date?
+  var lastSyncedStats: TokenStats?
+  var deviceSnapshots: [CodexDeviceTokenUsage] = []
+  var cachedLogEvents: [RateLimitEvent] = []
+  var lastIndexRevision = -1
+  public internal(set) var diagnostics = SessionReadDiagnostics()
+  public var lastSessionActivity: Date? { fileIndex.lastActivityAt }
+  let liveRateLimitSource: CodexAppServerRateLimitSource?
+  let resetCreditsSource: CodexResetCreditsSource?
+  let accountUsageSource: CodexProfileUsageSource?
+  let usageSyncStore: CodexUsageSyncStore?
+  let persistentEventCacheURL: URL?
+  var eventCache: [String: ParsedFileCache] = [:]
+  var tokenStatsCache: TokenStatsCache?
+  var workspaceMetadataStamp: Date?
+  var workspaceMetadataLoaded = false
+  var workspaceRootLabels: [String: String] = [:]
+  var didLoadPersistentEventCache = false
+  var persistentEventCacheDirty = false
 
   public init(
     codexHome: URL? = nil,
     sessionsRoot: URL? = nil,
     maxSessionFiles: Int = 1000,
+    fileIndex: SessionFileIndex? = nil,
+    clock: @escaping @Sendable () -> Date = { Date() },
+    officialRead: (@Sendable (Date) throws -> CodexStatus)? = nil,
     preferLiveStatus: Bool = true,
     persistentEventCacheURL: URL? = nil,
     fileManager: FileManager = .default
@@ -251,6 +82,8 @@ public final class CodexStatusReader: @unchecked Sendable {
       ?? environmentHome
       ?? defaultHome
 
+    self.clock = clock
+    self.officialRead = officialRead
     self.fileManager = fileManager
     if let sessionsRoot {
       self.codexHome = resolvedHome
@@ -263,9 +96,10 @@ public final class CodexStatusReader: @unchecked Sendable {
       let discoveredRoots = Self.discoverSessionRoots(fileManager: fileManager)
       self.sessionRoots = discoveredRoots.isEmpty ? [resolvedHome.appendingPathComponent("sessions")] : discoveredRoots
     }
-    self.maxSessionFiles = maxSessionFiles
+    // Retained initializer argument for source compatibility; complete statistics never truncate.
+    self.injectedFileIndex = fileIndex
     self.liveRateLimitSource = preferLiveStatus && codexHome == nil && sessionsRoot == nil
-      ? CodexAppServerRateLimitSource()
+      ? CodexAppServerRateLimitSource.shared
       : nil
     self.resetCreditsSource = preferLiveStatus && codexHome == nil && sessionsRoot == nil
       ? (environmentHome == nil
@@ -281,37 +115,50 @@ public final class CodexStatusReader: @unchecked Sendable {
     if let persistentEventCacheURL {
       self.persistentEventCacheURL = persistentEventCacheURL
     } else if preferLiveStatus && codexHome == nil && sessionsRoot == nil {
-      self.persistentEventCacheURL = fileManager.homeDirectoryForCurrentUser
-        .appendingPathComponent("Library/Application Support/CodexSuanliMeter/session-event-cache-v5.plist")
+      self.persistentEventCacheURL = PulsePaths.support.appendingPathComponent("session-event-cache-v6.plist")
     } else {
       self.persistentEventCacheURL = nil
     }
   }
 
-  public func read(now: Date = Date()) throws -> CodexStatus {
+  public func read(now: Date? = nil) throws -> CodexStatus {
+    let now = now ?? clock()
     loadPersistentEventCacheIfNeeded()
-    workspaceRootLabels = loadWorkspaceRootLabels()
-    let files = listJSONLFiles()
-    let activePaths = Set(files.map(\.path))
-    let filteredCache = eventCache.filter { activePaths.contains($0.key) }
-    if filteredCache.count != eventCache.count {
-      eventCache = filteredCache
-      persistentEventCacheDirty = true
+    let labelURL = codexHome.appendingPathComponent(".codex-global-state.json")
+    let labelStamp = (try? labelURL.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+    if !workspaceMetadataLoaded || labelStamp != workspaceMetadataStamp {
+      workspaceRootLabels = loadWorkspaceRootLabels()
+      workspaceMetadataStamp = labelStamp; workspaceMetadataLoaded = true
     }
-    let events = files
-      .flatMap { parseEvents(in: $0, now: now) }
-      .sorted { $0.timestamp < $1.timestamp }
-    persistEventCacheIfNeeded()
+    let entries = fileIndex.read(at: now)
+    let files = entries.map(\.url)
+    if lastIndexRevision != fileIndex.revision {
+      let activePaths = Set(files.map(\.path))
+      let filteredCache = eventCache.filter { activePaths.contains($0.key) }
+      if filteredCache.count != eventCache.count { eventCache = filteredCache; persistentEventCacheDirty = true }
+      cachedLogEvents = entries.flatMap { parseEvents(in: $0.url, entry: $0, now: now) }.sorted { $0.timestamp < $1.timestamp }
+      lastIndexRevision = fileIndex.revision
+      tokenStatsCache = nil
+      persistEventCacheIfNeeded()
+    }
+    let events = cachedLogEvents
+    let accountScope = synchronizeAccount()
     let liveSnapshot = liveRateLimitSource?.cachedSnapshot(now: now) ?? .empty
     let liveEvents = liveSnapshot.events
+    let flexibleCreditBalance = liveSnapshot.flexibleCreditBalance
     liveRateLimitSource?.refreshInBackground()
     let resetCredits = resetCreditsSource?.cached(now: now) ?? liveSnapshot.resetCredits
     resetCreditsSource?.refreshInBackground()
     let accountUsage = accountUsageSource?.cachedUsage(now: now)
     accountUsageSource?.refreshInBackground(now: now)
     let combinedEvents = (events + liveEvents).sorted { $0.timestamp < $1.timestamp }
+    let selectionEvents = Self.quotaSelectionEvents(
+      sessionEvents: events,
+      liveEvents: liveEvents,
+      requiresOfficialLive: liveRateLimitSource != nil
+    )
 
-    let latestByLimit = Self.latestByLimit(from: combinedEvents)
+    let latestByLimit = Self.latestByLimit(from: selectionEvents)
 
     let limits = latestByLimit.values.sorted {
       let lhsUsed = $0.primary?.usedPercent ?? 0
@@ -326,9 +173,15 @@ public final class CodexStatusReader: @unchecked Sendable {
     let recentEvents = combinedEvents
     var tokenStats = buildCachedTokenStats(from: events, now: now)
     tokenStats.accountUsage = accountUsage
-    tokenStats.deviceUsage = usageSyncStore?.persistAndReadSnapshots(from: tokenStats, now: now) ?? []
+    var syncInput = tokenStats
+    syncInput.accountUsage = nil
+    if syncInput != lastSyncedStats || lastSyncAt.map({ now.timeIntervalSince($0) >= 60 }) ?? true {
+      deviceSnapshots = usageSyncStore?.persistAndReadSnapshots(from: tokenStats, now: now) ?? []
+      lastSyncedStats = syncInput; lastSyncAt = now
+    }
+    tokenStats.deviceUsage = deviceSnapshots
 
-    return CodexStatus(
+    var result = CodexStatus(
       generatedAt: now,
       codexHome: codexHome.path,
       sessionsRoot: sessionRoots.map(\.path).joined(separator: " | "),
@@ -338,29 +191,56 @@ public final class CodexStatusReader: @unchecked Sendable {
       limits: limits,
       trend: Array(trend),
       rateLimitResetCredits: resetCredits,
+      flexibleCreditBalance: flexibleCreditBalance,
       tokenStats: tokenStats,
       recentEvents: Array(recentEvents.suffix(18).reversed())
     )
+    result.readerDiagnostics = diagnostics
+    result.usageValidUntil = tokenStatsCache?.validUntil
+    result.lastSessionActivity = fileIndex.lastActivityAt
+    let finalScope = resetCreditsSource?.anonymousAccountScope()
+    result.accountScope = finalScope
+    if finalScope != accountScope {
+      result.main = nil; result.limits = []; result.trend = []
+      result.flexibleCreditBalance = nil; result.rateLimitResetCredits = nil
+      result.quotaRead = SourceReadMetadata(source: "Codex app-server")
+      result.flexibleCreditRead = SourceReadMetadata(source: "Codex app-server")
+      result.resetCreditsRead = SourceReadMetadata(source: "Full reset 官方接口")
+      return result
+    }
+    result.quotaRead = liveRateLimitSource == nil ? nil : liveSnapshot.quotaRead
+    result.flexibleCreditRead = liveRateLimitSource == nil ? nil : liveSnapshot.flexibleRead
+    result.resetCreditsRead = resetCreditsSource?.readMetadata() ?? liveSnapshot.resetRead
+    return result
+
   }
 
   public func readFast(
-    now: Date = Date(),
+    now: Date? = nil,
     fileLimit: Int = 8,
-    tailBytes: Int = 768 * 1024
+    tailBytes: Int = 768 * 1024,
+    forceOfficial: Bool = false
   ) throws -> CodexStatus {
-    workspaceRootLabels = loadWorkspaceRootLabels()
-    let files = Array(listJSONLFiles().prefix(fileLimit))
-    let events = files
-      .flatMap { parseRecentEvents(in: $0, now: now, tailBytes: tailBytes) }
-      .sorted { $0.timestamp < $1.timestamp }
-    let liveSnapshot = liveRateLimitSource?.freshSnapshot(now: now) ?? .empty
+    let now = now ?? clock()
+    if let officialRead { return try officialRead(now) }
+    // Quota refresh never enumerates or reads session files.
+    let files: [URL] = []
+    let events: [RateLimitEvent] = []
+    let accountScope = synchronizeAccount()
+    let liveSnapshot = liveRateLimitSource?.freshSnapshot(now: now, maxAge: forceOfficial ? 0 : 45) ?? .empty
     let liveEvents = liveSnapshot.events
-    let resetCredits = resetCreditsSource?.fresh(now: now) ?? liveSnapshot.resetCredits
+    let flexibleCreditBalance = liveSnapshot.flexibleCreditBalance
+    let resetCredits = resetCreditsSource?.fresh(now: now, maxAge: forceOfficial ? 0 : 300) ?? liveSnapshot.resetCredits
     let accountUsage = accountUsageSource?.cachedUsage(now: now)
     accountUsageSource?.refreshInBackground(now: now)
     let combinedEvents = (events + liveEvents).sorted { $0.timestamp < $1.timestamp }
+    let selectionEvents = Self.quotaSelectionEvents(
+      sessionEvents: events,
+      liveEvents: liveEvents,
+      requiresOfficialLive: liveRateLimitSource != nil
+    )
 
-    let latestByLimit = Self.latestByLimit(from: combinedEvents)
+    let latestByLimit = Self.latestByLimit(from: selectionEvents)
     let limits = latestByLimit.values.sorted {
       let lhsUsed = $0.primary?.usedPercent ?? 0
       let rhsUsed = $1.primary?.usedPercent ?? 0
@@ -375,7 +255,7 @@ public final class CodexStatusReader: @unchecked Sendable {
     tokenStats.accountUsage = accountUsage
     tokenStats.deviceUsage = usageSyncStore?.readSnapshots() ?? []
 
-    return CodexStatus(
+    var result = CodexStatus(
       generatedAt: now,
       codexHome: codexHome.path,
       sessionsRoot: sessionRoots.map(\.path).joined(separator: " | "),
@@ -385,9 +265,25 @@ public final class CodexStatusReader: @unchecked Sendable {
       limits: limits,
       trend: Array(trend),
       rateLimitResetCredits: resetCredits,
+      flexibleCreditBalance: flexibleCreditBalance,
       tokenStats: tokenStats,
       recentEvents: Array(combinedEvents.suffix(18).reversed())
     )
+    let finalScope = resetCreditsSource?.anonymousAccountScope()
+    result.accountScope = finalScope
+    if finalScope != accountScope {
+      result.main = nil; result.limits = []; result.trend = []
+      result.flexibleCreditBalance = nil; result.rateLimitResetCredits = nil
+      result.quotaRead = SourceReadMetadata(source: "Codex app-server")
+      result.flexibleCreditRead = SourceReadMetadata(source: "Codex app-server")
+      result.resetCreditsRead = SourceReadMetadata(source: "Full reset 官方接口")
+      return result
+    }
+    result.quotaRead = liveRateLimitSource == nil ? nil : liveSnapshot.quotaRead
+    result.flexibleCreditRead = liveRateLimitSource == nil ? nil : liveSnapshot.flexibleRead
+    result.resetCreditsRead = resetCreditsSource?.readMetadata() ?? liveSnapshot.resetRead
+    return result
+
   }
 
   static func latestByLimit(from events: [RateLimitEvent]) -> [String: RateLimitEvent] {
@@ -402,10 +298,37 @@ public final class CodexStatusReader: @unchecked Sendable {
     return latestByLimit
   }
 
-  private static func shouldKeep(existing: RateLimitEvent, over candidate: RateLimitEvent) -> Bool {
+  /// Production dashboards have access to the account API. During process or
+  /// computer startup, do not publish a session-log percentage while that
+  /// authoritative source is still connecting. A temporary `--` is safer than
+  /// presenting an old percentage as the current account quota.
+  static func quotaSelectionEvents(
+    sessionEvents: [RateLimitEvent],
+    liveEvents: [RateLimitEvent],
+    requiresOfficialLive: Bool
+  ) -> [RateLimitEvent] {
+    requiresOfficialLive ? liveEvents : (sessionEvents + liveEvents)
+  }
+
+  static func shouldKeep(existing: RateLimitEvent, over candidate: RateLimitEvent) -> Bool {
     let existingIsLive = existing.sourceName == "Codex app-server"
     let candidateIsLive = candidate.sourceName == "Codex app-server"
     let freshStatusGrace: TimeInterval = 120
+
+    // When both samples identify the same official seven-day cycle, the
+    // account API is authoritative even if a nearby session-log line has a
+    // slightly newer local timestamp. This is the restart race that could show
+    // 77% while account/rateLimits/read already reported 76%.
+    if let existingReset = existing.sevenDayWindow?.resetsAt,
+       let candidateReset = candidate.sevenDayWindow?.resetsAt {
+      let resetDifference = candidateReset.timeIntervalSince(existingReset)
+      if abs(resetDifference) > 300 {
+        return resetDifference < 0
+      }
+      if existingIsLive != candidateIsLive {
+        return existingIsLive
+      }
+    }
 
     if existing.timestamp == candidate.timestamp {
       return !existingIsLive || candidateIsLive
@@ -428,40 +351,14 @@ public final class CodexStatusReader: @unchecked Sendable {
     return false
   }
 
-  private func listJSONLFiles() -> [URL] {
-    var files: [(url: URL, modified: Date)] = []
-    var seenPaths = Set<String>()
-
-    for root in sessionRoots {
-      guard fileManager.fileExists(atPath: root.path),
-            let enumerator = fileManager.enumerator(
-              at: root,
-              includingPropertiesForKeys: [.contentModificationDateKey, .isRegularFileKey],
-              options: [.skipsHiddenFiles]
-            )
-      else {
-        continue
-      }
-
-      for case let url as URL in enumerator where url.pathExtension == "jsonl" {
-        let path = url.standardizedFileURL.path
-        guard seenPaths.insert(path).inserted,
-              let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .isRegularFileKey]),
-              values.isRegularFile == true
-        else {
-          continue
-        }
-        files.append((url, values.contentModificationDate ?? .distantPast))
-      }
-    }
-
-    return files
-      .sorted { $0.modified > $1.modified }
-      .prefix(maxSessionFiles)
-      .map(\.url)
+  func synchronizeAccount() -> String? {
+    let scope = resetCreditsSource?.anonymousAccountScope()
+    liveRateLimitSource?.useAccount(scope)
+    resetCreditsSource?.useAccount(scope)
+    return scope
   }
 
-  private static func discoverSessionRoots(fileManager: FileManager) -> [URL] {
+  static func discoverSessionRoots(fileManager: FileManager) -> [URL] {
     let home = fileManager.homeDirectoryForCurrentUser
     let candidates = [
       home.appendingPathComponent(".codex/sessions"),
@@ -470,10 +367,10 @@ public final class CodexStatusReader: @unchecked Sendable {
       home.appendingPathComponent("Library/Application Support/com.openai.codex/sessions")
     ]
 
-    return candidates.filter { containsJSONL(in: $0, fileManager: fileManager) }
+    return candidates.filter { fileManager.fileExists(atPath: $0.path) }
   }
 
-  private static func containsJSONL(in root: URL, fileManager: FileManager) -> Bool {
+  static func containsJSONL(in root: URL, fileManager: FileManager) -> Bool {
     guard fileManager.fileExists(atPath: root.path),
           let enumerator = fileManager.enumerator(
             at: root,
@@ -496,84 +393,52 @@ public final class CodexStatusReader: @unchecked Sendable {
     return false
   }
 
-  private func parseEvents(in file: URL, now: Date) -> [RateLimitEvent] {
-    let values = try? file.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
-    let modified = values?.contentModificationDate ?? .distantPast
-    let fileSize = values?.fileSize ?? -1
+  func parseEvents(in file: URL, entry: SessionFileEntry, now: Date) -> [RateLimitEvent] {
     let cacheKey = file.path
-    if let cached = eventCache[cacheKey],
-       cached.modified == modified,
-       cached.fileSize == fileSize {
+    if var cached = eventCache[cacheKey], (cached.identity == nil || cached.identity == entry.identity),
+       cached.modified == entry.modified, cached.fileSize == entry.size {
+      // Adopt legacy v5 parses only when metadata is unchanged. The first changed
+      // file is verified or streamed again before any new accounting is appended.
+      if cached.identity == nil {
+        cached.identity = entry.identity
+        cached.prefix = readPrefix(in: file, length: min(4096, entry.size))
+        eventCache[cacheKey] = cached; persistentEventCacheDirty = true
+      }
       return cached.events
     }
-
-    if let cached = eventCache[cacheKey],
-       fileSize >= cached.fileSize,
-       let appendedText = readText(in: file, fromOffset: cached.fileSize) {
-      let split = splitCompleteJSONLines(cached.pendingLine + appendedText)
-      let parsed = autoreleasepool {
-        parseEventLines(
-          split.complete,
-          file: file,
-          initialScores: cached.pendingScores,
-          initialProjectName: cached.pendingProjectName,
-          initialProjectPath: cached.pendingProjectPath,
-          initialModel: cached.pendingModel,
-          initialCategory: cached.pendingCategory
-        )
+    let old = eventCache[cacheKey]
+    let canAppend: Bool
+    if let old, old.identity == entry.identity, entry.size > old.fileSize, let prefix = old.prefix {
+      canAppend = readPrefix(in: file, length: prefix.count) == prefix
+    } else { canAppend = false }
+    var cache = canAppend ? old! : ParsedFileCache(modified: entry.modified, identity: entry.identity,
+      prefix: nil, fileSize: 0, pendingScores: emptyCategoryScores(),
+      pendingProjectName: projectName(fromPath: file.deletingPathExtension().lastPathComponent),
+      pendingProjectPath: file.path, pendingModel: "unknown", pendingCategory: .other, pendingLine: "", events: [])
+    do {
+      let streamed = try SessionLogStream.read(file: file, offset: cache.fileSize, endOffset: max(0, entry.size),
+        pending: cache.pendingBytes ?? Data(cache.pendingLine.utf8)) { text in
+        let parsed = autoreleasepool {
+          parseEventLines(text, file: file, initialScores: cache.pendingScores,
+            initialProjectName: cache.pendingProjectName, initialProjectPath: cache.pendingProjectPath,
+            initialModel: cache.pendingModel, initialCategory: cache.pendingCategory)
+        }
+        cache.events.append(contentsOf: parsed.events)
+        cache.pendingScores = parsed.pendingScores; cache.pendingProjectName = parsed.pendingProjectName
+        cache.pendingProjectPath = parsed.pendingProjectPath; cache.pendingModel = parsed.pendingModel
+        cache.pendingCategory = parsed.pendingCategory
       }
-      let newEvents = parsed.events
-      let nextEvents = newEvents.isEmpty ? cached.events : cached.events + newEvents
-      eventCache[cacheKey] = ParsedFileCache(
-        modified: modified,
-        fileSize: fileSize,
-        pendingScores: parsed.pendingScores,
-        pendingProjectName: parsed.pendingProjectName,
-        pendingProjectPath: parsed.pendingProjectPath,
-        pendingModel: parsed.pendingModel,
-        pendingCategory: parsed.pendingCategory,
-        pendingLine: split.pending,
-        events: nextEvents
-      )
-      persistentEventCacheDirty = true
-      return nextEvents
-    }
-
-    let parsedCache: ParsedFileCache? = autoreleasepool {
-      guard let text = try? String(contentsOf: file, encoding: .utf8) else { return nil }
-      let split = splitCompleteJSONLines(text)
-      let fallbackProjectName = projectName(fromPath: file.deletingPathExtension().lastPathComponent)
-      let parsed = parseEventLines(
-        split.complete,
-        file: file,
-        initialScores: emptyCategoryScores(),
-        initialProjectName: fallbackProjectName,
-        initialProjectPath: file.path,
-        initialModel: "unknown",
-        initialCategory: .other
-      )
-      return ParsedFileCache(
-        modified: modified,
-        fileSize: fileSize,
-        pendingScores: parsed.pendingScores,
-        pendingProjectName: parsed.pendingProjectName,
-        pendingProjectPath: parsed.pendingProjectPath,
-        pendingModel: parsed.pendingModel,
-        pendingCategory: parsed.pendingCategory,
-        pendingLine: split.pending,
-        events: parsed.events
-      )
-    }
-    guard let parsedCache else {
-      return []
-    }
-    eventCache[cacheKey] = parsedCache
-    persistentEventCacheDirty = true
-    return parsedCache.events
+      diagnostics.parsedFiles += 1; diagnostics.bytesRead += streamed.bytesRead
+      cache.fileSize = streamed.offset; cache.pendingBytes = streamed.pending; cache.pendingLine = ""
+      cache.modified = entry.modified; cache.identity = entry.identity
+      cache.prefix = readPrefix(in: file, length: min(4096, cache.fileSize))
+      eventCache[cacheKey] = cache; persistentEventCacheDirty = true
+      return cache.events
+    } catch { return old?.events ?? [] }
   }
 
   /// Keep an in-progress final JSONL record and resume from the previous byte offset.
-  private func splitCompleteJSONLines(_ text: String) -> (complete: String, pending: String) {
+  func splitCompleteJSONLines(_ text: String) -> (complete: String, pending: String) {
     guard !text.isEmpty else { return ("", "") }
     if text.hasSuffix("\n") { return (text, "") }
 
@@ -588,18 +453,20 @@ public final class CodexStatusReader: @unchecked Sendable {
     return (String(text[..<finalLineStart]), finalLine)
   }
 
-  private func loadPersistentEventCacheIfNeeded() {
+  func loadPersistentEventCacheIfNeeded() {
     guard !didLoadPersistentEventCache else { return }
     didLoadPersistentEventCache = true
-    guard let persistentEventCacheURL,
-          let data = try? Data(contentsOf: persistentEventCacheURL),
+    guard let persistentEventCacheURL else { return }
+    let legacyURL = persistentEventCacheURL.deletingLastPathComponent().appendingPathComponent("session-event-cache-v5.plist")
+    let selectedURL = fileManager.fileExists(atPath: persistentEventCacheURL.path) ? persistentEventCacheURL : legacyURL
+    guard let data = try? Data(contentsOf: selectedURL),
           let cache = try? PropertyListDecoder().decode(PersistentEventCache.self, from: data),
-          cache.schemaVersion == PersistentEventCache.currentSchemaVersion
-    else { return }
+          [5, PersistentEventCache.currentSchemaVersion].contains(cache.schemaVersion) else { return }
     eventCache = cache.files
+    persistentEventCacheDirty = cache.schemaVersion != PersistentEventCache.currentSchemaVersion
   }
 
-  private func persistEventCacheIfNeeded() {
+  func persistEventCacheIfNeeded() {
     guard persistentEventCacheDirty, let persistentEventCacheURL else { return }
     let cache = PersistentEventCache(
       schemaVersion: PersistentEventCache.currentSchemaVersion,
@@ -620,7 +487,7 @@ public final class CodexStatusReader: @unchecked Sendable {
     }
   }
 
-  private func parseRecentEvents(in file: URL, now: Date, tailBytes: Int) -> [RateLimitEvent] {
+  func parseRecentEvents(in file: URL, now: Date, tailBytes: Int) -> [RateLimitEvent] {
     guard let text = readTailText(in: file, maxBytes: tailBytes) else {
       return []
     }
@@ -636,7 +503,7 @@ public final class CodexStatusReader: @unchecked Sendable {
     ).events
   }
 
-  private func parseEventLines(
+  func parseEventLines(
     _ text: String,
     file: URL,
     initialScores: [TokenUsageCategory: Int],
@@ -718,7 +585,7 @@ public final class CodexStatusReader: @unchecked Sendable {
     return (events, contextScores, currentProjectName, currentProjectPath, currentModel, currentCategory)
   }
 
-  private func updateModelContextIfPresent(_ line: Substring, model: inout String) {
+  func updateModelContextIfPresent(_ line: Substring, model: inout String) {
     guard asciiContains(line.utf8, turnContextNeedle),
           let parsed = Self.jsonStringField("model", in: String(line))?.trimmingCharacters(in: .whitespacesAndNewlines),
           !parsed.isEmpty
@@ -726,7 +593,15 @@ public final class CodexStatusReader: @unchecked Sendable {
     model = parsed
   }
 
-  private func readText(in file: URL, fromOffset offset: Int) -> String? {
+  func readPrefix(in file: URL, length: Int) -> Data? {
+    guard length >= 0, let handle = try? FileHandle(forReadingFrom: file) else { return nil }
+    defer { try? handle.close() }
+    let data = try? handle.read(upToCount: length)
+    diagnostics.bytesRead += data?.count ?? 0
+    return data
+  }
+
+  func readText(in file: URL, fromOffset offset: Int) -> String? {
     guard offset > 0 else { return try? String(contentsOf: file, encoding: .utf8) }
     do {
       let handle = try FileHandle(forReadingFrom: file)
@@ -739,7 +614,7 @@ public final class CodexStatusReader: @unchecked Sendable {
     }
   }
 
-  private func readTailText(in file: URL, maxBytes: Int) -> String? {
+  func readTailText(in file: URL, maxBytes: Int) -> String? {
     guard maxBytes > 0 else { return nil }
 
     do {
@@ -762,7 +637,7 @@ public final class CodexStatusReader: @unchecked Sendable {
     }
   }
 
-  private func updateProjectContextIfPresent(
+  func updateProjectContextIfPresent(
     _ line: Substring,
     projectName: inout String,
     projectPath: inout String
@@ -778,18 +653,18 @@ public final class CodexStatusReader: @unchecked Sendable {
     projectName = Self.projectName(fromPath: cwd)
   }
 
-  private static func projectName(fromPath path: String) -> String {
+  static func projectName(fromPath path: String) -> String {
     let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
     guard trimmed.isEmpty == false else { return "未知项目".coreL10n }
     let name = URL(fileURLWithPath: trimmed).lastPathComponent
     return name.isEmpty ? trimmed : name
   }
 
-  private func projectName(fromPath path: String) -> String {
+  func projectName(fromPath path: String) -> String {
     Self.projectName(fromPath: path)
   }
 
-  private func loadWorkspaceRootLabels() -> [String: String] {
+  func loadWorkspaceRootLabels() -> [String: String] {
     let stateFile = codexHome.appendingPathComponent(".codex-global-state.json")
     guard let data = try? Data(contentsOf: stateFile),
           let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
@@ -814,7 +689,7 @@ public final class CodexStatusReader: @unchecked Sendable {
     return normalized
   }
 
-  private func workspaceLabel(for path: String) -> String? {
+  func workspaceLabel(for path: String) -> String? {
     let normalizedPath = Self.standardizedPath(path)
     if let label = workspaceRootLabels[normalizedPath] {
       return label
@@ -826,18 +701,18 @@ public final class CodexStatusReader: @unchecked Sendable {
       .value
   }
 
-  private func workspaceLabelSignature() -> String {
+  func workspaceLabelSignature() -> String {
     workspaceRootLabels
       .sorted { $0.key < $1.key }
       .map { "\($0.key)=\($0.value)" }
       .joined(separator: "\u{1f}")
   }
 
-  private static func standardizedPath(_ path: String) -> String {
+  static func standardizedPath(_ path: String) -> String {
     URL(fileURLWithPath: path).standardizedFileURL.path
   }
 
-  private static func jsonStringField(_ key: String, in text: String) -> String? {
+  static func jsonStringField(_ key: String, in text: String) -> String? {
     guard let range = text.range(of: "\"\(key)\":\"") else { return nil }
     var value = ""
     var isEscaping = false
@@ -863,7 +738,7 @@ public final class CodexStatusReader: @unchecked Sendable {
     return nil
   }
 
-  private func normalizeWindow(_ window: [String: Any]?) -> LimitWindow? {
+  func normalizeWindow(_ window: [String: Any]?) -> LimitWindow? {
     guard let window else { return nil }
     let used = clamp(percentValue(in: window, keys: ["used_percent", "usedPercent", "used_percentage", "used"]) ?? 0)
     let remaining = percentValue(
@@ -892,14 +767,14 @@ public final class CodexStatusReader: @unchecked Sendable {
     )
   }
 
-  private func percentValue(in dictionary: [String: Any], keys: [String]) -> Double? {
+  func percentValue(in dictionary: [String: Any], keys: [String]) -> Double? {
     for key in keys where dictionary.keys.contains(key) {
       return double(dictionary[key])
     }
     return nil
   }
 
-  private func normalizeUsage(_ info: [String: Any]?) -> TokenUsage {
+  func normalizeUsage(_ info: [String: Any]?) -> TokenUsage {
     let total = info?["total_token_usage"] as? [String: Any] ?? [:]
     let last = info?["last_token_usage"] as? [String: Any] ?? [:]
     return TokenUsage(
@@ -916,11 +791,11 @@ public final class CodexStatusReader: @unchecked Sendable {
     )
   }
 
-  private func emptyCategoryScores() -> [TokenUsageCategory: Int] {
+  func emptyCategoryScores() -> [TokenUsageCategory: Int] {
     Dictionary(uniqueKeysWithValues: TokenUsageCategory.allCases.map { ($0, 0) })
   }
 
-  private func scoreContextLineIfRelevant(
+  func scoreContextLineIfRelevant(
     _ line: Substring,
     into scores: inout [TokenUsageCategory: Int]
   ) {
@@ -945,7 +820,7 @@ public final class CodexStatusReader: @unchecked Sendable {
     }
   }
 
-  private func isScorableContextLine<S: Sequence>(_ bytes: S) -> Bool where S.Element == UInt8 {
+  func isScorableContextLine<S: Sequence>(_ bytes: S) -> Bool where S.Element == UInt8 {
     if asciiContains(bytes, developerRoleNeedle) ||
        asciiContains(bytes, systemRoleNeedle) ||
        asciiContains(bytes, turnContextNeedle) ||
@@ -960,7 +835,7 @@ public final class CodexStatusReader: @unchecked Sendable {
       asciiContains(bytes, functionCallNeedle)
   }
 
-  private func category(from scores: [TokenUsageCategory: Int]) -> TokenUsageCategory {
+  func category(from scores: [TokenUsageCategory: Int]) -> TokenUsageCategory {
     return scores
       .filter { $0.key != .other }
       .max { lhs, rhs in
@@ -972,7 +847,7 @@ public final class CodexStatusReader: @unchecked Sendable {
       .flatMap { $0.value > 0 ? $0.key : nil } ?? .other
   }
 
-  private func addScore(
+  func addScore(
     _ scores: inout [TokenUsageCategory: Int],
     _ category: TokenUsageCategory,
     _ text: String.UTF8View,
@@ -983,7 +858,7 @@ public final class CodexStatusReader: @unchecked Sendable {
     }
   }
 
-  private func categoryPriority(_ category: TokenUsageCategory) -> Int {
+  func categoryPriority(_ category: TokenUsageCategory) -> Int {
     switch category {
     case .presentation: 13
     case .videoProduction: 12
@@ -1001,7 +876,7 @@ public final class CodexStatusReader: @unchecked Sendable {
     }
   }
 
-  private func resolvedCategory(
+  func resolvedCategory(
     scored: TokenUsageCategory,
     previous: TokenUsageCategory,
     projectName: String,
@@ -1021,7 +896,7 @@ public final class CodexStatusReader: @unchecked Sendable {
     return scored
   }
 
-  private func categoryFromProject(name: String, path: String) -> TokenUsageCategory {
+  func categoryFromProject(name: String, path: String) -> TokenUsageCategory {
     let value = "\(name) \(path)".lowercased()
     let rules: [(TokenUsageCategory, [String])] = [
       (.presentation, ["课题汇报ppt", "汇报ppt", "presentation", "slides"]),
@@ -1042,282 +917,6 @@ public final class CodexStatusReader: @unchecked Sendable {
     return .other
   }
 
-  private func buildCachedTokenStats(from events: [RateLimitEvent], now: Date) -> TokenStats {
-    let dayKey = hourKey(now)
-    let signature = tokenStatsSignature(for: events)
-    if let cached = tokenStatsCache,
-       cached.signature == signature,
-       cached.dayKey == dayKey {
-      return cached.stats
-    }
-
-    let stats = buildTokenStats(from: events, now: now)
-    tokenStatsCache = TokenStatsCache(signature: signature, dayKey: dayKey, stats: stats)
-    return stats
-  }
-
-  private func tokenStatsSignature(for events: [RateLimitEvent]) -> String {
-    guard let last = events.last else { return "empty" }
-    return [
-      String(events.count),
-      last.sourcePath,
-      String(last.timestamp.timeIntervalSince1970),
-      String(last.usage.totalTokens),
-      String(last.usage.lastTotalTokens),
-      last.model,
-      String(last.usage.lastCachedInputTokens),
-      workspaceLabelSignature()
-    ].joined(separator: "|")
-  }
-
-  private func buildTokenStats(from events: [RateLimitEvent], now: Date) -> TokenStats {
-    let usageEvents = buildTokenUsageEvents(from: events)
-    var daily: [String: TokenBucket] = [:]
-    var monthly: [String: TokenBucket] = [:]
-    var hourly: [String: TokenBucket] = [:]
-    var modelHourly: [String: ModelHourlyBucket] = [:]
-
-    for event in usageEvents {
-      add(event, to: &daily, key: periodKey(event.timestamp, period: .day))
-      add(event, to: &monthly, key: periodKey(event.timestamp, period: .month))
-      let hour = hourKey(event.timestamp)
-      add(event, to: &hourly, key: hour, label: formatHourLabel(event.timestamp))
-      add(event, to: &modelHourly, hourKey: hour)
-    }
-
-    let dailyRows = fillDailyRows(daily, count: 30, now: now)
-    let monthlyRows = fillMonthlyRows(monthly, count: 6, now: now)
-    let todayKey = periodKey(now, period: .day)
-    let monthKey = periodKey(now, period: .month)
-    let cutoff24h = now.addingTimeInterval(-24 * 60 * 60)
-    let cutoff7d = now.addingTimeInterval(-7 * 24 * 60 * 60)
-    let monthStart = Calendar.current.date(from: Calendar.current.dateComponents([.year, .month], from: now)) ?? .distantPast
-    let events24h = usageEvents.filter { $0.timestamp >= cutoff24h && $0.timestamp <= now }
-    let events7d = usageEvents.filter { $0.timestamp >= cutoff7d && $0.timestamp <= now }
-    let eventsMonth = usageEvents.filter { $0.timestamp >= monthStart && $0.timestamp <= now }
-    let last7Keys = Set(fillDailyKeys(count: 7, now: now))
-    let last7Tokens = daily
-      .filter { last7Keys.contains($0.key) }
-      .reduce(0) { $0 + $1.value.totalTokens }
-    let categoryBreakdown = buildCategoryBreakdown(
-      from: usageEvents.filter { periodKey($0.timestamp, period: .month) == monthKey }
-    )
-    let todayTopProjects = buildProjectBreakdown(
-      from: usageEvents.filter { periodKey($0.timestamp, period: .day) == todayKey },
-      limit: 3
-    )
-    let monthTopProjects = buildProjectBreakdown(
-      from: usageEvents.filter { periodKey($0.timestamp, period: .month) == monthKey },
-      limit: 3
-    )
-
-    return TokenStats(
-      rolling24HoursTokens: events24h.reduce(0) { $0 + $1.totalTokens },
-      todayTokens: daily[todayKey]?.totalTokens ?? 0,
-      monthTokens: monthly[monthKey]?.totalTokens ?? 0,
-      last7DaysTokens: last7Tokens,
-      sampleCount: usageEvents.count,
-      hourly: fillHourlyRows(hourly, count: 24, now: now),
-      modelHourly: modelHourly.values
-        .filter { Int($0.hourKey).map { Date(timeIntervalSince1970: Double($0 * 3600)) >= monthStart } ?? false }
-        .sorted { $0.id < $1.id },
-      daily: dailyRows,
-      monthly: monthlyRows,
-      cost24Hours: ModelPricingCatalog.current.estimate(events: events24h),
-      cost7Days: ModelPricingCatalog.current.estimate(events: events7d),
-      costMonth: ModelPricingCatalog.current.estimate(events: eventsMonth),
-      categoryBreakdown: categoryBreakdown,
-      todayTopProjects: todayTopProjects,
-      monthTopProjects: monthTopProjects,
-      recentUsageEvents: Array(usageEvents.suffix(12).reversed())
-    )
-  }
-
-  private func buildTokenUsageEvents(from events: [RateLimitEvent]) -> [TokenUsageEvent] {
-    var unique: [String: TokenUsageEvent] = [:]
-    for event in events where event.usage.lastTotalTokens > 0 && event.usage.totalTokens > 0 {
-      // `totalTokens` is cumulative within one rollout file. Codex can emit
-      // multiple quota snapshots without advancing that cumulative counter,
-      // sometimes with a different `lastTotalTokens` value. Count the first
-      // occurrence only so a status-only refresh never becomes new usage.
-      let key = "\(event.sourcePath):\(event.usage.totalTokens)"
-      let displayProjectName = workspaceLabel(for: event.projectPath) ?? event.projectName
-      let usageEvent = TokenUsageEvent(
-        timestamp: event.timestamp,
-        sourceName: event.sourceName,
-        model: event.model,
-        totalTokens: event.usage.lastTotalTokens,
-        inputTokens: event.usage.lastInputTokens,
-        cachedInputTokens: event.usage.lastCachedInputTokens,
-        outputTokens: event.usage.lastOutputTokens,
-        reasoningOutputTokens: event.usage.lastReasoningOutputTokens,
-        category: event.usageCategory,
-        projectName: displayProjectName,
-        projectPath: event.projectPath
-      )
-      if unique[key]?.timestamp ?? .distantFuture > usageEvent.timestamp {
-        unique[key] = usageEvent
-      }
-    }
-    return unique.values.sorted { $0.timestamp < $1.timestamp }
-  }
-
-  private func add(_ event: TokenUsageEvent, to buckets: inout [String: TokenBucket], key: String) {
-    var bucket = buckets[key] ?? TokenBucket(key: key, label: formatPeriodLabel(key))
-    bucket.totalTokens += event.totalTokens
-    bucket.inputTokens += event.inputTokens
-    bucket.cachedInputTokens += event.cachedInputTokens
-    bucket.outputTokens += event.outputTokens
-    bucket.reasoningOutputTokens += event.reasoningOutputTokens
-    bucket.calls += 1
-    buckets[key] = bucket
-  }
-
-  private func add(
-    _ event: TokenUsageEvent,
-    to buckets: inout [String: TokenBucket],
-    key: String,
-    label: String
-  ) {
-    var bucket = buckets[key] ?? TokenBucket(key: key, label: label)
-    bucket.totalTokens += event.totalTokens
-    bucket.inputTokens += event.inputTokens
-    bucket.cachedInputTokens += event.cachedInputTokens
-    bucket.outputTokens += event.outputTokens
-    bucket.reasoningOutputTokens += event.reasoningOutputTokens
-    bucket.calls += 1
-    buckets[key] = bucket
-  }
-
-  private func add(
-    _ event: TokenUsageEvent,
-    to buckets: inout [String: ModelHourlyBucket],
-    hourKey: String
-  ) {
-    let model = event.model.isEmpty ? "unknown" : event.model
-    let key = "\(hourKey)|\(model)"
-    var bucket = buckets[key] ?? ModelHourlyBucket(hourKey: hourKey, model: model)
-    bucket.totalTokens += event.totalTokens
-    bucket.inputTokens += event.inputTokens
-    bucket.cachedInputTokens += event.cachedInputTokens
-    bucket.outputTokens += event.outputTokens
-    bucket.reasoningOutputTokens += event.reasoningOutputTokens
-    bucket.calls += 1
-    buckets[key] = bucket
-  }
-
-  private func buildCategoryBreakdown(from events: [TokenUsageEvent]) -> [TokenCategoryBucket] {
-    var rows = Dictionary(
-      uniqueKeysWithValues: TokenUsageCategory.allCases.map {
-        ($0, TokenCategoryBucket(category: $0))
-      }
-    )
-
-    for event in events {
-      var bucket = rows[event.category] ?? TokenCategoryBucket(category: event.category)
-      bucket.totalTokens += event.totalTokens
-      bucket.inputTokens += event.inputTokens
-      bucket.outputTokens += event.outputTokens
-      bucket.reasoningOutputTokens += event.reasoningOutputTokens
-      bucket.calls += 1
-      rows[event.category] = bucket
-    }
-
-    return TokenUsageCategory.allCases.compactMap { rows[$0] }
-  }
-
-  private func buildProjectBreakdown(from events: [TokenUsageEvent], limit: Int) -> [TokenProjectBucket] {
-    var rows: [String: TokenProjectBucket] = [:]
-    for event in events {
-      let key = event.projectPath.isEmpty ? event.projectName : event.projectPath
-      var bucket = rows[key] ?? TokenProjectBucket(
-        projectName: event.projectName,
-        projectPath: event.projectPath
-      )
-      bucket.totalTokens += event.totalTokens
-      bucket.calls += 1
-      rows[key] = bucket
-    }
-
-    return rows.values
-      .sorted {
-        if $0.totalTokens == $1.totalTokens {
-          return $0.projectName < $1.projectName
-        }
-        return $0.totalTokens > $1.totalTokens
-      }
-      .prefix(limit)
-      .map { $0 }
-  }
-
-  private func fillDailyRows(_ rows: [String: TokenBucket], count: Int, now: Date) -> [TokenBucket] {
-    fillDailyKeys(count: count, now: now).map { rows[$0] ?? TokenBucket(key: $0, label: formatPeriodLabel($0)) }
-  }
-
-  private func fillHourlyRows(_ rows: [String: TokenBucket], count: Int, now: Date) -> [TokenBucket] {
-    let currentHour = Int(floor(now.timeIntervalSince1970 / 3600))
-    return (0..<count).map { index in
-      let value = currentHour - (count - 1 - index)
-      let key = String(value)
-      let date = Date(timeIntervalSince1970: Double(value * 3600))
-      return rows[key] ?? TokenBucket(key: key, label: formatHourLabel(date))
-    }
-  }
-
-  private func hourKey(_ date: Date) -> String {
-    String(Int(floor(date.timeIntervalSince1970 / 3600)))
-  }
-
-  private func formatHourLabel(_ date: Date) -> String {
-    let formatter = DateFormatter()
-    formatter.locale = Locale(identifier: "zh_CN")
-    formatter.dateFormat = "M/d HH时"
-    return formatter.string(from: date)
-  }
-
-  private func fillDailyKeys(count: Int, now: Date) -> [String] {
-    let calendar = Calendar.current
-    return (0..<count).compactMap { index in
-      let offset = count - 1 - index
-      return calendar.date(byAdding: .day, value: -offset, to: now).map { periodKey($0, period: .day) }
-    }
-  }
-
-  private func fillMonthlyRows(_ rows: [String: TokenBucket], count: Int, now: Date) -> [TokenBucket] {
-    let calendar = Calendar.current
-    return (0..<count).compactMap { index -> TokenBucket? in
-      let offset = count - 1 - index
-      guard let date = calendar.date(byAdding: .month, value: -offset, to: now) else { return nil }
-      let key = periodKey(date, period: .month)
-      return rows[key] ?? TokenBucket(key: key, label: formatPeriodLabel(key))
-    }
-  }
-
-  private enum Period {
-    case day
-    case month
-  }
-
-  private func periodKey(_ date: Date, period: Period) -> String {
-    let components = Calendar.current.dateComponents([.year, .month, .day], from: date)
-    let year = components.year ?? 0
-    let month = components.month ?? 0
-    if period == .month {
-      return String(format: "%04d-%02d", year, month)
-    }
-    return String(format: "%04d-%02d-%02d", year, month, components.day ?? 0)
-  }
-
-  private func formatPeriodLabel(_ key: String) -> String {
-    let parts = key.split(separator: "-")
-    if parts.count == 2 {
-      return "\(parts[0])/\(parts[1])"
-    }
-    if parts.count == 3 {
-      return "\(Int(parts[1]) ?? 0)/\(Int(parts[2]) ?? 0)"
-    }
-    return key
-  }
 }
 
 private extension ISO8601DateFormatter {
@@ -1331,697 +930,6 @@ private extension ISO8601DateFormatter {
     let withoutFractionalSeconds = ISO8601DateFormatter()
     withoutFractionalSeconds.formatOptions = [.withInternetDateTime]
     return withoutFractionalSeconds.date(from: string)
-  }
-}
-
-private final class ProfileUsageFetchResult: @unchecked Sendable {
-  private let lock = NSLock()
-  private var storage: AccountTokenUsage?
-
-  var value: AccountTokenUsage? {
-    lock.lock()
-    defer { lock.unlock() }
-    return storage
-  }
-
-  func set(_ usage: AccountTokenUsage) {
-    lock.lock()
-    storage = usage
-    lock.unlock()
-  }
-}
-
-private final class CodexProfileUsageSource: @unchecked Sendable {
-  private struct AuthFile: Decodable {
-    var tokens: Tokens?
-
-    struct Tokens: Decodable {
-      var accessToken: String?
-
-      enum CodingKeys: String, CodingKey {
-        case accessToken = "access_token"
-      }
-    }
-  }
-
-  private struct ProfilePayload: Decodable {
-    var stats: Stats?
-
-    struct Stats: Decodable {
-      var dailyUsageBuckets: [DailyUsageBucket]?
-
-      enum CodingKeys: String, CodingKey {
-        case dailyUsageBuckets = "daily_usage_buckets"
-      }
-    }
-  }
-
-  private struct DailyUsageBucket: Decodable {
-    var tokens: Int
-    var startDate: String
-
-    enum CodingKeys: String, CodingKey {
-      case tokens
-      case startDate = "start_date"
-    }
-
-    init(from decoder: Decoder) throws {
-      let container = try decoder.container(keyedBy: CodingKeys.self)
-      startDate = try container.decode(String.self, forKey: .startDate)
-      if let integerValue = try? container.decode(Int.self, forKey: .tokens) {
-        tokens = integerValue
-      } else if let doubleValue = try? container.decode(Double.self, forKey: .tokens) {
-        tokens = Int(doubleValue)
-      } else {
-        tokens = 0
-      }
-    }
-  }
-
-  private enum Period {
-    case day
-    case month
-  }
-
-  private let codexHome: URL
-  private let fileManager: FileManager
-  private let cacheLock = NSLock()
-  private var cachedUsage: AccountTokenUsage?
-  private var cachedAt: Date?
-  private var refreshInFlight = false
-  private var failedUntil: Date?
-
-  init(codexHome: URL, fileManager: FileManager) {
-    self.codexHome = codexHome
-    self.fileManager = fileManager
-  }
-
-  func cachedUsage(now: Date, maxAge: TimeInterval = 120) -> AccountTokenUsage? {
-    cacheLock.lock()
-    defer { cacheLock.unlock() }
-    guard let cachedAt, now.timeIntervalSince(cachedAt) <= maxAge else {
-      return nil
-    }
-    return cachedUsage
-  }
-
-  func refreshInBackground(now: Date) {
-    cacheLock.lock()
-    if refreshInFlight || (failedUntil.map { $0 > now } ?? false) {
-      cacheLock.unlock()
-      return
-    }
-    if let cachedAt, now.timeIntervalSince(cachedAt) < 45 {
-      cacheLock.unlock()
-      return
-    }
-    refreshInFlight = true
-    cacheLock.unlock()
-
-    DispatchQueue.global(qos: .utility).async { [weak self] in
-      guard let self else { return }
-      let usage = self.fetchUsage(now: Date())
-
-      self.cacheLock.lock()
-      if let usage {
-        self.cachedUsage = usage
-        self.cachedAt = Date()
-        self.failedUntil = nil
-      } else {
-        self.failedUntil = Date().addingTimeInterval(60)
-      }
-      self.refreshInFlight = false
-      self.cacheLock.unlock()
-    }
-  }
-
-  private func fetchUsage(now: Date) -> AccountTokenUsage? {
-    guard let accessToken = readAccessToken() else {
-      return nil
-    }
-    guard let url = URL(string: "https://chatgpt.com/backend-api/wham/profiles/me") else {
-      return nil
-    }
-
-    var request = URLRequest(url: url)
-    request.httpMethod = "GET"
-    request.timeoutInterval = 12
-    request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-    request.setValue("en", forHTTPHeaderField: "OAI-Language")
-    request.setValue("Codex Desktop", forHTTPHeaderField: "originator")
-    request.setValue("codex_desktop", forHTTPHeaderField: "OpenAI-Beta")
-
-    let semaphore = DispatchSemaphore(value: 0)
-    let result = ProfileUsageFetchResult()
-    URLSession.shared.dataTask(with: request) { data, response, _ in
-      defer { semaphore.signal() }
-      guard let httpResponse = response as? HTTPURLResponse,
-            (200..<300).contains(httpResponse.statusCode),
-            let data,
-            let payload = try? JSONDecoder().decode(ProfilePayload.self, from: data)
-      else {
-        return
-      }
-      result.set(self.usage(from: payload, now: now))
-    }.resume()
-
-    _ = semaphore.wait(timeout: .now() + 12)
-    return result.value
-  }
-
-  private func readAccessToken() -> String? {
-    let authFile = codexHome.appendingPathComponent("auth.json")
-    guard fileManager.fileExists(atPath: authFile.path),
-          let data = try? Data(contentsOf: authFile),
-          let auth = try? JSONDecoder().decode(AuthFile.self, from: data),
-          let token = auth.tokens?.accessToken?.trimmingCharacters(in: .whitespacesAndNewlines),
-          token.isEmpty == false
-    else {
-      return nil
-    }
-    return token
-  }
-
-  private func usage(from payload: ProfilePayload, now: Date) -> AccountTokenUsage {
-    let buckets = payload.stats?.dailyUsageBuckets ?? []
-    var daily: [String: TokenBucket] = [:]
-    var monthly: [String: TokenBucket] = [:]
-
-    for bucket in buckets {
-      let key = normalizedDayKey(bucket.startDate)
-      guard key.isEmpty == false else { continue }
-      let tokens = max(0, bucket.tokens)
-      var dayBucket = daily[key] ?? TokenBucket(key: key, label: formatPeriodLabel(key))
-      dayBucket.totalTokens += tokens
-      daily[key] = dayBucket
-
-      let monthKey = String(key.prefix(7))
-      var monthBucket = monthly[monthKey] ?? TokenBucket(key: monthKey, label: formatPeriodLabel(monthKey))
-      monthBucket.totalTokens += tokens
-      monthly[monthKey] = monthBucket
-    }
-
-    return AccountTokenUsage(
-      daily: fillDailyRows(daily, count: 14, now: now),
-      monthly: fillMonthlyRows(monthly, count: 6, now: now),
-      updatedAt: now
-    )
-  }
-
-  private func normalizedDayKey(_ rawValue: String) -> String {
-    let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard trimmed.count >= 10 else { return "" }
-    let candidate = String(trimmed.prefix(10))
-    let parts = candidate.split(separator: "-").compactMap { Int($0) }
-    guard parts.count == 3,
-          parts[0] > 2000,
-          (1...12).contains(parts[1]),
-          (1...31).contains(parts[2])
-    else {
-      return ""
-    }
-    return String(format: "%04d-%02d-%02d", parts[0], parts[1], parts[2])
-  }
-
-  private func fillDailyRows(_ rows: [String: TokenBucket], count: Int, now: Date) -> [TokenBucket] {
-    (0..<count).compactMap { index in
-      let offset = count - 1 - index
-      guard let date = Calendar.current.date(byAdding: .day, value: -offset, to: now) else {
-        return nil
-      }
-      let key = periodKey(date, period: .day)
-      return rows[key] ?? TokenBucket(key: key, label: formatPeriodLabel(key))
-    }
-  }
-
-  private func fillMonthlyRows(_ rows: [String: TokenBucket], count: Int, now: Date) -> [TokenBucket] {
-    (0..<count).compactMap { index in
-      let offset = count - 1 - index
-      guard let date = Calendar.current.date(byAdding: .month, value: -offset, to: now) else {
-        return nil
-      }
-      let key = periodKey(date, period: .month)
-      return rows[key] ?? TokenBucket(key: key, label: formatPeriodLabel(key))
-    }
-  }
-
-  private func periodKey(_ date: Date, period: Period) -> String {
-    let components = Calendar.current.dateComponents([.year, .month, .day], from: date)
-    let year = components.year ?? 0
-    let month = components.month ?? 0
-    if period == .month {
-      return String(format: "%04d-%02d", year, month)
-    }
-    return String(format: "%04d-%02d-%02d", year, month, components.day ?? 0)
-  }
-
-  private func formatPeriodLabel(_ key: String) -> String {
-    let parts = key.split(separator: "-")
-    if parts.count == 2 {
-      return "\(parts[0])/\(parts[1])"
-    }
-    if parts.count == 3 {
-      return "\(Int(parts[1]) ?? 0)/\(Int(parts[2]) ?? 0)"
-    }
-    return key
-  }
-}
-
-private struct LiveAccountRateLimitSnapshot: Sendable {
-  var events: [RateLimitEvent]
-  var resetCredits: RateLimitResetCreditsSummary?
-
-  static let empty = LiveAccountRateLimitSnapshot(events: [], resetCredits: nil)
-  var hasContent: Bool { !events.isEmpty || resetCredits != nil }
-}
-
-private final class CodexAppServerRateLimitSource: @unchecked Sendable {
-  private struct RPCErrorPayload: Decodable {
-    var code: Int?
-    var message: String
-  }
-
-  private struct RPCResponse<Result: Decodable>: Decodable {
-    var id: Int
-    var result: Result?
-    var error: RPCErrorPayload?
-  }
-
-  private struct LiveRateLimitsPayload: Decodable {
-    var rateLimits: LiveRateLimitSnapshot
-    var rateLimitsByLimitId: [String: LiveRateLimitSnapshot]?
-    var rateLimitResetCredits: RateLimitResetCreditsSummary?
-  }
-
-  private struct LiveRateLimitSnapshot: Decodable {
-    var limitId: String?
-    var limitName: String?
-    var primary: LiveRateLimitWindow?
-    var secondary: LiveRateLimitWindow?
-    var planType: String?
-    var rateLimitReachedType: String?
-  }
-
-  private struct LiveRateLimitWindow: Decodable {
-    var usedPercent: Double
-    var windowDurationMins: Double?
-    var resetsAt: Double?
-  }
-
-  private let condition = NSCondition()
-  private var process: Process?
-  private var inputPipe: Pipe?
-  private var outputPipe: Pipe?
-  private var errorPipe: Pipe?
-  private var outputBuffer = Data()
-  private var responses: [Int: Data] = [:]
-  private var nextRequestID = 1
-  private var initialized = false
-  private var completedLiveRead = false
-  private let cacheLock = NSLock()
-  private var cachedSnapshot = LiveAccountRateLimitSnapshot.empty
-  private var cachedAt: Date?
-  private var refreshInFlight = false
-  private var failedUntil: Date?
-
-  deinit {
-    stop()
-  }
-
-  func cachedSnapshot(now: Date, maxAge: TimeInterval = 20) -> LiveAccountRateLimitSnapshot {
-    cacheLock.lock()
-    defer { cacheLock.unlock() }
-    guard let cachedAt, now.timeIntervalSince(cachedAt) <= maxAge else {
-      return .empty
-    }
-    return cachedSnapshot
-  }
-
-  func freshSnapshot(now: Date, maxAge: TimeInterval = 20) -> LiveAccountRateLimitSnapshot {
-    cacheLock.lock()
-    if let cachedAt, now.timeIntervalSince(cachedAt) <= maxAge {
-      let snapshot = cachedSnapshot
-      cacheLock.unlock()
-      return snapshot
-    }
-    if refreshInFlight || (failedUntil.map { $0 > now } ?? false) {
-      let snapshot = cachedSnapshot
-      cacheLock.unlock()
-      return snapshot
-    }
-    refreshInFlight = true
-    cacheLock.unlock()
-
-    let snapshot = fetchSnapshot(now: now)
-    cacheLock.lock()
-    if snapshot.hasContent {
-      cachedSnapshot = snapshot
-      cachedAt = Date()
-    }
-    refreshInFlight = false
-    cacheLock.unlock()
-    return snapshot
-  }
-
-  func refreshInBackground() {
-    let now = Date()
-    cacheLock.lock()
-    if refreshInFlight || (failedUntil.map { $0 > now } ?? false) {
-      cacheLock.unlock()
-      return
-    }
-    refreshInFlight = true
-    cacheLock.unlock()
-
-    DispatchQueue.global(qos: .utility).async { [weak self] in
-      guard let self else { return }
-      let snapshot = self.fetchSnapshot(now: Date())
-
-      self.cacheLock.lock()
-      if snapshot.hasContent {
-        self.cachedSnapshot = snapshot
-        self.cachedAt = Date()
-      }
-      self.refreshInFlight = false
-      self.cacheLock.unlock()
-    }
-  }
-
-  private func fetchSnapshot(now: Date) -> LiveAccountRateLimitSnapshot {
-    do {
-      try ensureInitialized()
-      let id = nextID()
-      try send([
-        "jsonrpc": "2.0",
-        "id": id,
-        "method": "account/rateLimits/read"
-      ])
-      let data = try waitForResponse(id: id, timeout: completedLiveRead ? 3.0 : 12.0)
-      let response = try JSONDecoder().decode(RPCResponse<LiveRateLimitsPayload>.self, from: data)
-      if let error = response.error {
-        throw LiveRateLimitError.server(error.message)
-      }
-      guard let payload = response.result else {
-        throw LiveRateLimitError.emptyResponse
-      }
-      clearFailureCooldown()
-      completedLiveRead = true
-      return LiveAccountRateLimitSnapshot(
-        events: events(from: payload, now: now),
-        resetCredits: payload.rateLimitResetCredits
-      )
-    } catch {
-      NSLog("CodexBalance live rate limit source failed: \(error.localizedDescription)")
-      stop()
-      markFailureCooldown(seconds: 15)
-      return .empty
-    }
-  }
-
-  private func ensureInitialized() throws {
-    if initialized, process?.isRunning == true {
-      return
-    }
-
-    try start()
-    let id = nextID()
-    try send([
-      "jsonrpc": "2.0",
-      "id": id,
-      "method": "initialize",
-      "params": [
-        "clientInfo": [
-          "name": "CodexBalance",
-          "version": "1"
-        ]
-      ]
-    ])
-    _ = try waitForResponse(id: id, timeout: 8)
-    try send([
-      "jsonrpc": "2.0",
-      "method": "initialized"
-    ])
-    initialized = true
-  }
-
-  private func start() throws {
-    if process?.isRunning == true {
-      return
-    }
-
-    guard let executableURL = Self.codexExecutableURL() else {
-      NSLog("CodexBalance live rate limit source failed: codex executable missing")
-      throw LiveRateLimitError.codexExecutableMissing
-    }
-
-    let nextProcess = Process()
-    let nextInputPipe = Pipe()
-    let nextOutputPipe = Pipe()
-    let nextErrorPipe = Pipe()
-    nextProcess.executableURL = executableURL
-    nextProcess.arguments = ["app-server", "--listen", "stdio://"]
-    nextProcess.standardInput = nextInputPipe
-    nextProcess.standardOutput = nextOutputPipe
-    nextProcess.standardError = nextErrorPipe
-
-    nextOutputPipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
-      let data = handle.availableData
-      guard data.isEmpty == false else {
-        self?.handleProcessExit()
-        return
-      }
-      self?.appendOutput(data)
-    }
-    nextErrorPipe.fileHandleForReading.readabilityHandler = { handle in
-      _ = handle.availableData
-    }
-    nextProcess.terminationHandler = { [weak self] _ in
-      self?.handleProcessExit()
-    }
-
-    condition.lock()
-    process = nextProcess
-    inputPipe = nextInputPipe
-    outputPipe = nextOutputPipe
-    errorPipe = nextErrorPipe
-    outputBuffer.removeAll(keepingCapacity: true)
-    responses.removeAll()
-    initialized = false
-    completedLiveRead = false
-    condition.unlock()
-
-    try nextProcess.run()
-  }
-
-  private func stop() {
-    condition.lock()
-    let currentProcess = process
-    outputPipe?.fileHandleForReading.readabilityHandler = nil
-    errorPipe?.fileHandleForReading.readabilityHandler = nil
-    process = nil
-    inputPipe = nil
-    outputPipe = nil
-    errorPipe = nil
-    outputBuffer.removeAll(keepingCapacity: true)
-    responses.removeAll()
-    initialized = false
-    completedLiveRead = false
-    condition.broadcast()
-    condition.unlock()
-
-    if let currentProcess, currentProcess.isRunning {
-      currentProcess.terminate()
-      DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 1) {
-        guard currentProcess.isRunning else { return }
-        #if canImport(Darwin)
-        Darwin.kill(currentProcess.processIdentifier, SIGKILL)
-        #else
-        currentProcess.terminate()
-        #endif
-      }
-    }
-  }
-
-  private func handleProcessExit() {
-    condition.lock()
-    process = nil
-    inputPipe = nil
-    outputPipe = nil
-    errorPipe = nil
-    initialized = false
-    completedLiveRead = false
-    condition.broadcast()
-    condition.unlock()
-  }
-
-  private func appendOutput(_ data: Data) {
-    condition.lock()
-    outputBuffer.append(data)
-    while let newlineIndex = outputBuffer.firstIndex(of: 10) {
-      let lineData = outputBuffer[..<newlineIndex]
-      outputBuffer.removeSubrange(...newlineIndex)
-      guard lineData.isEmpty == false,
-            let object = try? JSONSerialization.jsonObject(with: Data(lineData)) as? [String: Any],
-            let id = Self.integerID(object["id"])
-      else {
-        continue
-      }
-      responses[id] = Data(lineData)
-      condition.broadcast()
-    }
-    condition.unlock()
-  }
-
-  private func nextID() -> Int {
-    condition.lock()
-    defer { condition.unlock() }
-    let id = nextRequestID
-    nextRequestID += 1
-    return id
-  }
-
-  private func send(_ object: [String: Any]) throws {
-    let data = try JSONSerialization.data(withJSONObject: object)
-    guard var line = String(data: data, encoding: .utf8)?.data(using: .utf8) else {
-      throw LiveRateLimitError.encodingFailed
-    }
-    line.append(10)
-    guard let inputPipe else {
-      throw LiveRateLimitError.processExited
-    }
-    try inputPipe.fileHandleForWriting.write(contentsOf: line)
-  }
-
-  private func waitForResponse(id: Int, timeout: TimeInterval) throws -> Data {
-    let deadline = Date().addingTimeInterval(timeout)
-    condition.lock()
-    defer { condition.unlock() }
-
-    while responses[id] == nil {
-      if process?.isRunning != true {
-        throw LiveRateLimitError.processExited
-      }
-      if Date() >= deadline {
-        throw LiveRateLimitError.timeout
-      }
-      condition.wait(until: deadline)
-    }
-
-    return responses.removeValue(forKey: id) ?? Data()
-  }
-
-  private func events(from payload: LiveRateLimitsPayload, now: Date) -> [RateLimitEvent] {
-    var snapshots = payload.rateLimitsByLimitId ?? [:]
-    let mainID = payload.rateLimits.limitId ?? "codex"
-    snapshots[mainID] = payload.rateLimits
-
-    return snapshots
-      .values
-      .compactMap { snapshot in
-        guard let limitID = snapshot.limitId, limitID.isEmpty == false else {
-          return nil
-        }
-        return RateLimitEvent(
-          timestamp: now,
-          sourceName: "Codex app-server",
-          sourcePath: "account/rateLimits/read",
-          limitID: limitID,
-          limitName: snapshot.limitName ?? (limitID == "codex" ? "Codex 默认额度".coreL10n : limitID),
-          planType: snapshot.planType,
-          primary: normalize(snapshot.primary),
-          secondary: normalize(snapshot.secondary),
-          reachedType: snapshot.rateLimitReachedType
-        )
-      }
-  }
-
-  private func normalize(_ window: LiveRateLimitWindow?) -> LimitWindow? {
-    guard let window else { return nil }
-    let used = clamp(window.usedPercent)
-    return LimitWindow(
-      usedPercent: used,
-      remainingPercent: clamp(100 - used),
-      windowMinutes: window.windowDurationMins ?? 0,
-      resetsAt: window.resetsAt.map { Date(timeIntervalSince1970: $0) }
-    )
-  }
-
-  private static func codexExecutableURL() -> URL? {
-    let fm = FileManager.default
-    let home = fm.homeDirectoryForCurrentUser.path
-    var candidates = [
-      // Codex 2026 起打包进 ChatGPT.app；旧 Codex.app 仍兼容
-      "/Applications/ChatGPT.app/Contents/Resources/codex",
-      "/Applications/Codex.app/Contents/Resources/codex",
-      // npm 全局安装（-g）常见位置
-      "\(home)/.npm-global/bin/codex",
-      "/opt/homebrew/bin/codex",
-      "/usr/local/bin/codex",
-      "/usr/bin/codex"
-    ]
-    // nvm 各 node 版本下的 bin/codex
-    let nvmVersions = "\(home)/.nvm/versions/node"
-    if let entries = try? fm.contentsOfDirectory(atPath: nvmVersions) {
-      candidates.append(contentsOf: entries.map { "\(nvmVersions)/\($0)/bin/codex" })
-    }
-    if let direct = candidates.map(URL.init(fileURLWithPath:))
-      .first(where: { fm.isExecutableFile(atPath: $0.path) }) {
-      return direct
-    }
-    // 兜底：用 login shell 解析 PATH 里的 codex（覆盖任意自定义安装位置）
-    let which = Process()
-    which.executableURL = URL(fileURLWithPath: "/bin/zsh")
-    which.arguments = ["-lc", "command -v codex"]
-    let pipe = Pipe()
-    which.standardOutput = pipe
-    which.standardError = FileHandle.nullDevice
-    try? which.run()
-    which.waitUntilExit()
-    if let data = try? pipe.fileHandleForReading.readToEnd(),
-       let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
-       !path.isEmpty, fm.isExecutableFile(atPath: path) {
-      return URL(fileURLWithPath: path)
-    }
-    return nil
-  }
-
-  private static func integerID(_ value: Any?) -> Int? {
-    if let value = value as? Int { return value }
-    if let value = value as? NSNumber { return value.intValue }
-    if let value = value as? String { return Int(value) }
-    return nil
-  }
-
-  private func markFailureCooldown(seconds: TimeInterval) {
-    cacheLock.lock()
-    failedUntil = Date().addingTimeInterval(seconds)
-    cacheLock.unlock()
-  }
-
-  private func clearFailureCooldown() {
-    cacheLock.lock()
-    failedUntil = nil
-    cacheLock.unlock()
-  }
-}
-
-private enum LiveRateLimitError: LocalizedError {
-  case codexExecutableMissing
-  case encodingFailed
-  case processExited
-  case timeout
-  case emptyResponse
-  case server(String)
-
-  var errorDescription: String? {
-    switch self {
-    case .codexExecutableMissing: "找不到 Codex 可执行文件".coreL10n
-    case .encodingFailed: "无法编码 Codex app-server 请求".coreL10n
-    case .processExited: "Codex app-server 已退出".coreL10n
-    case .timeout: "Codex app-server 响应超时".coreL10n
-    case .emptyResponse: "Codex app-server 返回空结果".coreL10n
-    case let .server(message): message
-    }
   }
 }
 

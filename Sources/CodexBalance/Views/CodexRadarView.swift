@@ -2,12 +2,21 @@ import CodexBalanceCore
 import SwiftUI
 
 struct CodexRadarView: View {
-  @EnvironmentObject private var store: DashboardStore
+  let snapshot: CodexRadarSnapshot?
+  let palette: DashboardPalette
+  let isLoading: Bool
+  let nextSyncAt: Date?
+  let statusMessage: String
+  let refresh: () -> Void
+  @AppStorage("radarDetailsExpanded") private var detailsExpanded = false
+  @AppStorage("radarCommunityExpanded") private var communityExpanded = false
+  @AppStorage("radarScoringExpanded") private var scoringExpanded = false
 
   var body: some View {
     VStack(spacing: 14) {
       resetOverviewCard
-      tiboCard
+      DisclosureGroup("原帖与翻译", isExpanded: $detailsExpanded) { tiboCard }
+      DisclosureGroup("模型效率与社区推荐", isExpanded: $communityExpanded) { CodexRadarCommunityView(snapshot: snapshot) }
     }
   }
 
@@ -21,10 +30,10 @@ struct CodexRadarView: View {
           Text("24H RESET")
             .font(.system(size: 11, weight: .heavy, design: .rounded))
             .tracking(2.1)
-            .foregroundStyle(store.palette.weekly)
+            .foregroundStyle(palette.weekly)
         }
 
-        if let snapshot = store.codexRadarSnapshot {
+        if let snapshot = snapshot {
           HStack(alignment: .center, spacing: 28) {
             radarGraphic(snapshot)
               .frame(width: 174, height: 174)
@@ -44,11 +53,11 @@ struct CodexRadarView: View {
         HStack(spacing: 10) {
           Link(CodexRadarService.attributionText, destination: CodexRadarService.siteURL)
           Spacer()
-          if store.codexRadarIsLoading {
+          if isLoading {
             ProgressView().controlSize(.small)
           }
           Label("每 30 分钟自动同步", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90")
-          if let nextSync = store.codexRadarNextSyncAt {
+          if let nextSync = nextSyncAt {
             Text("下次 \(shortTime(nextSync))")
               .monospacedDigit()
           }
@@ -71,7 +80,10 @@ struct CodexRadarView: View {
         }
         Spacer()
         VStack(alignment: .trailing, spacing: 2) {
-          probabilityText(snapshot.probability24hPercent, tint: probabilityTint(snapshot.prediction?.level))
+          probabilityText(
+            snapshot.probability24hPercent,
+            tint: probabilityTint(snapshot.localResetEstimate?.level ?? snapshot.prediction?.level)
+          )
           if let probabilityUpdate = snapshot.probabilityUpdate {
             Text("重置雷达 · \(radarUpdateTime(probabilityUpdate))")
               .font(.system(size: 8, weight: .semibold, design: .rounded))
@@ -90,8 +102,51 @@ struct CodexRadarView: View {
           .lineLimit(3)
       }
 
+      if let estimate = snapshot.localResetEstimate {
+        VStack(alignment: .leading, spacing: 5) {
+          Label("App 本地估算 · 24h 全局硬重置 · 非官方", systemImage: "function")
+            .font(.system(size: 10, weight: .bold))
+            .foregroundStyle(palette.weekly)
+          DisclosureGroup("详细评分依据", isExpanded: $scoringExpanded) {
+          ForEach(estimate.signals, id: \.self) { signal in
+            Text("• \(signal)")
+              .font(.system(size: 9, weight: .medium))
+              .foregroundStyle(DashboardColors.subtleText)
+          }
+          }
+        }
+      }
+
+      if let sync = snapshot.syncState {
+        VStack(alignment: .leading, spacing: 3) {
+          HStack(spacing: 10) {
+            Label(sync.statusLabel, systemImage: sync.isStale ? "exclamationmark.triangle.fill" : "network")
+              .foregroundStyle(sync.isStale ? .orange : DashboardColors.subtleText)
+            if let checked = sync.lastAttemptAt {
+              Text("本次检查 \(radarUpdateTime(checked))")
+            }
+            if let source = sync.feedUpdatedAt {
+              Text("Tibo 源 \(radarUpdateTime(source))")
+            }
+          }
+          HStack(spacing: 10) {
+            if let evaluated = snapshot.localResetEstimate?.evaluatedAt {
+              Text("概率评估 \(radarUpdateTime(evaluated))")
+            }
+            if let evidence = snapshot.localResetEstimate?.evidenceUpdatedAt {
+              Text("有效证据 \(radarUpdateTime(evidence))")
+            } else {
+              Text("当前无有效硬重置证据")
+            }
+          }
+        }
+        .font(.system(size: 9, weight: .medium, design: .rounded))
+        .foregroundStyle(DashboardColors.subtleText)
+      }
+
       HStack(spacing: 12) {
-        if let probability48h = snapshot.prediction?.probability48h {
+        if snapshot.localResetEstimate == nil,
+           let probability48h = snapshot.prediction?.probability48h {
           Text("48h  \(Int((min(1, max(0, probability48h)) * 100).rounded()))%")
         }
         if snapshot.windowOpen == true || snapshot.window?.open == true {
@@ -104,7 +159,7 @@ struct CodexRadarView: View {
           Label("最新研判", systemImage: "sparkles")
             .foregroundStyle(.green)
           Text(judgement.updatedAt.formatted(.dateTime.month().day().hour().minute()))
-        } else if let updated = snapshot.latestUpdate {
+        } else if let updated = snapshot.probabilityUpdate ?? snapshot.latestUpdate {
           Text("最新更新 \(radarUpdateTime(updated))")
         }
       }
@@ -121,13 +176,13 @@ struct CodexRadarView: View {
         .font(.system(size: 15, weight: .medium))
         .foregroundStyle(DashboardColors.subtleText)
       Divider().overlay(DashboardColors.separator)
-      Text(store.codexRadarStatusMessage)
+      Text(statusMessage)
         .font(.system(size: 11, weight: .medium))
         .foregroundStyle(DashboardColors.subtleText)
         .fixedSize(horizontal: false, vertical: true)
       HStack {
-        Button("重新同步") { store.refreshCodexRadar(force: true) }
-          .disabled(store.codexRadarIsLoading)
+        Button("重新同步") { refresh() }
+          .disabled(isLoading)
         Link("打开数据源", destination: CodexRadarService.siteURL)
       }
       .font(.caption)
@@ -135,7 +190,6 @@ struct CodexRadarView: View {
   }
 
   private var tiboCard: some View {
-    let snapshot = store.codexRadarSnapshot
     let presence = snapshot?.tiboPresence
     let timezoneID = presence?.timezone ?? "America/Los_Angeles"
     return PanelCard {
@@ -143,7 +197,7 @@ struct CodexRadarView: View {
         HStack(alignment: .firstTextBaseline) {
           Text("Tibo 雷达")
             .font(.system(size: 20, weight: .heavy, design: .rounded))
-            .foregroundStyle(store.palette.weekly)
+            .foregroundStyle(palette.weekly)
           Spacer()
           Text("\(presence?.handle ?? "@thsottiaux") · PT")
             .font(.system(size: 11, weight: .semibold))
@@ -153,18 +207,18 @@ struct CodexRadarView: View {
         TiboClockView(
           timezoneID: timezoneID,
           hasRadarData: presence != nil,
-          tint: store.palette.weekly
+          tint: palette.weekly
         )
 
         HStack(alignment: .top, spacing: 13) {
           ZStack {
             Circle()
-              .fill(store.palette.weekly.opacity(0.13))
+              .fill(palette.weekly.opacity(0.13))
             Circle()
-              .stroke(store.palette.weekly.opacity(0.55), lineWidth: 1.5)
+              .stroke(palette.weekly.opacity(0.55), lineWidth: 1.5)
             Image(systemName: "person.fill")
               .font(.system(size: 22, weight: .semibold))
-              .foregroundStyle(store.palette.weekly)
+              .foregroundStyle(palette.weekly)
           }
           .frame(width: 52, height: 52)
 
@@ -187,6 +241,12 @@ struct CodexRadarView: View {
 
         latestTiboUpdate(snapshot: snapshot, presence: presence)
 
+        if let posts = snapshot?.tiboFeed?.posts,
+           displayPosts(from: posts).isEmpty == false {
+          Divider().overlay(DashboardColors.separator)
+          tiboPosts(posts)
+        }
+
         HStack {
           Link(CodexRadarService.attributionText, destination: CodexRadarService.siteURL)
           Spacer()
@@ -195,6 +255,92 @@ struct CodexRadarView: View {
         .font(.system(size: 9, weight: .medium))
         .foregroundStyle(DashboardColors.subtleText)
       }
+    }
+  }
+
+  private func tiboPosts(_ posts: [CodexRadarTiboPost]) -> some View {
+    VStack(alignment: .leading, spacing: 10) {
+      HStack {
+        Text("重置相关 Posts / Replies")
+          .font(.system(size: 12, weight: .bold))
+          .foregroundStyle(palette.weekly)
+        Spacer()
+        Text("只读公开动态")
+          .font(.system(size: 9, weight: .semibold))
+          .foregroundStyle(DashboardColors.subtleText)
+      }
+
+      ForEach(displayPosts(from: posts)) { post in
+        VStack(alignment: .leading, spacing: 5) {
+          HStack(spacing: 7) {
+            Text(post.kindLabel)
+              .font(.system(size: 9, weight: .bold, design: .rounded))
+              .padding(.horizontal, 7)
+              .padding(.vertical, 3)
+              .background(palette.weekly.opacity(0.12), in: Capsule())
+            Text(post.relevanceLabel)
+              .font(.system(size: 9, weight: .bold))
+              .foregroundStyle(relevanceTint(post.relevance))
+            Spacer()
+            if let date = post.publishedAt {
+              Text(radarUpdateTime(date))
+                .font(.system(size: 9, weight: .medium, design: .rounded))
+                .foregroundStyle(DashboardColors.subtleText)
+            }
+            if let url = post.url {
+              Link(destination: url) {
+                Image(systemName: "arrow.up.right.square")
+              }
+              .help("打开 Tibo X 原帖")
+            }
+          }
+          Text(post.originalText)
+            .font(.system(size: 11, weight: .semibold))
+            .textSelection(.enabled)
+          if let translation = post.translationZh, translation.isEmpty == false {
+            Text(translation)
+              .font(.system(size: 10, weight: .medium))
+              .foregroundStyle(DashboardColors.subtleText)
+              .textSelection(.enabled)
+          }
+          if let analysis = post.analysisZh, analysis.isEmpty == false {
+            Text(analysis)
+              .font(.system(size: 9, weight: .medium))
+              .foregroundStyle(DashboardColors.subtleText)
+              .lineSpacing(2)
+              .lineLimit(2)
+          }
+        }
+        .padding(10)
+        .background(DashboardColors.faintFill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+      }
+    }
+  }
+
+  private func displayPosts(from posts: [CodexRadarTiboPost]) -> [CodexRadarTiboPost] {
+    let relevantPosts = posts.filter(\.isResetRelevantForDisplay)
+    var selected = Array(relevantPosts.prefix(2))
+    if let strong = relevantPosts.first(where: { post in
+      post.isStrongResetSignal
+        && selected.contains(where: { selectedPost in selectedPost.id == post.id }) == false
+    }) {
+      selected.append(strong)
+    }
+    if selected.count < 3,
+       let next = relevantPosts.first(where: { post in
+         selected.contains(where: { $0.id == post.id }) == false
+       }) {
+      selected.append(next)
+    }
+    return Array(selected.prefix(3))
+  }
+
+  private func relevanceTint(_ relevance: String) -> Color {
+    switch relevance.lowercased() {
+    case "official", "direct", "high": .green
+    case "medium": .orange
+    case "indirect": .yellow
+    default: DashboardColors.subtleText
     }
   }
 
@@ -209,15 +355,15 @@ struct CodexRadarView: View {
       presenceActivityAt.map { judgement.updatedAt > $0 } ?? true
     } ?? false
     let activity = usesPublicJudgement ? publicJudgement?.summary : presence?.latestActivityZh
-    let fallback = snapshot?.latestSummary
+    let fallback = usesPublicJudgement ? snapshot?.latestSummary : nil
     let activityDate = usesPublicJudgement ? publicJudgement?.updatedAt : presenceActivityAt
     VStack(alignment: .leading, spacing: 7) {
       HStack {
         Text(usesPublicJudgement || activity == nil ? "最新研判" : "最新动态")
           .font(.system(size: 12, weight: .bold))
-          .foregroundStyle(store.palette.weekly)
+          .foregroundStyle(palette.weekly)
         Spacer()
-        if let date = activityDate ?? snapshot?.latestUpdate {
+        if let date = activityDate {
           Text(date.formatted(.dateTime.month().day().hour().minute()))
             .font(.system(size: 10, weight: .medium, design: .rounded))
             .foregroundStyle(DashboardColors.subtleText)
@@ -232,9 +378,9 @@ struct CodexRadarView: View {
   }
 
   private func radarGraphic(_ snapshot: CodexRadarSnapshot?) -> some View {
-    let rawProbability = snapshot?.prediction?.probability24h
+    let rawProbability = snapshot?.displayProbability24h
     let probability = min(1, max(0, rawProbability ?? 0))
-    let tint = probabilityTint(snapshot?.prediction?.level)
+    let tint = probabilityTint(snapshot?.localResetEstimate?.level ?? snapshot?.prediction?.level)
     return ZStack {
       ForEach([0.28, 0.52, 0.76, 1.0], id: \.self) { scale in
         Circle()
@@ -267,7 +413,7 @@ struct CodexRadarView: View {
       .foregroundStyle(tint)
     }
     .accessibilityElement(children: .ignore)
-    .accessibilityLabel("Codex 24 小时重置概率")
+    .accessibilityLabel("Codex 24 小时全局硬重置概率")
     .accessibilityValue(rawProbability == nil ? "等待数据" : "\(Int((probability * 100).rounded()))%")
   }
 
@@ -286,11 +432,11 @@ struct CodexRadarView: View {
 
   private func probabilityTint(_ level: String?) -> Color {
     switch level?.lowercased() {
-    case "very_high", "high": store.palette.weekly
+    case "very_high", "high": palette.weekly
     case "medium_high", "medium": .orange
     case "medium_low": .yellow
-    case "low", "very_low": store.palette.usage24h
-    default: store.palette.weekly
+    case "low", "very_low": palette.usage24h
+    default: palette.weekly
     }
   }
 

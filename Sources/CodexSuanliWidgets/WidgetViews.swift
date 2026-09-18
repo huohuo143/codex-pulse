@@ -6,7 +6,9 @@ import WidgetKit
 
 struct CodexOverviewWidgetView: View {
   let entry: CodexWidgetEntry
-  @Environment(\.widgetFamily) private var family
+  @Environment(\.widgetFamily) private var systemFamily
+  @Environment(\.codexWidgetFamilyOverride) private var familyOverride
+  private var family: WidgetFamily { familyOverride ?? systemFamily }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 8) {
@@ -16,7 +18,7 @@ struct CodexOverviewWidgetView: View {
         VStack(alignment: .leading, spacing: 6) {
           KeyValueRow(
             title: "滚动 24h",
-            value: BalanceFormatters.compactNumber(entry.snapshot.rolling24HoursTokens),
+            value: (entry.snapshot.usageState(at: entry.date).canDisplayValue ? BalanceFormatters.compactNumber(entry.snapshot.rolling24HoursTokens) : "--"),
             tint: CodexWidgetTheme.usage
           )
           KeyValueRow(
@@ -34,11 +36,12 @@ struct CodexOverviewWidgetView: View {
       }
       if family == .systemLarge {
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 7), count: 4), spacing: 7) {
-          MetricTile(title: "今日", value: entry.snapshot.todayTokens, tint: CodexWidgetTheme.usage, compact: true)
-          MetricTile(title: "近 7 天", value: entry.snapshot.last7DaysTokens, tint: CodexWidgetTheme.weekly, compact: true)
-          MetricTile(title: "本月", value: entry.snapshot.monthTokens, tint: CodexWidgetTheme.text, compact: true)
-          CurrencyTile(title: "月度等价", usd: entry.snapshot.costMonthUSD, cnyRate: entry.snapshot.cnyRate)
+          MetricTile(title: "今日", value: entry.snapshot.usageState(at: entry.date).canDisplayValue ? entry.snapshot.todayTokens : nil, tint: CodexWidgetTheme.usage, compact: true)
+          MetricTile(title: "近 7 天", value: entry.snapshot.usageState(at: entry.date).canDisplayValue ? entry.snapshot.last7DaysTokens : nil, tint: CodexWidgetTheme.weekly, compact: true)
+          MetricTile(title: "本月", value: entry.snapshot.usageState(at: entry.date).canDisplayValue ? entry.snapshot.monthTokens : nil, tint: CodexWidgetTheme.text, compact: true)
+          CurrencyTile(title: "本月折算", usd: entry.snapshot.costMonthUSD, cnyRate: entry.snapshot.cnyRate, coverage: entry.snapshot.costMonthCoverage)
         }
+        PricingCaption(snapshot: entry.snapshot)
         UsageBars(points: entry.snapshot.hourly24, tint: CodexWidgetTheme.usage, labelStride: 4)
       }
       UpdatedText(entry: entry)
@@ -50,14 +53,17 @@ struct CodexOverviewWidgetView: View {
 
 struct QuotaWidgetView: View {
   let entry: CodexWidgetEntry
-  @Environment(\.widgetFamily) private var family
+  @Environment(\.widgetFamily) private var systemFamily
+  @Environment(\.codexWidgetFamilyOverride) private var familyOverride
+  private var family: WidgetFamily { familyOverride ?? systemFamily }
 
   var body: some View {
     Group {
       if family == .systemSmall {
         VStack(spacing: 7) {
-          QuotaRing(snapshot: entry.snapshot, size: 90)
+          QuotaRing(snapshot: entry.snapshot, size: 80)
           ResetText(snapshot: entry.snapshot)
+          UpdatedText(entry: entry)
         }
       } else {
         HStack(spacing: 18) {
@@ -91,7 +97,9 @@ struct QuotaWidgetView: View {
 
 struct RadarWidgetView: View {
   let entry: CodexWidgetEntry
-  @Environment(\.widgetFamily) private var family
+  @Environment(\.widgetFamily) private var systemFamily
+  @Environment(\.codexWidgetFamilyOverride) private var familyOverride
+  private var family: WidgetFamily { familyOverride ?? systemFamily }
 
   private var probabilityText: String {
     entry.snapshot.resetProbability24h.map { "\($0)%" } ?? "--"
@@ -111,7 +119,7 @@ struct RadarWidgetView: View {
             .font(.system(size: 11, weight: .bold))
             .foregroundStyle(CodexWidgetTheme.text)
             .lineLimit(1)
-          RadarAttribution(updatedAt: entry.snapshot.radarUpdatedAt)
+          RadarAttribution(snapshot: entry.snapshot)
         }
       } else {
         HStack(spacing: 16) {
@@ -136,7 +144,7 @@ struct RadarWidgetView: View {
               .font(.system(size: 10.5, weight: .medium))
               .foregroundStyle(CodexWidgetTheme.subtle)
               .lineLimit(3)
-            RadarAttribution(updatedAt: entry.snapshot.radarUpdatedAt)
+            RadarAttribution(snapshot: entry.snapshot)
           }
         }
       }
@@ -148,7 +156,9 @@ struct RadarWidgetView: View {
 
 struct ResetCreditsWidgetView: View {
   let entry: CodexWidgetEntry
-  @Environment(\.widgetFamily) private var family
+  @Environment(\.widgetFamily) private var systemFamily
+  @Environment(\.codexWidgetFamilyOverride) private var familyOverride
+  private var family: WidgetFamily { familyOverride ?? systemFamily }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 9) {
@@ -169,14 +179,15 @@ struct ResetCreditsWidgetView: View {
           EmptyWidgetText("暂无到期明细")
         }
       } else if entry.snapshot.resetCredits.isEmpty {
-        EmptyWidgetText("官方本次未返回可用权益到期明细")
+        EmptyWidgetText(entry.snapshot.resetCreditsRead?.state(at: entry.date).canDisplayValue == true
+          ? "暂无可用权益到期明细" : "等待重新读取权益明细")
       } else {
         ForEach(Array(entry.snapshot.resetCredits.prefix(3).enumerated()), id: \.offset) { _, credit in
           CreditExpiryRow(credit: credit, compact: false)
         }
       }
       Spacer(minLength: 0)
-      UpdatedText(entry: entry)
+      UpdatedText(entry: entry, domain: .resetCredits)
     }
     .padding(14)
     .codexWidgetBackground()
@@ -185,44 +196,49 @@ struct ResetCreditsWidgetView: View {
 
 struct TokenSummaryWidgetView: View {
   let entry: CodexWidgetEntry
-  @Environment(\.widgetFamily) private var family
+  @Environment(\.widgetFamily) private var systemFamily
+  @Environment(\.codexWidgetFamilyOverride) private var familyOverride
+  private var family: WidgetFamily { familyOverride ?? systemFamily }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 8) {
+    VStack(alignment: .leading, spacing: family == .systemMedium ? 3 : 8) {
       WidgetHeader(title: "Token 汇总", symbol: "sum", tint: CodexWidgetTheme.usage)
       LazyVGrid(columns: [GridItem(.flexible(), spacing: 7), GridItem(.flexible(), spacing: 7)], spacing: 7) {
-        MetricTile(title: "滚动 24h", value: entry.snapshot.rolling24HoursTokens, tint: CodexWidgetTheme.usage, compact: true)
-        MetricTile(title: "今日", value: entry.snapshot.todayTokens, tint: CodexWidgetTheme.usage, compact: true)
-        MetricTile(title: "近 7 天", value: entry.snapshot.last7DaysTokens, tint: CodexWidgetTheme.weekly, compact: true)
-        MetricTile(title: "本月", value: entry.snapshot.monthTokens, tint: CodexWidgetTheme.text, compact: true)
+        MetricTile(title: "滚动 24h", value: entry.snapshot.usageState(at: entry.date).canDisplayValue ? entry.snapshot.rolling24HoursTokens : nil, tint: CodexWidgetTheme.usage, compact: true)
+        MetricTile(title: "今日", value: entry.snapshot.usageState(at: entry.date).canDisplayValue ? entry.snapshot.todayTokens : nil, tint: CodexWidgetTheme.usage, compact: true)
+        MetricTile(title: "近 7 天", value: entry.snapshot.usageState(at: entry.date).canDisplayValue ? entry.snapshot.last7DaysTokens : nil, tint: CodexWidgetTheme.weekly, compact: true)
+        MetricTile(title: "本月", value: entry.snapshot.usageState(at: entry.date).canDisplayValue ? entry.snapshot.monthTokens : nil, tint: CodexWidgetTheme.text, compact: true)
       }
       if family == .systemMedium {
         HStack {
-          Text("API 等价预估")
+          Text("本月折算")
           Spacer()
-          Text(currencyText(entry.snapshot.costMonthUSD, cnyRate: entry.snapshot.cnyRate))
+          Text(currencyText(entry.snapshot.costMonthUSD, cnyRate: entry.snapshot.cnyRate, coverage: entry.snapshot.costMonthCoverage))
             .foregroundStyle(CodexWidgetTheme.credit)
             .monospacedDigit()
         }
         .font(.system(size: 10, weight: .bold))
+        PricingCaption(snapshot: entry.snapshot)
       }
-      UpdatedText(entry: entry)
+      UpdatedText(entry: entry, domain: .usage)
     }
-    .padding(family == .systemSmall ? 12 : 14)
+    .padding(family == .systemSmall ? 12 : 11)
     .codexWidgetBackground()
   }
 }
 
 struct TokenTrendWidgetView: View {
   let entry: CodexWidgetEntry
-  @Environment(\.widgetFamily) private var family
+  @Environment(\.widgetFamily) private var systemFamily
+  @Environment(\.codexWidgetFamilyOverride) private var familyOverride
+  private var family: WidgetFamily { familyOverride ?? systemFamily }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 9) {
       HStack {
         WidgetHeader(title: "滚动 24h 趋势", symbol: "chart.bar.fill", tint: CodexWidgetTheme.usage)
         Spacer()
-        Text(BalanceFormatters.compactNumber(entry.snapshot.rolling24HoursTokens))
+        Text((entry.snapshot.usageState(at: entry.date).canDisplayValue ? BalanceFormatters.compactNumber(entry.snapshot.rolling24HoursTokens) : "--"))
           .font(.system(size: 17, weight: .heavy, design: .rounded))
           .foregroundStyle(CodexWidgetTheme.usage)
       }
@@ -234,7 +250,7 @@ struct TokenTrendWidgetView: View {
           .foregroundStyle(CodexWidgetTheme.subtle)
         UsageBars(points: entry.snapshot.daily14, tint: CodexWidgetTheme.weekly, labelStride: 2)
       }
-      UpdatedText(entry: entry)
+      UpdatedText(entry: entry, domain: .usage)
     }
     .padding(14)
     .codexWidgetBackground()
@@ -251,7 +267,7 @@ struct WorkloadWidgetView: View {
         RankedMetrics(title: "今日项目 Top 3", metrics: entry.snapshot.topProjects, tint: CodexWidgetTheme.usage)
         RankedMetrics(title: "本月用途 Top 3", metrics: entry.snapshot.topCategories, tint: CodexWidgetTheme.weekly)
       }
-      UpdatedText(entry: entry)
+      UpdatedText(entry: entry, domain: .usage)
     }
     .padding(12)
     .codexWidgetBackground()
@@ -306,7 +322,7 @@ private struct QuotaRing: View {
             .font(.system(size: size * 0.27, weight: .heavy, design: .rounded))
             .foregroundStyle(CodexWidgetTheme.weekly)
             .monospacedDigit()
-          Text("7 天剩余")
+          Text(snapshot.quotaRead?.state(at: Date(), resetAt: snapshot.resetsAt) == .cached ? "7 天剩余 · 缓存" : "7 天剩余")
             .font(.system(size: size * 0.085, weight: .bold))
             .foregroundStyle(CodexWidgetTheme.subtle)
         }
@@ -359,7 +375,7 @@ private struct KeyValueRow: View {
 
 private struct MetricTile: View {
   let title: String
-  let value: Int
+  let value: Int?
   let tint: Color
   var compact = false
 
@@ -369,7 +385,7 @@ private struct MetricTile: View {
         .font(.system(size: compact ? 8.5 : 9.5, weight: .bold))
         .foregroundStyle(CodexWidgetTheme.subtle)
         .lineLimit(1)
-      Text(BalanceFormatters.compactNumber(value))
+      Text(value.map(BalanceFormatters.compactNumber) ?? "--")
         .font(.system(size: compact ? 14.5 : 17, weight: .heavy, design: .rounded))
         .foregroundStyle(tint)
         .monospacedDigit()
@@ -386,21 +402,52 @@ private struct CurrencyTile: View {
   let title: String
   let usd: Double
   let cnyRate: Double?
+  var coverage: Double? = nil
 
   var body: some View {
     VStack(alignment: .leading, spacing: 2) {
       Text(title)
         .font(.system(size: 8.5, weight: .bold))
         .foregroundStyle(CodexWidgetTheme.subtle)
-      Text(currencyText(usd, cnyRate: cnyRate))
+      Text(currencyText(usd, cnyRate: nil, coverage: coverage, includeCoverage: false))
         .font(.system(size: 12.5, weight: .heavy, design: .rounded))
         .foregroundStyle(CodexWidgetTheme.credit)
         .lineLimit(1)
         .minimumScaleFactor(0.58)
+      if let coverage, coverage > 0, let cnyRate {
+        Text(String(format: "¥%.0f", usd * cnyRate))
+          .font(.system(size: 8, weight: .semibold, design: .rounded))
+          .foregroundStyle(CodexWidgetTheme.subtle)
+          .lineLimit(1)
+          .minimumScaleFactor(0.58)
+      }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(5)
     .background(Color.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 7))
+  }
+}
+
+private struct PricingCaption: View {
+  let snapshot: CodexWidgetSnapshot
+  private var label: String {
+    let coverage = snapshot.costMonthCoverage.map { "计价覆盖 \(Int($0.rounded()))%" } ?? "计价状态待确认"
+    return "按当前价格表折算 · \(coverage)"
+  }
+  var body: some View {
+    VStack(alignment: .leading, spacing: 1) {
+      Text(label)
+      if let models = snapshot.unpricedModels, !models.isEmpty {
+        Text("未计价：" + models.joined(separator: "、"))
+          .foregroundStyle(CodexWidgetTheme.credit)
+          .help(models.joined(separator: "、"))
+      }
+    }
+    .font(.system(size: 7.5, weight: .medium))
+    .foregroundStyle(CodexWidgetTheme.subtle)
+    .lineLimit(1)
+    .minimumScaleFactor(0.8)
+    .frame(maxWidth: .infinity, alignment: .leading)
   }
 }
 
@@ -424,18 +471,37 @@ private struct ResetText: View {
 }
 
 private struct RadarAttribution: View {
-  let updatedAt: Date?
+  let snapshot: CodexWidgetSnapshot
 
   var body: some View {
-    HStack(spacing: 4) {
-      Text("数据来自重置雷达公开源")
-      if let updatedAt {
-        Text("·")
-        Text(updatedAt, style: .relative)
+    VStack(alignment: .leading, spacing: 2) {
+      HStack(spacing: 4) {
+        Image(systemName: snapshot.radarIsStale == true
+          ? "exclamationmark.triangle.fill"
+          : "dot.radiowaves.left.and.right")
+        Text(snapshot.radarSyncStatus ?? "公开源")
       }
+      .font(.system(size: 8.5, weight: .semibold))
+
+      HStack(spacing: 3) {
+        if let checkedAt = snapshot.radarCheckedAt {
+          Text("检")
+          Text(checkedAt, format: .dateTime.hour().minute())
+        }
+        if let sourceAt = snapshot.radarSourceUpdatedAt {
+          Text("· 源")
+          Text(sourceAt, format: .dateTime.hour().minute())
+        }
+        if let evaluatedAt = snapshot.radarEvaluatedAt ?? snapshot.radarUpdatedAt {
+          Text("· 评")
+          Text(evaluatedAt, format: .dateTime.hour().minute())
+        }
+      }
+      .font(.system(size: 7.5, weight: .medium))
+      .monospacedDigit()
+      .minimumScaleFactor(0.65)
     }
-    .font(.system(size: 8.5, weight: .semibold))
-    .foregroundStyle(CodexWidgetTheme.subtle)
+    .foregroundStyle(snapshot.radarIsStale == true ? Color.orange : CodexWidgetTheme.subtle)
     .lineLimit(1)
   }
 }
@@ -549,26 +615,23 @@ private struct RankedMetrics: View {
 }
 
 private struct UpdatedText: View {
+  enum Domain { case quota, resetCredits, usage }
   let entry: CodexWidgetEntry
-
+  var domain: Domain = .quota
+  private var state: DataFreshnessState {
+    switch domain {
+    case .quota: entry.snapshot.quotaRead?.state(at: entry.date, resetAt: entry.snapshot.resetsAt) ?? .unavailable
+    case .resetCredits: entry.snapshot.resetCreditsRead?.state(at: entry.date) ?? .unavailable
+    case .usage: entry.snapshot.usageState(at: entry.date)
+    }
+  }
   var body: some View {
     HStack(spacing: 4) {
-      Circle()
-        .fill(entry.hasLiveData ? CodexWidgetTheme.weekly : Color.orange)
-        .frame(width: 5, height: 5)
-      if entry.hasLiveData {
-        Text("更新")
-        Text(entry.snapshot.updatedAt, style: .relative)
-        if entry.snapshot.deviceCount > 0 {
-          Text("· \(entry.snapshot.deviceCount) 台设备")
-        }
-      } else {
-        Text("打开 Codex 脉动刷新数据")
-      }
+      Circle().fill(state == .fresh ? CodexWidgetTheme.weekly : Color.orange).frame(width: 5, height: 5)
+      Text(entry.hasLiveData ? (domain == .usage && state == .fresh ? "本机日志统计已更新" : state.label) : "状态待确认 · 打开 Codex 脉动")
+      if domain == .usage, let date = entry.snapshot.usageUpdatedAt { Text(date, style: .relative) }
     }
-    .font(.system(size: 8.5, weight: .semibold))
-    .foregroundStyle(CodexWidgetTheme.subtle)
-    .lineLimit(1)
+    .font(.system(size: 8.5, weight: .semibold)).foregroundStyle(CodexWidgetTheme.subtle).lineLimit(1)
   }
 }
 
@@ -581,8 +644,10 @@ private func radarTint(_ probability: Int?) -> Color {
   }
 }
 
-private func currencyText(_ usd: Double, cnyRate: Double?) -> String {
-  let usdText = String(format: "$%.2f", usd)
+private func currencyText(_ usd: Double, cnyRate: Double?, coverage: Double? = nil, includeCoverage: Bool = true) -> String {
+  guard let coverage else { return "计价状态待确认" }
+  guard coverage > 0 else { return "暂无法估算" }
+  let usdText = String(format: "$%.2f", usd) + (includeCoverage && coverage < 100 ? " · 计价\(Int(coverage.rounded()))%" : "")
   guard let cnyRate else { return usdText }
   return "\(usdText) · ¥\(String(format: "%.0f", usd * cnyRate))"
 }

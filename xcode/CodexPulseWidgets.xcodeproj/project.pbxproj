@@ -15,6 +15,7 @@
 		A10000000000000000000007 /* L10nCore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000007 /* L10nCore.swift */; };
 		A10000000000000000000008 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B10000000000000000000008 /* SwiftUI.framework */; };
 		A10000000000000000000009 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B10000000000000000000009 /* WidgetKit.framework */; };
+		A1000000000000000000000B /* DataFreshness.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1000000000000000000000B; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -28,6 +29,7 @@
 		B10000000000000000000008 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		B10000000000000000000009 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		B1000000000000000000000A /* CodexSuanliWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CodexSuanliWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		B1000000000000000000000B /* DataFreshness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ../Sources/CodexBalanceCore/DataFreshness.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -62,6 +64,7 @@
 				B10000000000000000000005 /* WidgetSnapshot.swift */,
 				B10000000000000000000006 /* Formatters.swift */,
 				B10000000000000000000007 /* L10nCore.swift */,
+				B1000000000000000000000B /* DataFreshness.swift */,
 			);
 			name = Sources;
 			sourceTree = "<group>";
@@ -141,6 +144,7 @@
 				A10000000000000000000005 /* WidgetSnapshot.swift in Sources */,
 				A10000000000000000000006 /* Formatters.swift in Sources */,
 				A10000000000000000000007 /* L10nCore.swift in Sources */,
+				A1000000000000000000000B /* DataFreshness.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -156,13 +160,13 @@
 				ARCHS = "$(ARCHS_STANDARD)";
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGN_ENTITLEMENTS = ../config/CodexSuanliWidgets.entitlements;
-				CURRENT_PROJECT_VERSION = 2104;
+				CURRENT_PROJECT_VERSION = 2118;
 				DEFINES_MODULE = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ../config/CodexSuanliWidgets-Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/../Frameworks", "@executable_path/../../../../Frameworks");
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.10.2;
+				MARKETING_VERSION = 2.11.0;
 				OTHER_SWIFT_FLAGS = "$(inherited) -package-name CodexSuanliMeter";
 				PRODUCT_BUNDLE_IDENTIFIER = dev.codex.balance-dashboard.codex.widgets;
 				PRODUCT_NAME = CodexSuanliWidgets;
@@ -179,13 +183,13 @@
 				ARCHS = "$(ARCHS_STANDARD)";
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGN_ENTITLEMENTS = ../config/CodexSuanliWidgets.entitlements;
-				CURRENT_PROJECT_VERSION = 2104;
+				CURRENT_PROJECT_VERSION = 2118;
 				DEFINES_MODULE = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ../config/CodexSuanliWidgets-Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/../Frameworks", "@executable_path/../../../../Frameworks");
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.10.2;
+				MARKETING_VERSION = 2.11.0;
 				OTHER_SWIFT_FLAGS = "$(inherited) -package-name CodexSuanliMeter";
 				PRODUCT_BUNDLE_IDENTIFIER = dev.codex.balance-dashboard.codex.widgets;
 				PRODUCT_NAME = CodexSuanliWidgets;

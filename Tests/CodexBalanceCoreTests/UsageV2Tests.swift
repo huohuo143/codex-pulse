@@ -5,6 +5,37 @@ import Testing
 @Suite("Codex v2 usage, pricing and sync")
 struct UsageV2Tests {
   @Test
+  func flexibleCreditsDecodeLiveBalanceAndConvertToUSD() throws {
+    let fixture = #"{"hasCredits":true,"unlimited":false,"balance":"2500"}"#
+    let balance = try JSONDecoder().decode(CodexFlexibleCreditBalance.self, from: Data(fixture.utf8))
+
+    #expect(balance.hasCredits)
+    #expect(!balance.unlimited)
+    #expect(balance.balanceCredits == 2_500)
+    #expect(balance.amountUSD == 100)
+  }
+
+  @Test
+  func flexibleCreditsAcceptNumericBalance() throws {
+    let fixture = #"{"hasCredits":true,"unlimited":false,"balance":125.5}"#
+    let balance = try JSONDecoder().decode(CodexFlexibleCreditBalance.self, from: Data(fixture.utf8))
+
+    #expect(balance.balanceCredits == 125.5)
+    #expect(balance.amountUSD == 5.02)
+  }
+
+  @Test
+  func flexibleCreditsLiveProbeOnlyWhenExplicitlyEnabled() throws {
+    guard ProcessInfo.processInfo.environment["RUN_LIVE_FLEXIBLE_CREDITS_TEST"] == "1" else { return }
+    let status = try CodexStatusReader().readFast()
+    let balance = try #require(status.flexibleCreditBalance)
+
+    #expect(balance.hasCredits)
+    #expect(balance.balanceCredits == 2_500)
+    #expect(balance.amountUSD == 100)
+  }
+
+  @Test
   func usageCSVIncludesSummaryModelsAndEscapesProjectNames() {
     let stats = TokenStats(
       rolling24HoursTokens: 1_200,
@@ -227,8 +258,8 @@ struct UsageV2Tests {
     )
     let estimate = ModelPricingCatalog.current.estimate(events: [event])
 
-    // 600 * $5/M + 400 * $0.50/M + 200 * $30/M = $0.0092.
-    #expect(abs(estimate.usd - 0.0092) < 0.000_000_1)
+    // 600 * $4/M + 400 * $0.40/M + 200 * $20/M = $0.00656.
+    #expect(abs(estimate.usd - 0.00656) < 0.000_000_1)
     #expect(estimate.pricedTokens == 1_200)
     #expect(!estimate.isPartial)
   }

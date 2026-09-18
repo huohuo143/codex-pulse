@@ -1,4 +1,5 @@
 import SwiftUI
+import WidgetKit
 
 enum CodexWidgetTheme {
   static let weekly = Color(red: 0.18, green: 0.91, blue: 0.72)
@@ -44,5 +45,17 @@ extension View {
     } else {
       background(CodexWidgetBackground())
     }
+  }
+}
+
+// A test-only environment override allows the same real views to be rendered
+// at each supported family without a running WidgetKit host.
+private struct CodexWidgetFamilyOverrideKey: EnvironmentKey {
+  static let defaultValue: WidgetFamily? = nil
+}
+extension EnvironmentValues {
+  var codexWidgetFamilyOverride: WidgetFamily? {
+    get { self[CodexWidgetFamilyOverrideKey.self] }
+    set { self[CodexWidgetFamilyOverrideKey.self] = newValue }
   }
 }

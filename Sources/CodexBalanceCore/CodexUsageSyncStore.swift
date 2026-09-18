@@ -178,6 +178,7 @@ public final class CodexUsageSyncStore: @unchecked Sendable {
   }
 
   private static func resolveSyncRoot(fileManager: FileManager, environment: [String: String]) -> URL? {
+    if let path = environment["CODEX_PULSE_SUPPORT_DIR"] { return URL(fileURLWithPath: path).appendingPathComponent("device-sync") }
     if let override = environment["CODEX_BALANCE_SYNC_DIR"], !override.isEmpty {
       return URL(fileURLWithPath: override).standardizedFileURL
     }

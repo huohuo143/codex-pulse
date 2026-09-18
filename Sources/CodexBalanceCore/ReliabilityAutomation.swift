@@ -72,6 +72,7 @@ public enum ReliabilityAuditor {
   public struct Inputs: Sendable {
     public var lastQuotaRefresh: Date?
     public var hasOfficialQuota: Bool
+    public var quotaState: DataFreshnessState?
     public var lastUsageRefresh: Date?
     public var usageSampleCount: Int
     public var radarUpdatedAt: Date?
@@ -89,8 +90,10 @@ public enum ReliabilityAuditor {
       launchWatcherEnabled: Bool,
       quotaHistoryURL: URL = QuotaHistoryStore.defaultURL,
       projectBudgetsURL: URL = ProjectBudgetStore.defaultURL,
-      widgetSnapshotURL: URL = CodexWidgetSnapshotStore.defaultURL()
+      widgetSnapshotURL: URL = CodexWidgetSnapshotStore.defaultURL(),
+      quotaState: DataFreshnessState? = nil
     ) {
+      self.quotaState = quotaState
       self.lastQuotaRefresh = lastQuotaRefresh
       self.hasOfficialQuota = hasOfficialQuota
       self.lastUsageRefresh = lastUsageRefresh
@@ -108,7 +111,7 @@ public enum ReliabilityAuditor {
     now: Date = Date(),
     fileManager: FileManager = .default
   ) -> ReliabilitySnapshot {
-    let checks = [
+    var checks = [
       freshnessCheck(
         id: .officialQuota,
         title: "官方额度读取",
@@ -162,6 +165,16 @@ public enum ReliabilityAuditor {
         checkedAt: now
       )
     ]
+    if let state = inputs.quotaState {
+      let level: ReliabilityHealthLevel = switch state {
+      case .fresh: .healthy
+      case .cached, .waitingForReset: .warning
+      case .expired: .critical
+      case .unavailable: .unknown
+      }
+      checks[0] = ReliabilityCheck(id: .officialQuota, title: "官方额度读取", level: level,
+        detail: state.label, checkedAt: now)
+    }
     return ReliabilitySnapshot(generatedAt: now, checks: checks)
   }
 
@@ -265,8 +278,7 @@ public struct ReliabilityEvent: Identifiable, Equatable, Codable, Sendable {
 }
 
 public final class ReliabilityEventStore: @unchecked Sendable {
-  public static let defaultURL = FileManager.default.homeDirectoryForCurrentUser
-    .appendingPathComponent("Library/Application Support/CodexSuanliMeter/reliability-events-v1.json")
+  public static let defaultURL = PulsePaths.support.appendingPathComponent("reliability-events-v1.json")
 
   private struct Payload: Codable {
     var schemaVersion: Int
@@ -333,8 +345,7 @@ public struct LocalAutomationResult: Equatable, Sendable {
 }
 
 public final class LocalAutomationArchive: @unchecked Sendable {
-  public static let defaultRoot = FileManager.default.homeDirectoryForCurrentUser
-    .appendingPathComponent("Library/Application Support/CodexSuanliMeter/automation", isDirectory: true)
+  public static let defaultRoot = PulsePaths.support.appendingPathComponent("automation", isDirectory: true)
 
   private let root: URL
   private let fileManager: FileManager

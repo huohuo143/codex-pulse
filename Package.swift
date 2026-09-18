@@ -30,7 +30,7 @@ let package = Package(
     .executable(name: "CodexSuanliWidgets", targets: ["CodexSuanliWidgets"])
   ],
   targets: [
-    .target(name: "CodexBalanceCore"),
+    .target(name: "CodexBalanceCore", resources: [.process("Resources")]),
     .executableTarget(
       name: "CodexBalance",
       dependencies: ["CodexBalanceCore"]
@@ -51,6 +51,12 @@ let package = Package(
     .testTarget(
       name: "CodexBalanceCoreTests",
       dependencies: ["CodexBalanceCore"],
+      swiftSettings: testingFlags,
+      linkerSettings: testingLinkerFlags
+    ),
+    .testTarget(
+      name: "CodexBalanceWidgetViewTests",
+      dependencies: ["CodexSuanliWidgets"],
       swiftSettings: testingFlags,
       linkerSettings: testingLinkerFlags
     ),
