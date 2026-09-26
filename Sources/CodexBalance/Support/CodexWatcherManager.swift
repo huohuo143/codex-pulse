@@ -96,6 +96,7 @@ enum CodexWatcherManager {
       exit 0
     fi
     trap '/bin/rmdir "$WATCH_LOCK_DIR" 2>/dev/null || true' EXIT
+    trap 'exit 0' HUP INT TERM
 
     resolve_dashboard_app() {
       local candidates=(
@@ -120,6 +121,7 @@ enum CodexWatcherManager {
     }
 
     is_codex_running() {
+      /usr/bin/pgrep -f "/ChatGPT[.]app/Contents/MacOS/ChatGPT($| )" >/dev/null 2>&1 ||
       /usr/bin/pgrep -f "Codex.app/Contents/MacOS/Codex" >/dev/null 2>&1 ||
         /usr/bin/pgrep -x "Codex" >/dev/null 2>&1 ||
         /usr/bin/pgrep -f "Contents/Resources/codex app-server" >/dev/null 2>&1
@@ -198,6 +200,8 @@ enum CodexWatcherManager {
     return script.contains("APP_PATH=\(shellQuote(appPath))") &&
       script.contains("resolve_dashboard_app()") &&
       script.contains("is_codex_running()") &&
+      script.contains("/ChatGPT[.]app/Contents/MacOS/ChatGPT") &&
+      script.contains("trap 'exit 0' HUP INT TERM") &&
       script.contains("WATCH_LOCK_DIR=") &&
       script.contains("--background")
   }

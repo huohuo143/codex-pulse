@@ -7,8 +7,8 @@ EXECUTABLE_NAME="CodexSuanliMeter"
 WIDGET_EXECUTABLE_NAME="CodexSuanliWidgets"
 BUNDLE_ID="${CODEX_PULSE_BUNDLE_ID:-dev.codex.balance-dashboard.codex}"
 WIDGET_BUNDLE_ID="$BUNDLE_ID.widgets"
-VERSION="${VERSION:-2.11.0}"
-BUILD_NUMBER="${BUILD_NUMBER:-2118}"
+VERSION="${VERSION:-2.11.1}"
+BUILD_NUMBER="${BUILD_NUMBER:-2119}"
 ARCH="${ARCH:-$(uname -m)}"
 # macOS 13 可运行主应用；桌面小组件只在 macOS 14 及以后提供。发布完整
 # 小组件扩展的独立部署目标保持 macOS 14，不抬高主应用要求。
@@ -49,6 +49,7 @@ WIDGET_ENTITLEMENTS="$ROOT_DIR/config/CodexSuanliWidgets.entitlements"
 WIDGET_XCODE_PROJECT="$ROOT_DIR/xcode/CodexPulseWidgets.xcodeproj"
 WIDGET_DERIVED_DATA="${CODEX_PULSE_WIDGET_DERIVED_DATA:-$ROOT_DIR/.build/xcode-widget-$BUILD_NUMBER-$ARCH}"
 CONFIGURATION="release"
+SWIFT_BUILD_SYSTEM="${CODEX_PULSE_SWIFT_BUILD_SYSTEM:-native}"
 
 codesign_args=(--force --sign "$CODE_SIGN_IDENTITY")
 if [[ "$CODE_SIGN_IDENTITY" != "-" ]]; then
@@ -75,28 +76,39 @@ if [[ "${OPEN_APP:-1}" != "0" ]]; then
 fi
 
 cd "$ROOT_DIR"
-swift build -j 1 --disable-index-store -c "$CONFIGURATION" --arch "$ARCH" --scratch-path "$SWIFT_SCRATCH_PATH" --product "$EXECUTABLE_NAME"
-BUILD_DIR="$(swift build -c "$CONFIGURATION" --arch "$ARCH" --scratch-path "$SWIFT_SCRATCH_PATH" --show-bin-path)"
+swift build --build-system "$SWIFT_BUILD_SYSTEM" -j 1 --disable-index-store -c "$CONFIGURATION" --arch "$ARCH" --scratch-path "$SWIFT_SCRATCH_PATH" --product "$EXECUTABLE_NAME"
+BUILD_DIR="$(swift build --build-system "$SWIFT_BUILD_SYSTEM" -c "$CONFIGURATION" --arch "$ARCH" --scratch-path "$SWIFT_SCRATCH_PATH" --show-bin-path)"
 BUILD_BINARY="$BUILD_DIR/$EXECUTABLE_NAME"
 if [[ "$INCLUDE_WIDGETS" == "1" ]]; then
-  if [[ "$CONFIGURATION" == "debug" ]]; then
-    WIDGET_XCODE_CONFIGURATION="Debug"
+  if [[ -n "${CODEX_PULSE_PREBUILT_WIDGET:-}" ]]; then
+    # Optional for main-app-only hotfixes. The caller must verify widget source
+    # compatibility; the complete copied extension is still signed and checked.
+    WIDGET_XCODE_BUNDLE="$CODEX_PULSE_PREBUILT_WIDGET"
+    /usr/bin/codesign --verify --strict "$WIDGET_XCODE_BUNDLE"
+    [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$WIDGET_XCODE_BUNDLE/Contents/Info.plist")" == "$WIDGET_BUNDLE_ID" ]] || {
+      echo "Prebuilt widget bundle identifier mismatch." >&2
+      exit 1
+    }
   else
-    WIDGET_XCODE_CONFIGURATION="Release"
+    if [[ "$CONFIGURATION" == "debug" ]]; then
+      WIDGET_XCODE_CONFIGURATION="Debug"
+    else
+      WIDGET_XCODE_CONFIGURATION="Release"
+    fi
+    /usr/bin/xcodebuild \
+      -project "$WIDGET_XCODE_PROJECT" \
+      -scheme "$WIDGET_EXECUTABLE_NAME" \
+      -configuration "$WIDGET_XCODE_CONFIGURATION" \
+      -derivedDataPath "$WIDGET_DERIVED_DATA" \
+      CODE_SIGNING_ALLOWED=NO \
+      MARKETING_VERSION="$VERSION" \
+      CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+      PRODUCT_BUNDLE_IDENTIFIER="$WIDGET_BUNDLE_ID" \
+      ARCHS="$ARCH" \
+      ONLY_ACTIVE_ARCH=YES \
+      build >/dev/null
+    WIDGET_XCODE_BUNDLE="$WIDGET_DERIVED_DATA/Build/Products/$WIDGET_XCODE_CONFIGURATION/$WIDGET_EXECUTABLE_NAME.appex"
   fi
-  /usr/bin/xcodebuild \
-    -project "$WIDGET_XCODE_PROJECT" \
-    -scheme "$WIDGET_EXECUTABLE_NAME" \
-    -configuration "$WIDGET_XCODE_CONFIGURATION" \
-    -derivedDataPath "$WIDGET_DERIVED_DATA" \
-    CODE_SIGNING_ALLOWED=NO \
-    MARKETING_VERSION="$VERSION" \
-    CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
-    PRODUCT_BUNDLE_IDENTIFIER="$WIDGET_BUNDLE_ID" \
-    ARCHS="$ARCH" \
-    ONLY_ACTIVE_ARCH=YES \
-    build >/dev/null
-  WIDGET_XCODE_BUNDLE="$WIDGET_DERIVED_DATA/Build/Products/$WIDGET_XCODE_CONFIGURATION/$WIDGET_EXECUTABLE_NAME.appex"
 fi
 
 rm -rf "$APP_BUNDLE"
@@ -120,6 +132,8 @@ if [[ "$INCLUDE_WIDGETS" == "1" ]]; then
   WIDGET_CONTENTS="$WIDGET_BUNDLE/Contents"
   mkdir -p "$APP_CONTENTS/PlugIns"
   /usr/bin/ditto --noextattr --norsrc "$WIDGET_XCODE_BUNDLE" "$WIDGET_BUNDLE"
+  /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$WIDGET_CONTENTS/Info.plist"
+  /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$WIDGET_CONTENTS/Info.plist"
   mkdir -p "$WIDGET_CONTENTS/Resources"
   cp "$ICON_PATH" "$WIDGET_CONTENTS/Resources/AppIcon.icns"
 fi

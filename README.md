@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-2.11.0-8b7cff">
+  <img alt="Version" src="https://img.shields.io/badge/version-2.11.1-8b7cff">
   <img alt="macOS" src="https://img.shields.io/badge/macOS-13%2B-111827?logo=apple">
   <img alt="Mac architectures" src="https://img.shields.io/badge/Mac-arm64%20%7C%20x86__64-111827">
   <img alt="Swift" src="https://img.shields.io/badge/Swift-6.0-f05138?logo=swift&logoColor=white">
@@ -18,7 +18,11 @@
 
 `Codex 脉动` 将 Codex 的额度、Token 消耗、重置节奏和 Full reset 权益集中到一套原生 macOS 界面中。它既可以作为常驻悬浮框，也可以完全隐藏悬浮框，仅使用主窗口或 7 款桌面小组件。
 
-> 当前发行版本：`2.11.0` build 2118。主应用兼容 macOS 13；桌面小组件要求 macOS 14 或更高版本；本地构建为 ad-hoc 签名、未公证版本。
+> 当前发行版本：`2.11.1` build 2119。主应用兼容 macOS 13；桌面小组件要求 macOS 14 或更高版本；本地构建为 ad-hoc 签名、未公证版本。
+
+## 2.11.1 额度兼容性修复
+
+修复新版 Codex/ChatGPT 更新后官方额度和灵活额度不显示的问题，并兼容新的自动启动进程名称。详见 [2.11.1 改版说明](docs/RELEASE_2.11.1.md)。
 
 ## 当前版本界面
 
@@ -163,11 +167,11 @@ flowchart LR
 在 [Releases](https://github.com/huohuo143/codex-pulse/releases) 下载：
 
 ```text
-Codex-Pulse-v2.11.0-build2118-20260906-arm64.dmg
-Codex-Pulse-v2.11.0-build2118-20260906-arm64.dmg.sha256
+Codex-Pulse-v2.11.1-build2119-20260926-arm64.dmg
+Codex-Pulse-v2.11.1-build2119-20260926-arm64.dmg.sha256
 ```
 
-本次 2.11.0 提供 Apple Silicon（arm64）安装包；Intel Mac 可从源码构建，或在历史 Releases 中选择对应的 x86_64 包。
+本次 2.11.1 提供 Apple Silicon（arm64）安装包；Intel Mac 可从源码构建，或在历史 Releases 中选择对应的 x86_64 包。
 
 1. 打开 DMG。
 2. 将 `Codex 脉动.app` 拖入 Applications；也可以运行 DMG 内的“安装或更新（保留设置）.command”，备份旧版本并保留原有设置。
@@ -178,7 +182,7 @@ Codex-Pulse-v2.11.0-build2118-20260906-arm64.dmg.sha256
 
 ## 与旧版并行
 
-| 项目 | Codex 脉动 2.11.0 | 旧算力码表 0.1.0 |
+| 项目 | Codex 脉动 2.11.1 | 旧算力码表 0.1.0 |
 | --- | --- | --- |
 | App | `Codex 脉动.app` | `算力码表.app` |
 | Bundle ID | `dev.codex.balance-dashboard.codex` | `dev.codex.balance-dashboard` |
@@ -238,7 +242,7 @@ ARCH=arm64 ./script/create_transfer_package.sh
 
 ## 已知边界
 
-- 当前 2.11.0 安装包为 Apple Silicon arm64；历史版本包含 x86_64 包。请下载与 Mac 处理器匹配的文件。安装包采用 ad-hoc 签名且尚未公证。
+- 当前 2.11.1 安装包为 Apple Silicon arm64；历史版本包含 x86_64 包。请下载与 Mac 处理器匹配的文件。安装包采用 ad-hoc 签名且尚未公证。
 - 本地 Token 统计来自 Codex 会话日志，不包含无法在本机日志中观察到的网页端用量。
 - 未知模型不会猜测价格，而会保持“未计价”。
 - WidgetKit 的实际刷新时刻仍受 macOS 桌面小组件预算控制。

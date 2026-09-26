@@ -536,13 +536,39 @@ final class CodexAppServerRateLimitSource: @unchecked Sendable {
     )
   }
 
+  // Finder/LaunchAgent launches do not inherit the desktop app's CLI PATH.
+  // Resolve both current nested CLI bundles and legacy resource layouts directly.
+  static func bundledCodexExecutableURL(
+    applicationDirectories: [URL] = [
+      URL(fileURLWithPath: "/Applications"),
+      FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications")
+    ],
+    fileManager: FileManager = .default
+  ) -> URL? {
+    let relativePaths = [
+      "Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+      "Contents/Resources/codex"
+    ]
+    for directory in applicationDirectories {
+      for appName in ["ChatGPT.app", "Codex.app"] {
+        for relativePath in relativePaths {
+          let candidate = directory.appendingPathComponent(appName).appendingPathComponent(relativePath)
+          var isDirectory: ObjCBool = false
+          if fileManager.fileExists(atPath: candidate.path, isDirectory: &isDirectory),
+             !isDirectory.boolValue, fileManager.isExecutableFile(atPath: candidate.path) {
+            return candidate
+          }
+        }
+      }
+    }
+    return nil
+  }
+
   private static func codexExecutableURL() -> URL? {
     let fm = FileManager.default
     let home = fm.homeDirectoryForCurrentUser.path
+    if let bundled = bundledCodexExecutableURL(fileManager: fm) { return bundled }
     var candidates = [
-      // Codex 2026 起打包进 ChatGPT.app；旧 Codex.app 仍兼容
-      "/Applications/ChatGPT.app/Contents/Resources/codex",
-      "/Applications/Codex.app/Contents/Resources/codex",
       // npm 全局安装（-g）常见位置
       "\(home)/.npm-global/bin/codex",
       "/opt/homebrew/bin/codex",
