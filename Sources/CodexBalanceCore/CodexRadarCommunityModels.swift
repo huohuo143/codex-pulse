@@ -43,18 +43,31 @@ public struct CodexRadarTiboPost: Equatable, Codable, Identifiable, Sendable {
   public var originalText: String
   public var translationZh: String?
   public var analysisZh: String?
+  // Challenge cards may supply a linked public summary without an English
+  // original. Keep its provenance distinct; never score it as original text.
+  public var publicSummaryZh: String? = nil
+
+  public var displayTextZh: String {
+    publicSummaryZh ?? translationZh ?? originalText
+  }
+
+  public var isPublicSummary: Bool {
+    originalText.isEmpty && publicSummaryZh != nil
+  }
 
   public var isReply: Bool {
     originalText.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("@")
   }
 
-  public var kindLabel: String { isReply ? "Reply" : "Post" }
+  public var kindLabel: String { isPublicSummary ? "公开摘要" : (isReply ? "Reply" : "Post") }
 
   public var isStrongResetSignal: Bool {
-    ["official", "direct", "high"].contains(relevance.lowercased())
+    originalText.isEmpty == false
+      && ["official", "direct", "high"].contains(relevance.lowercased())
   }
 
   public var isResetRelevantForDisplay: Bool {
+    guard originalText.isEmpty == false else { return false }
     if ["official", "direct", "high", "medium"].contains(relevance.lowercased()) {
       return true
     }

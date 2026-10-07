@@ -8,6 +8,19 @@ struct CodexRadarTiboHistory: Codable, Sendable {
   var feedUpdatedAt: Date? = nil
   var feedFingerprint: String? = nil
   var consecutiveFailures: Int? = nil
+  // The scoring archive clears at a reset; the last public timeline does not
+  // discard ordinary posts before the UI can display them.
+  var latestPosts: [CodexRadarTiboPost]? = nil
+  var retryNotBefore: Date? = nil
+  var lastFailureMessage: String? = nil
+  var recentSyncAttempts: [CodexRadarSyncAttempt]? = nil
+}
+
+struct CodexRadarSyncAttempt: Codable, Sendable {
+  var startedAt: Date
+  var completedAt: Date
+  var succeeded: Bool
+  var failureMessage: String?
 }
 
 enum CodexRadarTiboHistoryStore {

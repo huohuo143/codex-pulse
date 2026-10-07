@@ -226,8 +226,9 @@ struct CodexRadarTests {
     #expect(snapshot.probability24hPercent == 0)
     #expect(snapshot.probabilityUpdate == now)
     #expect(snapshot.localResetEstimate?.evidenceUpdatedAt == nil)
-    #expect(snapshot.tiboFeed?.posts.count == 1)
-    #expect(snapshot.tiboPresence?.latestActivityZh?.contains("可储存") == true)
+    #expect(snapshot.tiboFeed?.posts.count == 2)
+    #expect(snapshot.tiboPresence?.latestActivityZh?.contains("恭喜") == true)
+    #expect(snapshot.tiboFeed?.posts.contains(where: { $0.translationZh?.contains("可储存") == true }) == true)
     #expect(snapshot.latestSummary?.contains("不等于全局硬重置") == true)
   }
 
@@ -624,7 +625,9 @@ struct CodexRadarTests {
     #expect(snapshot.syncState?.isStale == true)
     #expect(snapshot.syncState?.isUsingCachedFeed == true)
     #expect(snapshot.probability24hPercent == nil)
-    #expect(snapshot.latestLevelLabel == "数据过期")
+    #expect(snapshot.syncState?.lastSuccessAt == nil)
+    #expect(snapshot.latestLevelLabel == "等待数据")
+    #expect(snapshot.latestSummary?.contains("90 分钟") == false)
   }
 
   @Test

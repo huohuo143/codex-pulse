@@ -188,7 +188,8 @@ public struct CodexWidgetSnapshot: Codable, Equatable, Sendable {
     }
     if schemaVersion < 4 || radarIsStale == true || radarLastSuccessAt.map({ now.timeIntervalSince($0) > 90 * 60 }) != false || radarValidUntil.map({ $0 <= now }) == true {
       result.resetProbability24h = nil
-      result.radarLevel = "数据过期"
+      result.radarLevel = radarLastSuccessAt == nil && (radarConsecutiveFailures ?? 0) > 0
+        ? "等待数据" : "数据过期"
     }
     if !usageState(at: now).canDisplayValue {
       result.hourly24 = []; result.daily14 = []; result.topProjects = []; result.topCategories = []

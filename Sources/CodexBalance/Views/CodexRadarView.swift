@@ -11,11 +11,12 @@ struct CodexRadarView: View {
   @AppStorage("radarDetailsExpanded") private var detailsExpanded = false
   @AppStorage("radarCommunityExpanded") private var communityExpanded = false
   @AppStorage("radarScoringExpanded") private var scoringExpanded = false
+  @State private var allTiboPostsExpanded = false
 
   var body: some View {
     VStack(spacing: 14) {
       resetOverviewCard
-      DisclosureGroup("原帖与翻译", isExpanded: $detailsExpanded) { tiboCard }
+      DisclosureGroup("动态、原帖与翻译", isExpanded: $detailsExpanded) { tiboCard }
       DisclosureGroup("模型效率与社区推荐", isExpanded: $communityExpanded) { CodexRadarCommunityView(snapshot: snapshot) }
     }
   }
@@ -139,6 +140,11 @@ struct CodexRadarView: View {
               Text("当前无有效硬重置证据")
             }
           }
+          if let failure = sync.failureMessage {
+            Text(failure)
+              .foregroundStyle(.orange)
+              .fixedSize(horizontal: false, vertical: true)
+          }
         }
         .font(.system(size: 9, weight: .medium, design: .rounded))
         .foregroundStyle(DashboardColors.subtleText)
@@ -250,7 +256,7 @@ struct CodexRadarView: View {
         HStack {
           Link(CodexRadarService.attributionText, destination: CodexRadarService.siteURL)
           Spacer()
-          Text("仅显示 Codex 相关内容")
+          Text("公开源收录的动态")
         }
         .font(.system(size: 9, weight: .medium))
         .foregroundStyle(DashboardColors.subtleText)
@@ -261,7 +267,7 @@ struct CodexRadarView: View {
   private func tiboPosts(_ posts: [CodexRadarTiboPost]) -> some View {
     VStack(alignment: .leading, spacing: 10) {
       HStack {
-        Text("重置相关 Posts / Replies")
+        Text("最新 Posts / Replies")
           .font(.system(size: 12, weight: .bold))
           .foregroundStyle(palette.weekly)
         Spacer()
@@ -294,7 +300,7 @@ struct CodexRadarView: View {
               .help("打开 Tibo X 原帖")
             }
           }
-          Text(post.originalText)
+          Text(post.isPublicSummary ? post.displayTextZh : post.originalText)
             .font(.system(size: 11, weight: .semibold))
             .textSelection(.enabled)
           if let translation = post.translationZh, translation.isEmpty == false {
@@ -314,25 +320,19 @@ struct CodexRadarView: View {
         .padding(10)
         .background(DashboardColors.faintFill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
       }
+      if posts.count > 3 {
+        Button(allTiboPostsExpanded ? "收起动态" : "查看全部 \(posts.count) 条动态") {
+          allTiboPostsExpanded.toggle()
+        }
+        .font(.system(size: 11, weight: .semibold))
+        .buttonStyle(.plain)
+        .foregroundStyle(palette.weekly)
+      }
     }
   }
 
   private func displayPosts(from posts: [CodexRadarTiboPost]) -> [CodexRadarTiboPost] {
-    let relevantPosts = posts.filter(\.isResetRelevantForDisplay)
-    var selected = Array(relevantPosts.prefix(2))
-    if let strong = relevantPosts.first(where: { post in
-      post.isStrongResetSignal
-        && selected.contains(where: { selectedPost in selectedPost.id == post.id }) == false
-    }) {
-      selected.append(strong)
-    }
-    if selected.count < 3,
-       let next = relevantPosts.first(where: { post in
-         selected.contains(where: { $0.id == post.id }) == false
-       }) {
-      selected.append(next)
-    }
-    return Array(selected.prefix(3))
+    allTiboPostsExpanded ? posts : Array(posts.prefix(3))
   }
 
   private func relevanceTint(_ relevance: String) -> Color {
@@ -349,14 +349,12 @@ struct CodexRadarView: View {
     snapshot: CodexRadarSnapshot?,
     presence: CodexRadarTiboPresence?
   ) -> some View {
-    let publicJudgement = snapshot?.publicJudgement
-    let presenceActivityAt = presence?.latestActivityAt
-    let usesPublicJudgement = publicJudgement.map { judgement in
-      presenceActivityAt.map { judgement.updatedAt > $0 } ?? true
-    } ?? false
-    let activity = usesPublicJudgement ? publicJudgement?.summary : presence?.latestActivityZh
-    let fallback = usesPublicJudgement ? snapshot?.latestSummary : nil
-    let activityDate = usesPublicJudgement ? publicJudgement?.updatedAt : presenceActivityAt
+    let latest = snapshot?.tiboFeed?.posts.first
+    let activity = latest?.displayTextZh ?? presence?.latestActivityZh
+    let usesPublicJudgement = activity == nil
+    let fallback = snapshot?.publicJudgement?.summary ?? snapshot?.latestSummary
+    let activityDate = latest?.publishedAt ?? presence?.latestActivityAt
+      ?? snapshot?.publicJudgement?.updatedAt
     VStack(alignment: .leading, spacing: 7) {
       HStack {
         Text(usesPublicJudgement || activity == nil ? "最新研判" : "最新动态")

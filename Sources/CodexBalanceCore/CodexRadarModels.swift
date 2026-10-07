@@ -55,6 +55,7 @@ public struct CodexRadarSnapshot: Equatable, Decodable, Sendable {
   }
 
   public var latestLevelLabel: String {
+    if syncState?.isWaitingForFirstFeed == true { return "等待数据" }
     if syncState?.isStale == true { return "数据过期" }
     if let localResetEstimate {
       return localResetEstimate.levelLabel
@@ -66,6 +67,9 @@ public struct CodexRadarSnapshot: Equatable, Decodable, Sendable {
   }
 
   public var latestSummary: String? {
+    if syncState?.isWaitingForFirstFeed == true {
+      return "尚未成功读取 Tibo 公开动态，已安排自动重连；取得数据后再评估重置概率。"
+    }
     if syncState?.isStale == true {
       return "Tibo 公开源已连续 90 分钟未成功同步，已停止展示缓存概率。"
     }
@@ -97,6 +101,7 @@ public struct CodexRadarSyncState: Equatable, Codable, Sendable {
   public var isUsingCachedFeed: Bool
   public var isStale: Bool
   public var failureMessage: String?
+  public var retryNotBefore: Date? = nil
 
   public init(
     lastAttemptAt: Date? = nil,
@@ -105,7 +110,8 @@ public struct CodexRadarSyncState: Equatable, Codable, Sendable {
     consecutiveFailures: Int = 0,
     isUsingCachedFeed: Bool = false,
     isStale: Bool = false,
-    failureMessage: String? = nil
+    failureMessage: String? = nil,
+    retryNotBefore: Date? = nil
   ) {
     self.lastAttemptAt = lastAttemptAt
     self.lastSuccessAt = lastSuccessAt
@@ -114,9 +120,15 @@ public struct CodexRadarSyncState: Equatable, Codable, Sendable {
     self.isUsingCachedFeed = isUsingCachedFeed
     self.isStale = isStale
     self.failureMessage = failureMessage
+    self.retryNotBefore = retryNotBefore
+  }
+
+  public var isWaitingForFirstFeed: Bool {
+    lastSuccessAt == nil && consecutiveFailures > 0
   }
 
   public var statusLabel: String {
+    if isWaitingForFirstFeed { return "等待数据·自动重连中" }
     if isStale { return "数据过期" }
     if isUsingCachedFeed { return "使用缓存·自动重试中" }
     return "同步正常"

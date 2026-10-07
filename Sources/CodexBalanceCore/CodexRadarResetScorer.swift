@@ -1,5 +1,32 @@
 import Foundation
 
+enum CodexRadarTiboTimeline {
+  static func mergedPosts(
+    current: [CodexRadarTiboPost],
+    previous: [CodexRadarTiboPost] = [],
+    now: Date
+  ) -> [CodexRadarTiboPost] {
+    var postsByID: [String: CodexRadarTiboPost] = [:]
+    for post in current + previous {
+      if let date = post.publishedAt, date > now.addingTimeInterval(60 * 60) { continue }
+      if let existing = postsByID[post.id] {
+        // A linked summary must not replace a previously fetched original.
+        if existing.isPublicSummary && post.originalText.isEmpty == false {
+          postsByID[post.id] = post
+        }
+      } else {
+        postsByID[post.id] = post
+      }
+    }
+    return postsByID.values.sorted { lhs, rhs in
+      if lhs.publishedAt != rhs.publishedAt {
+        return (lhs.publishedAt ?? .distantPast) > (rhs.publishedAt ?? .distantPast)
+      }
+      return lhs.id > rhs.id
+    }
+  }
+}
+
 enum CodexRadarVerifiedTiboSignals {
   static let shippingSignalID = "2082655731204096275"
 
@@ -25,7 +52,9 @@ enum CodexRadarVerifiedTiboSignals {
         return abs(date.timeIntervalSince(resetAt)) < 1
           && isDeferredNextCycleSignal(post)
       }
-      .filter(\.isResetRelevantForDisplay)
+      // Evaluate every original in the current reset cycle. An upstream
+      // display label cannot decide which wording the semantic scorer sees.
+      .filter { $0.originalText.isEmpty == false }
       .filter { seen.insert($0.id).inserted }
       .sorted { lhs, rhs in
         switch (lhs.publishedAt, rhs.publishedAt) {

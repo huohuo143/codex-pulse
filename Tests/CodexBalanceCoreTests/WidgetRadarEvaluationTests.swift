@@ -4,6 +4,23 @@ import Testing
 
 @Suite("Independent widget states and radar evaluation")
 struct WidgetRadarEvaluationTests {
+  @Test func coldStartRadarWaitIsPreservedUntilARealFeedSucceeds() {
+    let now = Date(timeIntervalSince1970: 1_800_000_000)
+    var value = CodexWidgetSnapshot(updatedAt: now)
+    value.resetProbability24h = 40
+    value.radarLevel = "等待数据"
+    value.radarSyncStatus = "等待数据·自动重连中"
+    value.radarConsecutiveFailures = 1
+    value.radarIsUsingCachedFeed = true
+    value.radarIsStale = true
+    let waiting = value.effective(at: now)
+    #expect(waiting.resetProbability24h == nil)
+    #expect(waiting.radarLevel == "等待数据")
+    #expect(waiting.radarSyncStatus == "等待数据·自动重连中")
+    value.radarLastSuccessAt = now.addingTimeInterval(-91 * 60)
+    #expect(value.effective(at: now).radarLevel == "数据过期")
+  }
+
   @Test func contentChangesOnlyReloadRelatedKinds() {
     let original = CodexWidgetSnapshot(updatedAt: Date())
     var next = original

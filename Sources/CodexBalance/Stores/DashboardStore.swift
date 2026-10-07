@@ -1,6 +1,7 @@
 import AppKit
 import CodexBalanceCore
 import Foundation
+import Network
 import OSLog
 import SwiftUI
 import UniformTypeIdentifiers
@@ -209,7 +210,7 @@ final class DashboardStore: ObservableObject {
   let fastReader = CodexStatusReader()
   let fullReader = CodexStatusReader()
   let exchangeRateService: ExchangeRateService
-  let codexRadarService = CodexRadarService()
+  let codexRadarService: CodexRadarService
   let radarEvaluationArchive = RadarEvaluationArchive()
   var quotaHistoryStore = QuotaHistoryStore()
   let creditExpiryStore = CreditExpiryStore()
@@ -238,6 +239,8 @@ final class DashboardStore: ObservableObject {
   var codexRadarEvaluationTimer: Timer?
   var codexRadarRetryTask: Task<Void, Never>?
   var codexRadarRefreshGate = CodexRadarRefreshGate()
+  var codexRadarNetworkMonitor: NWPathMonitor?
+  var codexRadarNetworkRecoveryGate = CodexRadarNetworkRecoveryGate()
   var reliabilityTimer: Timer?
   var appUpdateTimer: Timer?
   var fullRefreshInFlight = false
@@ -257,7 +260,8 @@ final class DashboardStore: ObservableObject {
   var lastAutomaticRecoveryAt: Date?
   var automaticRecoveryAttempts = 0
 
-  init(startServices: Bool = true) {
+  init(startServices: Bool = true, radarService: CodexRadarService = CodexRadarService()) {
+    codexRadarService = radarService
     servicesEnabled = startServices
     let defaults = PulsePreferences.shared
     quotaAlertsEnabled = defaults.object(forKey: "quotaAlertsEnabled") as? Bool ?? false
@@ -360,6 +364,7 @@ final class DashboardStore: ObservableObject {
   }
 
   func startAutoRefresh() {
+    installCodexRadarNetworkMonitor()
     if refreshTimer == nil {
       recordRuntimeEvent("started")
       refresh()
@@ -416,6 +421,9 @@ final class DashboardStore: ObservableObject {
   }
 
   func stopAutoRefresh() {
+    codexRadarNetworkMonitor?.cancel()
+    codexRadarNetworkMonitor = nil
+    codexRadarNetworkRecoveryGate = CodexRadarNetworkRecoveryGate()
     refreshTimer?.invalidate()
     refreshTimer = nil
     codexRadarRefreshTimer?.invalidate()

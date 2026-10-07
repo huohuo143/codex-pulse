@@ -51,15 +51,71 @@ enum CodexRadarPublicPageParser {
       throw CodexRadarError.invalidPayload
     }
 
-    if let sectionStart = html.range(of: #"<section class="reset-judgement""#) {
-      return try decodeJudgementSection(in: html, from: sectionStart, now: now)
+    let page: CodexRadarPublicPageSnapshot
+    if let sectionStart = sectionStart(className: "reset-judgement", in: html) {
+      page = try decodeJudgementSection(in: html, from: sectionStart, now: now)
+    } else if let sectionStart = sectionStart(className: "desktop-tibo-radar", in: html) {
+      page = try decodeTiboOnlySection(in: html, from: sectionStart)
+    } else {
+      throw CodexRadarError.invalidPayload
     }
+    return includeChallengeUpdates(in: html, page: page, now: now)
+  }
 
-    if let sectionStart = html.range(of: #"<section class="desktop-tibo-radar""#) {
-      return try decodeTiboOnlySection(in: html, from: sectionStart)
+  private static func includeChallengeUpdates(
+    in html: String,
+    page: CodexRadarPublicPageSnapshot,
+    now: Date
+  ) -> CodexRadarPublicPageSnapshot {
+    guard let start = sectionStart(id: "tibo-challenge", in: html),
+          let end = html.range(of: "</section>", range: start.upperBound..<html.endIndex)
+    else { return page }
+
+    let section = String(html[start.lowerBound..<end.upperBound])
+    let summaries = matches(#"<article\b[^>]*>.*?</article>"#, in: section).compactMap { article -> CodexRadarTiboPost? in
+      guard let urlText = attribute("href", in: article),
+            let url = URL(string: urlText),
+            let id = url.pathComponents.last,
+            id.allSatisfy(\.isNumber),
+            isVerifiedTiboURL(url, postID: id),
+            let publishedAt = timeDate(in: article),
+            publishedAt <= now.addingTimeInterval(60 * 60),
+            let title = capture(#"<h3\b[^>]*>(.*?)</h3>"#, in: article).map(cleanText),
+            let summary = capture(#"<p\b[^>]*>(.*?)</p>"#, in: article).map(cleanText),
+            title.isEmpty == false, summary.isEmpty == false
+      else { return nil }
+
+      // The challenge card is a public editorial summary linked to a Tibo
+      // status. Do not fabricate an English original or score its paraphrase.
+      return CodexRadarTiboPost(
+        id: id,
+        url: url,
+        publishedAt: publishedAt,
+        relevance: "none",
+        relevanceLabel: "挑战进展",
+        originalText: "",
+        translationZh: nil,
+        analysisZh: "公开页面摘要；英文全文请查看原帖。摘要不作为重置承诺计分。",
+        publicSummaryZh: "\(title)：\(summary)"
+      )
     }
+    guard summaries.isEmpty == false else { return page }
 
-    throw CodexRadarError.invalidPayload
+    var enriched = page
+    enriched.tiboFeed.posts = CodexRadarTiboTimeline.mergedPosts(
+      current: page.tiboFeed.posts,
+      previous: summaries,
+      now: now
+    )
+    enriched.tiboFeed.updatedAt = [
+      page.tiboFeed.updatedAt,
+      enriched.tiboFeed.posts.first?.publishedAt
+    ].compactMap { $0 }.max()
+    if page.judgement.kind == "Tibo 动态", let updatedAt = enriched.tiboFeed.updatedAt {
+      enriched.judgement.updatedAt = updatedAt
+      enriched.judgement.summary = "已读取公开页面收录的 Tibo 动态与挑战进展；重置概率只根据有效重置证据本地估算。"
+    }
+    return enriched
   }
 
   private static func decodeJudgementSection(
@@ -161,7 +217,7 @@ enum CodexRadarPublicPageParser {
         kind: "Tibo 动态",
         level: nil,
         headline: "根据 Tibo 公开动态本地估算",
-        summary: "已读取 Tibo 最新公开 Posts / Replies；重置概率由 App 本地规则计算。"
+        summary: "已读取公开页面收录的 Tibo Posts / Replies；重置概率由 App 本地规则计算。"
       ),
       eventKind: nil,
       eventStatus: nil,
@@ -191,8 +247,7 @@ enum CodexRadarPublicPageParser {
     return CodexRadarTiboPost(
       id: id,
       url: url,
-      publishedAt: capture(#"<time\b[^>]*datetime="([^"]+)""#, in: html)
-        .flatMap(parseISO8601Date),
+      publishedAt: timeDate(in: html),
       relevance: relevance,
       relevanceLabel: relevanceLabel,
       originalText: original,
@@ -226,7 +281,7 @@ enum CodexRadarPublicPageParser {
 
   private static func classText(_ className: String, in html: String) -> String? {
     capture(
-      #"<([a-z0-9]+)\b[^>]*class="[^"]*\#(NSRegularExpression.escapedPattern(for: className))[^"]*"[^>]*>(.*?)</\1>"#,
+      #"<([a-z0-9]+)\b(?=[^>]*\bclass\s*=\s*["'][^"']*(?<![\w-])\#(NSRegularExpression.escapedPattern(for: className))(?![\w-])[^"']*["'])[^>]*>(.*?)</\1>"#,
       in: html,
       group: 2
     ).map(cleanText)
@@ -250,9 +305,34 @@ enum CodexRadarPublicPageParser {
 
   private static func attribute(_ name: String, in html: String) -> String? {
     capture(
-      #"\#(NSRegularExpression.escapedPattern(for: name))="([^"]*)""#,
-      in: html
+      #"\b\#(NSRegularExpression.escapedPattern(for: name))\s*=\s*(["'])(.*?)\1"#,
+      in: html,
+      group: 2
     )
+  }
+
+  private static func sectionStart(
+    className: String? = nil,
+    id: String? = nil,
+    in html: String
+  ) -> Range<String.Index>? {
+    for match in regex(#"<section\b[^>]*>"#).matches(in: html, range: NSRange(html.startIndex..., in: html)) {
+      guard let range = Range(match.range, in: html) else { continue }
+      let tag = String(html[range])
+      if let className {
+        let classes = (attribute("class", in: tag) ?? "").split(whereSeparator: \.isWhitespace)
+        guard classes.contains(Substring(className)) else { continue }
+      }
+      if let id, attribute("id", in: tag) != id { continue }
+      return range
+    }
+    return nil
+  }
+
+  private static func timeDate(in html: String) -> Date? {
+    capture(#"(<time\b[^>]*>)"#, in: html)
+      .flatMap { attribute("datetime", in: $0) }
+      .flatMap(parseISO8601Date)
   }
 
   private static func parseISO8601Date(_ text: String) -> Date? {

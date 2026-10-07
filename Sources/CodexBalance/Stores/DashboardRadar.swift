@@ -1,6 +1,7 @@
 import AppKit
 import CodexBalanceCore
 import Foundation
+import Network
 import OSLog
 import SwiftUI
 import UniformTypeIdentifiers
@@ -40,8 +41,10 @@ extension DashboardStore {
         from: snapshot.syncState
       )
       updateCodexRadarStatusMessage(snapshot)
-      archiveRadarEvaluation(snapshot)
-      writeWidgetSnapshotFile()
+      if servicesEnabled {
+        archiveRadarEvaluation(snapshot)
+        writeWidgetSnapshotFile()
+      }
     }
   }
 
@@ -55,12 +58,14 @@ extension DashboardStore {
       from: snapshot.syncState
     )
     updateCodexRadarStatusMessage(snapshot)
-    archiveRadarEvaluation(snapshot)
-    writeWidgetSnapshotFile()
+    if servicesEnabled {
+      archiveRadarEvaluation(snapshot)
+      writeWidgetSnapshotFile()
+    }
 
     if let sync = snapshot.syncState, sync.isUsingCachedFeed {
       scheduleCodexRadarRetry(
-        after: CodexRadarService.retryDelay(afterConsecutiveFailures: sync.consecutiveFailures)
+        after: CodexRadarService.retryDelay(for: sync)
       )
     } else {
       codexRadarRetryTask?.cancel()
@@ -140,11 +145,39 @@ extension DashboardStore {
     recordRuntimeEvent("resume")
     refresh(forceFull: true)
     let lastSuccess = codexRadarSnapshot?.syncState?.lastSuccessAt
-    if CodexRadarRefreshPolicy.shouldFetchAfterResume(lastSuccessAt: lastSuccess, now: now) {
+    if CodexRadarRefreshPolicy.shouldFetchAfterResume(
+      lastSuccessAt: lastSuccess, now: now,
+      consecutiveFailures: codexRadarSnapshot?.syncState?.consecutiveFailures ?? 0
+    ) {
       refreshCodexRadar(force: true)
     } else {
       reevaluateCodexRadar()
     }
+  }
+
+  func handleCodexRadarNetworkUpdate(isAvailable: Bool, now: Date = Date()) {
+    guard codexRadarNetworkRecoveryGate.shouldRefresh(
+      isAvailable: isAvailable, sync: codexRadarSnapshot?.syncState, now: now
+    )
+    else { return }
+    recordRuntimeEvent("radar-network-recovery")
+    codexRadarRetryTask?.cancel()
+    codexRadarRetryTask = nil
+    refreshCodexRadar(force: true)
+  }
+
+  func installCodexRadarNetworkMonitor() {
+    guard codexRadarNetworkMonitor == nil else { return }
+    let monitor = NWPathMonitor()
+    codexRadarNetworkMonitor = monitor
+    monitor.pathUpdateHandler = { [weak self, weak monitor] path in
+      let isAvailable = path.status == .satisfied
+      Task { @MainActor in
+        guard let self, let monitor, self.codexRadarNetworkMonitor === monitor else { return }
+        self.handleCodexRadarNetworkUpdate(isAvailable: isAvailable)
+      }
+    }
+    monitor.start(queue: DispatchQueue(label: "dev.codex.pulse.radar-network"))
   }
 
 }

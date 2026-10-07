@@ -9,8 +9,8 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-2.11.1-8b7cff">
-  <img alt="macOS" src="https://img.shields.io/badge/macOS-13%2B-111827?logo=apple">
+  <img alt="Version" src="https://img.shields.io/badge/version-2.11.3-8b7cff">
+  <img alt="macOS" src="https://img.shields.io/badge/macOS-14%2B-111827?logo=apple">
   <img alt="Mac architectures" src="https://img.shields.io/badge/Mac-arm64%20%7C%20x86__64-111827">
   <img alt="Swift" src="https://img.shields.io/badge/Swift-6.0-f05138?logo=swift&logoColor=white">
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-22c55e"></a>
@@ -18,7 +18,15 @@
 
 `Codex 脉动` 将 Codex 的额度、Token 消耗、重置节奏和 Full reset 权益集中到一套原生 macOS 界面中。它既可以作为常驻悬浮框，也可以完全隐藏悬浮框，仅使用主窗口或 7 款桌面小组件。
 
-> 当前发行版本：`2.11.1` build 2119。主应用兼容 macOS 13；桌面小组件要求 macOS 14 或更高版本；本地构建为 ad-hoc 签名、未公证版本。
+> 当前开发版本：`2.11.3` build 2121。主应用兼容 macOS 13；桌面小组件要求 macOS 14 或更高版本；本地构建为 ad-hoc 签名、未公证版本。
+
+## 2.11.3 雷达连接恢复修复
+
+Tibo 公开源在同次同步中自动重试短暂连接故障和暂时性服务器错误，整次请求最多 30 秒；独立数据源并行读取，附属请求最多 6 秒。网络从不可用恢复为可用时立即重连，重复网络回调合并并设短冷却；连接恢复、唤醒与手动刷新均遵守服务器的 `Retry-After` 等待时间。首次取不到数据显示“等待数据”，保留连续失败次数与退避重试；历史动态、成功检查时间、等待时间和最近 48 次同步结果保存在本机。网页属性顺序、额外 class 与单/双引号变化不再中断解析。
+
+## 2.11.2 雷达动态更新修复
+
+Tibo 动态列表保留公开源收录的最新 Posts / Replies，并读取页面中更新较晚的 28 天挑战进展，按实际发布时间排序，可展开查看全部记录。挑战卡片只提供摘要时明确标注“公开摘要”，不补写英文原文，不把摘要计作重置承诺。重置评分独立读取当前周期的有效原帖，不再由上游展示标签决定是否读取；断网缓存保留最新动态与原始成功时间。
 
 ## 2.11.1 额度兼容性修复
 
@@ -142,7 +150,7 @@ flowchart LR
 - 项目预算保存于 `~/Library/Application Support/CodexSuanliMeter/project-budgets-v1.json`，高级分析只使用已有本机聚合结果。
 - 可靠性事件位于 `reliability-events-v1.json`；备份和每日摘要位于 `~/Library/Application Support/CodexSuanliMeter/automation/`。
 - Codex 额度和 Full reset 权益通过只读方式获取；Full reset 不提供兑换或消耗入口。
-- 重置雷达每 30 分钟读取 Codex Radar 首页收录的 Tibo 公开动态，校验 Post ID、作者与 `x.com/thsottiaux/status/<id>` 链接一致性；`current.json` 只作重置窗口锚点，不再提供概率。
+- 重置雷达每 30 分钟读取 Codex Radar 首页收录的 Tibo 公开动态及带有原帖链接、发布时间的挑战进展，校验 Post ID、作者与 `x.com/thsottiaux/status/<id>` 链接一致性；最新动态与重置评分分别处理，公开摘要不代替英文原文计分；`current.json` 只作重置窗口锚点，不再提供概率。
 - 本地概率每 5 分钟依据已存证据重评；一般信号前 6 小时保持、随后线性衰减并在 24 小时归零，“tomorrow/明天”按 PT 目标日生效和过期。
 - USD/CNY 汇率来自 Frankfurter；网络失败时使用上次成功缓存。
 - 版本更新只读取项目公开 GitHub Release 标签、时间、说明和下载链接。
@@ -167,14 +175,14 @@ flowchart LR
 在 [Releases](https://github.com/huohuo143/codex-pulse/releases) 下载：
 
 ```text
-Codex-Pulse-v2.11.1-build2119-20260926-arm64.dmg
-Codex-Pulse-v2.11.1-build2119-20260926-arm64.dmg.sha256
+Codex-Pulse-v2.10.5-build2108-20260731-arm64.dmg
+Codex-Pulse-v2.10.5-build2108-20260731-arm64.dmg.sha256
+Codex-Pulse-v2.10.5-build2108-20260731-x86_64.dmg
+Codex-Pulse-v2.10.5-build2108-20260731-x86_64.dmg.sha256
 ```
 
-本次 2.11.1 提供 Apple Silicon（arm64）安装包；Intel Mac 可从源码构建，或在历史 Releases 中选择对应的 x86_64 包。
-
 1. 打开 DMG。
-2. 将 `Codex 脉动.app` 拖入 Applications；也可以运行 DMG 内的“安装或更新（保留设置）.command”，备份旧版本并保留原有设置。
+2. 将 `Codex 脉动.app` 拖入 Applications；也可以运行 DMG 内的“安装并启用自动启动”脚本。
 3. 首次打开若被 Gatekeeper 拦截，在“系统设置 → 隐私与安全性”中选择“仍要打开”。
 4. 打开一次 App，等待首次历史数据解析完成。
 
@@ -182,7 +190,7 @@ Codex-Pulse-v2.11.1-build2119-20260926-arm64.dmg.sha256
 
 ## 与旧版并行
 
-| 项目 | Codex 脉动 2.11.1 | 旧算力码表 0.1.0 |
+| 项目 | Codex 脉动 2.11.3 | 旧算力码表 0.1.0 |
 | --- | --- | --- |
 | App | `Codex 脉动.app` | `算力码表.app` |
 | Bundle ID | `dev.codex.balance-dashboard.codex` | `dev.codex.balance-dashboard` |
@@ -242,7 +250,7 @@ ARCH=arm64 ./script/create_transfer_package.sh
 
 ## 已知边界
 
-- 当前 2.11.1 安装包为 Apple Silicon arm64；历史版本包含 x86_64 包。请下载与 Mac 处理器匹配的文件。安装包采用 ad-hoc 签名且尚未公证。
+- DMG 按架构分别发布为 arm64 与 x86_64；请下载与 Mac 处理器匹配的文件。安装包采用 ad-hoc 签名且尚未公证。
 - 本地 Token 统计来自 Codex 会话日志，不包含无法在本机日志中观察到的网页端用量。
 - 未知模型不会猜测价格，而会保持“未计价”。
 - WidgetKit 的实际刷新时刻仍受 macOS 桌面小组件预算控制。
@@ -253,6 +261,8 @@ ARCH=arm64 ./script/create_transfer_package.sh
 - 版本检测依赖 GitHub Releases 可访问；断网时保留上次成功结果，不影响其他功能。
 
 ## 版本说明
+
+2.11.3 修复最新 Tibo 动态遗漏、短暂断连恢复、限流等待和首次无数据状态。详见 [2.11.3 更新说明](docs/RELEASE_2.11.3.md)。
 
 2.11.0 统一官方数据来源与有效期、金额计价覆盖率、到期记录和账户确认；日志采用目录索引、追加读取和分块解析，小组件按内容刷新，新增雷达预测归档与已核实结果评分。详见 [2.11.0 改版说明](docs/RELEASE_2.11.0.md) 和 [本地验收与维护](docs/VALIDATION_2.11.0.md)。
 

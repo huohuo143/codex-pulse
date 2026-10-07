@@ -8,6 +8,7 @@ public enum CodexRadarError: Error, Equatable, LocalizedError, Sendable {
   case rateLimited
   case invalidPayload
   case server(Int)
+  case retryAfter(status: Int, seconds: TimeInterval)
 
   public var errorDescription: String? {
     switch self {
@@ -19,6 +20,8 @@ public enum CodexRadarError: Error, Equatable, LocalizedError, Sendable {
       "Codex 雷达返回的数据格式无法识别"
     case .server(let status):
       "Codex 雷达服务暂不可用（HTTP \(status)）"
+    case .retryAfter(let status, let seconds):
+      "公开源要求稍后重试（HTTP \(status)，约 \(Int(ceil(seconds / 60))) 分钟）"
     }
   }
 }
@@ -73,7 +76,8 @@ public actor CodexRadarService {
       self.fetcher = {
         try await CodexRadarService.fetch(
           url: CodexRadarService.legacyPublicJSONURL,
-          accept: "application/json"
+          accept: "application/json",
+          options: .ancillary
         )
       }
       self.publicPageFetcher = publicPageFetcher ?? {
@@ -86,13 +90,15 @@ public actor CodexRadarService {
       self.stationInsightsFetcher = stationInsightsFetcher ?? {
         try await CodexRadarService.fetch(
           url: CodexRadarService.stationInsightsURL,
-          accept: "application/json"
+          accept: "application/json",
+          options: .ancillary
         )
       }
       self.efficiencyFetcher = efficiencyFetcher ?? {
         try await CodexRadarService.fetch(
           url: CodexRadarService.efficiencyURL,
-          accept: "application/json"
+          accept: "application/json",
+          options: .ancillary
         )
       }
     }
@@ -100,6 +106,21 @@ public actor CodexRadarService {
 
   public func current(force: Bool = false) async throws -> CodexRadarSnapshot {
     let checkedAt = now()
+    var storedHistory = loadTiboHistory()
+    if publicPageFetcher != nil,
+       let retryNotBefore = storedHistory.retryNotBefore,
+       checkedAt < retryNotBefore {
+      var snapshot = cachedSnapshot
+        ?? cachedPage(base: nil, cached: nil, history: storedHistory, at: checkedAt)
+          .map(makePublicSnapshot)
+        ?? makeUnavailableSnapshot()
+      snapshot.syncState = syncState(
+        from: storedHistory, at: checkedAt, usingCache: true,
+        failureMessage: storedHistory.lastFailureMessage
+      )
+      cachedSnapshot = snapshot
+      return reevaluate(snapshot: snapshot, at: checkedAt)
+    }
     if !force,
        let cachedSnapshot,
        let cachedAt,
@@ -107,14 +128,17 @@ public actor CodexRadarService {
       return reevaluate(snapshot: cachedSnapshot, at: checkedAt)
     }
 
+    // The source timeline must not wait for an independent reset anchor or
+    // optional insights to start its request. Every production fetch is bounded.
+    async let baseData = fetcher()
+    async let publicPageData = publicPageFetcher?()
     async let stationData = optionalFetch(stationInsightsFetcher)
     async let efficiencyData = optionalFetch(efficiencyFetcher)
 
-    var storedHistory = loadTiboHistory()
     var baseError: Error?
     var snapshot: CodexRadarSnapshot?
     do {
-      snapshot = try CodexRadarCodec.decode(try await fetcher())
+      snapshot = try CodexRadarCodec.decode(try await baseData)
       if usesLegacyPublicSummary {
         // The production current.json percentage is a stale remote judgement.
         // Keep only its reset-window anchor; all displayed probability is local.
@@ -126,9 +150,9 @@ public actor CodexRadarService {
 
     var page: CodexRadarPublicPageSnapshot?
     var pageError: Error?
-    if let publicPageFetcher {
+    if publicPageFetcher != nil {
       do {
-        let pageData = try await publicPageFetcher()
+        guard let pageData = try await publicPageData else { throw CodexRadarError.invalidPayload }
         let decoded = try CodexRadarPublicPageParser.decode(pageData, now: checkedAt)
         if let incomingUpdate = decoded.tiboFeed.updatedAt,
            let storedUpdate = storedHistory.feedUpdatedAt,
@@ -140,6 +164,8 @@ public actor CodexRadarService {
         pageError = error
       }
     }
+    try Task.checkCancellation()
+    let completedAt = now()
     if var enrichedPage = page {
       if let completedAt = snapshot?.window?.closedAt {
         enrichedPage.resetAt = [enrichedPage.resetAt, completedAt]
@@ -155,26 +181,37 @@ public actor CodexRadarService {
         .compactMap { $0 }
         .max()
       enrichedPage.resetAt = resetAt
-      enrichedPage.tiboFeed.posts = CodexRadarVerifiedTiboSignals.mergedPosts(
+      let latestPosts = enrichedPage.tiboFeed.posts
+      let scoringPosts = CodexRadarVerifiedTiboSignals.mergedPosts(
         current: enrichedPage.tiboFeed.posts,
         previous: (cachedSnapshot?.tiboFeed?.posts ?? []) + storedHistory.posts,
         resetAt: resetAt,
         now: checkedAt
       )
-      storedHistory = CodexRadarTiboHistory(
-        resetAt: resetAt,
-        posts: enrichedPage.tiboFeed.posts,
-        lastAttemptAt: checkedAt,
-        lastSuccessAt: checkedAt,
-        feedUpdatedAt: maxDate(storedHistory.feedUpdatedAt, enrichedPage.tiboFeed.updatedAt),
-        feedFingerprint: enrichedPage.feedFingerprint ?? storedHistory.feedFingerprint,
-        consecutiveFailures: 0
+      enrichedPage.tiboFeed.posts = CodexRadarTiboTimeline.mergedPosts(
+        current: latestPosts,
+        previous: scoringPosts,
+        now: checkedAt
       )
+      storedHistory.resetAt = resetAt
+      storedHistory.posts = scoringPosts
+      storedHistory.lastAttemptAt = checkedAt
+      storedHistory.lastSuccessAt = completedAt
+      storedHistory.feedUpdatedAt = maxDate(storedHistory.feedUpdatedAt, enrichedPage.tiboFeed.updatedAt)
+      storedHistory.feedFingerprint = enrichedPage.feedFingerprint ?? storedHistory.feedFingerprint
+      storedHistory.consecutiveFailures = 0
+      storedHistory.latestPosts = latestPosts
+      storedHistory.retryNotBefore = nil
+      storedHistory.lastFailureMessage = nil
+      recordSyncAttempt(in: &storedHistory, startedAt: checkedAt, completedAt: completedAt, error: nil)
       persistTiboHistory(storedHistory)
       page = enrichedPage
     } else if publicPageFetcher != nil {
       storedHistory.lastAttemptAt = checkedAt
       storedHistory.consecutiveFailures = (storedHistory.consecutiveFailures ?? 0) + 1
+      storedHistory.lastFailureMessage = pageError.map(Self.failureDescription)
+      storedHistory.retryNotBefore = Self.retryNotBefore(for: pageError, at: completedAt)
+      recordSyncAttempt(in: &storedHistory, startedAt: checkedAt, completedAt: completedAt, error: pageError)
       persistTiboHistory(storedHistory)
       page = cachedPage(
         base: snapshot,
@@ -185,6 +222,9 @@ public actor CodexRadarService {
     }
     if snapshot == nil, let page {
       snapshot = makePublicSnapshot(from: page)
+    }
+    if snapshot == nil, publicPageFetcher != nil {
+      snapshot = makeUnavailableSnapshot()
     }
     guard var snapshot else {
       throw baseError ?? CodexRadarError.invalidPayload
@@ -225,13 +265,13 @@ public actor CodexRadarService {
     if publicPageFetcher != nil {
       snapshot.syncState = syncState(
         from: storedHistory,
-        at: checkedAt,
+        at: now(),
         usingCache: pageError != nil,
-        failureMessage: pageError?.localizedDescription
+        failureMessage: storedHistory.lastFailureMessage
       )
     }
     cachedSnapshot = snapshot
-    cachedAt = checkedAt
+    cachedAt = now()
     return snapshot
   }
 
@@ -247,6 +287,13 @@ public actor CodexRadarService {
     case 3: 15 * 60
     default: refreshInterval
     }
+  }
+
+  public static func retryDelay(for sync: CodexRadarSyncState, at now: Date = Date()) -> TimeInterval {
+    max(
+      retryDelay(afterConsecutiveFailures: sync.consecutiveFailures),
+      sync.retryNotBefore?.timeIntervalSince(now) ?? 0
+    )
   }
 
   public func clearCache() {
@@ -277,6 +324,40 @@ public actor CodexRadarService {
     }
   }
 
+  private func recordSyncAttempt(
+    in history: inout CodexRadarTiboHistory,
+    startedAt: Date,
+    completedAt: Date,
+    error: Error?
+  ) {
+    let entry = CodexRadarSyncAttempt(
+      startedAt: startedAt, completedAt: completedAt,
+      succeeded: error == nil, failureMessage: error.map(Self.failureDescription)
+    )
+    history.recentSyncAttempts = Array(((history.recentSyncAttempts ?? []) + [entry]).suffix(48))
+  }
+
+  private static func retryNotBefore(for error: Error?, at date: Date) -> Date? {
+    switch error as? CodexRadarError {
+    case .retryAfter(_, let seconds): date.addingTimeInterval(seconds)
+    case .rateLimited: date.addingTimeInterval(5 * 60)
+    default: nil
+    }
+  }
+
+  private static func failureDescription(_ error: Error) -> String {
+    if let networkError = error as? URLError {
+      switch networkError.code {
+      case .notConnectedToInternet: return "网络不可用，恢复连接后自动重试"
+      case .timedOut: return "公开源响应超时，已安排自动重试"
+      case .networkConnectionLost, .cannotConnectToHost, .cannotFindHost, .dnsLookupFailed:
+        return "公开源连接中断，已安排自动重试"
+      default: break
+      }
+    }
+    return error.localizedDescription
+  }
+
   private func reevaluate(
     snapshot original: CodexRadarSnapshot,
     at date: Date
@@ -292,7 +373,7 @@ public actor CodexRadarService {
       from: history,
       at: date,
       usingCache: (history.consecutiveFailures ?? 0) > 0,
-      failureMessage: snapshot.syncState?.failureMessage
+      failureMessage: history.lastFailureMessage ?? snapshot.syncState?.failureMessage
     )
     cachedSnapshot = snapshot
     return snapshot
@@ -304,16 +385,22 @@ public actor CodexRadarService {
     history: CodexRadarTiboHistory,
     at date: Date
   ) -> CodexRadarPublicPageSnapshot? {
-    let posts = (cached?.tiboFeed?.posts ?? []) + history.posts
+    let latestPosts = history.latestPosts ?? cached?.tiboFeed?.posts ?? history.posts
+    let posts = latestPosts + history.posts
     let resetAt = [history.resetAt, base?.window?.closedAt]
       .compactMap { $0 }
       .max()
     guard posts.isEmpty == false || resetAt != nil || cached?.publicJudgement != nil else {
       return nil
     }
-    let merged = CodexRadarVerifiedTiboSignals.mergedPosts(
+    let scoringPosts = CodexRadarVerifiedTiboSignals.mergedPosts(
       current: posts,
       resetAt: resetAt,
+      now: date
+    )
+    let merged = CodexRadarTiboTimeline.mergedPosts(
+      current: latestPosts,
+      previous: scoringPosts,
       now: date
     )
     let judgement = cached?.publicJudgement ?? CodexRadarPublicJudgement(
@@ -354,7 +441,8 @@ public actor CodexRadarService {
       consecutiveFailures: history.consecutiveFailures ?? 0,
       isUsingCachedFeed: usingCache,
       isStale: stale,
-      failureMessage: failureMessage
+      failureMessage: failureMessage,
+      retryNotBefore: history.retryNotBefore
     )
   }
 
@@ -390,6 +478,20 @@ public actor CodexRadarService {
     )
   }
 
+  private func makeUnavailableSnapshot() -> CodexRadarSnapshot {
+    CodexRadarSnapshot(
+      schemaVersion: "codexradar-public-page-v1", service: "codex-radar-public",
+      type: "unavailable", monitoredAt: nil, timezone: "Asia/Shanghai",
+      windowOpen: nil, status: nil, recommendedAction: "wait-for-source",
+      window: nil, prediction: nil, tiboPresence: nil,
+      links: CodexRadarLinks(
+        html: Self.siteURL.absoluteString, rss: nil, fullAPI: Self.fullAPIURL.absoluteString
+      ),
+      publicJudgement: nil, tiboFeed: nil, localResetEstimate: nil,
+      stationInsights: nil, efficiency: nil
+    )
+  }
+
   private func makeTiboPresence(
     from page: CodexRadarPublicPageSnapshot
   ) -> CodexRadarTiboPresence {
@@ -405,12 +507,12 @@ public actor CodexRadarService {
       evidenceSummaryEn: nil,
       sourceURLs: page.tiboFeed.posts.compactMap { $0.url?.absoluteString },
       shouldDisplay: true,
-      safetyNoteZh: "仅展示与重置判断有关的公开动态。",
+      safetyNoteZh: "公开源动态；产品发布不等于额度重置。",
       updatedAt: page.tiboFeed.updatedAt,
       observedAt: latest?.publishedAt,
       staleAt: nil,
-      latestActivityZh: latest?.translationZh ?? latest?.originalText,
-      latestActivityEn: latest?.originalText,
+      latestActivityZh: latest?.displayTextZh,
+      latestActivityEn: latest?.originalText.isEmpty == false ? latest?.originalText : nil,
       latestActivityAt: latest?.publishedAt
     )
   }
@@ -481,41 +583,15 @@ public actor CodexRadarService {
     maxDate(window?.openedAt, window?.closedAt)
   }
 
-  private static func fetch(
+  static func fetch(
     url: URL,
     accept: String,
-    cacheBust: Bool = false
+    cacheBust: Bool = false,
+    session: URLSession = CodexRadarHTTPClient.session,
+    options: CodexRadarHTTPClient.Options = .primary
   ) async throws -> Data {
-    let requestURL: URL
-    if cacheBust, var components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
-      var items = components.queryItems ?? []
-      items.append(URLQueryItem(name: "pulse_check", value: UUID().uuidString))
-      components.queryItems = items
-      requestURL = components.url ?? url
-    } else {
-      requestURL = url
-    }
-    var request = URLRequest(
-      url: requestURL,
-      cachePolicy: .reloadIgnoringLocalAndRemoteCacheData,
-      timeoutInterval: 12
+    try await CodexRadarHTTPClient.fetch(
+      url: url, accept: accept, cacheBust: cacheBust, session: session, options: options
     )
-    request.httpMethod = "GET"
-    request.setValue(accept, forHTTPHeaderField: "Accept")
-    request.setValue("no-cache, no-store, max-age=0", forHTTPHeaderField: "Cache-Control")
-    request.setValue("no-cache", forHTTPHeaderField: "Pragma")
-    request.setValue("CodexSuanliMeter/2.10.10 (public-read-only-radar-sync)", forHTTPHeaderField: "User-Agent")
-    let (data, response) = try await URLSession.shared.data(for: request)
-    guard let http = response as? HTTPURLResponse else { throw CodexRadarError.invalidPayload }
-    switch http.statusCode {
-    case 200..<300:
-      return data
-    case 401, 403:
-      throw CodexRadarError.accessDenied
-    case 429:
-      throw CodexRadarError.rateLimited
-    default:
-      throw CodexRadarError.server(http.statusCode)
-    }
   }
 }
