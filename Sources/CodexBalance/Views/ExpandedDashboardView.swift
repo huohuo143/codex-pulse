@@ -139,6 +139,7 @@ struct ExpandedDashboardView: View {
         isLoading: store.isLoading,
         tint: store.palette.weekly,
         expiryLabel: store.creditExpiry.label(account: store.status?.accountScope),
+        expiryBatches: store.creditExpiry.confirmedBatches(for: store.status?.accountScope),
         metadata: store.status?.flexibleCreditRead
       )
       QuotaForecastCard(forecast: store.quotaForecast, tint: store.palette.weekly)

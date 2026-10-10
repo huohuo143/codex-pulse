@@ -648,7 +648,9 @@ struct CompactDashboardView: View {
       weeklyTint: store.palette.weekly,
       fiveHourTint: fiveHourTint,
       size: size,
-      lineWidth: lineWidth
+      lineWidth: lineWidth,
+      showsResetCountdown: true,
+      resetsAt: quotaWindow(primaryQuotaMetric)?.resetsAt
     )
   }
 

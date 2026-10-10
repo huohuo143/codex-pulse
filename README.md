@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-2.11.3-8b7cff">
+  <img alt="Version" src="https://img.shields.io/badge/version-2.11.4-8b7cff">
   <img alt="macOS" src="https://img.shields.io/badge/macOS-14%2B-111827?logo=apple">
   <img alt="Mac architectures" src="https://img.shields.io/badge/Mac-arm64%20%7C%20x86__64-111827">
   <img alt="Swift" src="https://img.shields.io/badge/Swift-6.0-f05138?logo=swift&logoColor=white">
@@ -18,7 +18,11 @@
 
 `Codex 脉动` 将 Codex 的额度、Token 消耗、重置节奏和 Full reset 权益集中到一套原生 macOS 界面中。它既可以作为常驻悬浮框，也可以完全隐藏悬浮框，仅使用主窗口或 7 款桌面小组件。
 
-> 当前开发版本：`2.11.3` build 2121。主应用兼容 macOS 13；桌面小组件要求 macOS 14 或更高版本；本地构建为 ad-hoc 签名、未公证版本。
+> 当前开发版本：`2.11.4` build 2125。主应用兼容 macOS 13；桌面小组件要求 macOS 14 或更高版本；本地构建为 ad-hoc 签名、未公证版本。
+
+## 2.11.4 悬浮倒计时与到期批次
+
+悬浮额度环新增“距重置 X天 X小时”，按官方重置时刻每分钟更新；倒计时字号增大并加粗。灵活额度可分别记录各笔发放数量与到期日期，明确区分来源写明的日期和按通知日期推算的日期。详见 [2.11.4 更新说明](docs/RELEASE_2.11.4.md)。
 
 ## 2.11.3 雷达连接恢复修复
 
@@ -175,10 +179,8 @@ flowchart LR
 在 [Releases](https://github.com/huohuo143/codex-pulse/releases) 下载：
 
 ```text
-Codex-Pulse-v2.10.5-build2108-20260731-arm64.dmg
-Codex-Pulse-v2.10.5-build2108-20260731-arm64.dmg.sha256
-Codex-Pulse-v2.10.5-build2108-20260731-x86_64.dmg
-Codex-Pulse-v2.10.5-build2108-20260731-x86_64.dmg.sha256
+Codex-Pulse-v2.11.4-build2125-20261010-arm64.dmg
+Codex-Pulse-v2.11.4-build2125-20261010-arm64.dmg.sha256
 ```
 
 1. 打开 DMG。
@@ -190,7 +192,7 @@ Codex-Pulse-v2.10.5-build2108-20260731-x86_64.dmg.sha256
 
 ## 与旧版并行
 
-| 项目 | Codex 脉动 2.11.3 | 旧算力码表 0.1.0 |
+| 项目 | Codex 脉动 2.11.4 | 旧算力码表 0.1.0 |
 | --- | --- | --- |
 | App | `Codex 脉动.app` | `算力码表.app` |
 | Bundle ID | `dev.codex.balance-dashboard.codex` | `dev.codex.balance-dashboard` |
@@ -261,6 +263,8 @@ ARCH=arm64 ./script/create_transfer_package.sh
 - 版本检测依赖 GitHub Releases 可访问；断网时保留上次成功结果，不影响其他功能。
 
 ## 版本说明
+
+2.11.4 增加悬浮环中的天数与小时重置倒计时，增大字号，并支持灵活额度按批次记录到期日期。详见 [2.11.4 更新说明](docs/RELEASE_2.11.4.md)。
 
 2.11.3 修复最新 Tibo 动态遗漏、短暂断连恢复、限流等待和首次无数据状态。详见 [2.11.3 更新说明](docs/RELEASE_2.11.3.md)。
 

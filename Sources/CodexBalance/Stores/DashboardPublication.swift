@@ -141,7 +141,7 @@ extension DashboardStore {
 
     snapshot.usageUpdatedAt = lastFullRefresh
     snapshot.usageValidUntil = status?.usageValidUntil
-    snapshot.confirmedCreditExpiry = creditExpiry.isConfirmed(for: status?.accountScope) ? creditExpiry.expiresAt : nil
+    snapshot.confirmedCreditExpiry = creditExpiry.nextExplicitExpiry(for: status?.accountScope)
     pendingSnapshotTask?.cancel()
     pendingSnapshotTask = Task { [weak self, snapshot] in
       try? await Task.sleep(for: .seconds(1))

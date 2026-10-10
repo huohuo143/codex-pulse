@@ -4,8 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_NAME="Codex 脉动"
 EXECUTABLE_NAME="CodexSuanliMeter"
-VERSION="${VERSION:-2.11.3}"
-BUILD_NUMBER="${BUILD_NUMBER:-2121}"
+VERSION="${VERSION:-2.11.4}"
+BUILD_NUMBER="${BUILD_NUMBER:-2125}"
 DATE_TAG="${DATE_TAG:-$(/bin/date +%Y%m%d)}"
 ARCH="${ARCH:-$(uname -m)}"
 

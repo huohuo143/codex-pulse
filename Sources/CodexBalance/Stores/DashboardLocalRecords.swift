@@ -7,18 +7,27 @@ import UniformTypeIdentifiers
 import WidgetKit
 
 extension DashboardStore {
-  func saveCreditExpiry(date: Date, source: String, confirmed: Bool) {
-    let cleanSource = source.trimmingCharacters(in: .whitespacesAndNewlines)
+  func saveCreditExpiry(batch: CreditExpiryBatch, confirmed: Bool) {
+    let cleanSource = batch.record.source.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !confirmed || (status?.accountScope != nil && !cleanSource.isEmpty) else {
       expiryMessage = "确认前需要读取当前账户，并填写到期日来源"; return
     }
-    let record = CreditExpiryRecord(expiresAt: date, source: cleanSource,
+    guard let date = CreditExpiryBatch.localDate(batch.expiryDate),
+      !batch.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+      batch.grantedCredits.map({ $0.isFinite && $0 > 0 }) ?? true else {
+      expiryMessage = "请填写名称、有效日期和正确的发放数量"; return
+    }
+    var saved = batch
+    saved.record = CreditExpiryRecord(expiresAt: date, source: cleanSource,
       confirmedAt: confirmed ? Date() : nil, accountScope: confirmed ? status?.accountScope : nil)
     Task {
       do {
         let storage = creditExpiryStore
-        try await Task.detached(priority: .utility) { try storage.save(record) }.value
-        creditExpiry = record; expiryMessage = confirmed ? "已保存当前账户的确认记录" : "已保存，等待核实"
+        var ledger = creditExpiry
+        ledger.upsert(saved)
+        let updatedLedger = ledger
+        try await Task.detached(priority: .utility) { try storage.save(updatedLedger) }.value
+        creditExpiry = updatedLedger; expiryMessage = confirmed ? "已保存当前账户的这一笔记录" : "已保存这一笔，等待核实"
         writeWidgetSnapshotFile()
       } catch { expiryMessage = "记录保存失败：\(error.localizedDescription)" }
     }

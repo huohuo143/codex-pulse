@@ -24,7 +24,7 @@ final class DashboardStore: ObservableObject {
   @Published var exportMessage: String?
   @Published var radarEvaluation = RadarEvaluationSummary()
   @Published var radarEvaluationMessage: String?
-  @Published var creditExpiry = CreditExpiryStore().load()
+  @Published var creditExpiry = CreditExpiryLedgerStore().load()
   @Published var expiryMessage: String?
   @Published var pricingMessage = ModelPricingStore.shared.snapshot().description
   @Published var launchWithCodexEnabled = CodexWatcherManager.isEnabled()
@@ -213,7 +213,7 @@ final class DashboardStore: ObservableObject {
   let codexRadarService: CodexRadarService
   let radarEvaluationArchive = RadarEvaluationArchive()
   var quotaHistoryStore = QuotaHistoryStore()
-  let creditExpiryStore = CreditExpiryStore()
+  let creditExpiryStore = CreditExpiryLedgerStore()
   var analysisGeneration = 0
   var forecastGeneration = 0
   var lastAnalysisStats: TokenStats?

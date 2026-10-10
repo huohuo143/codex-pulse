@@ -75,7 +75,7 @@ struct DashboardSettingsView: View {
         Toggle("自动避让其他窗口", isOn: $store.autoDodgeEnabled)
       }
 
-      CreditExpirySettingsView(record: store.creditExpiry, account: store.status?.accountScope, message: store.expiryMessage, save: store.saveCreditExpiry)
+      CreditExpirySettingsView(ledger: store.creditExpiry, account: store.status?.accountScope, message: store.expiryMessage, save: store.saveCreditExpiry)
 
       settingsSection("模型价格与金额估算") {
         Text(store.pricingMessage).font(.caption).foregroundStyle(DashboardColors.subtleText)

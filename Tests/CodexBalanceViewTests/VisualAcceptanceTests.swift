@@ -7,6 +7,33 @@ import CodexBalanceCore
 @Suite("App visual acceptance", .serialized)
 struct VisualAcceptanceTests {
   @Test(.enabled(if: ProcessInfo.processInfo.environment["CODEX_PULSE_RENDER_DIR"] != nil))
+  @MainActor func renderFlexibleCreditBatches() throws {
+    let folder = URL(fileURLWithPath: ProcessInfo.processInfo.environment["CODEX_PULSE_RENDER_DIR"]!)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    let now = Date()
+    let batches = [
+      CreditExpiryBatch(id: "grant-a", title: "测试额度 A", grantedCredits: 10_000, expiryDate: "2030-12-31",
+        note: "用于验证明确到期日期的测试数据。",
+        record: .init(expiresAt: CreditExpiryBatch.localDate("2030-12-31")!, source: "验收示例", confirmedAt: now, accountScope: "fixture")),
+      CreditExpiryBatch(id: "grant-b", title: "测试额度 B", grantedCredits: 500, grantedAmountUSD: 20,
+        expiryDate: "2031-07-24", basis: .oneYearFromNotice,
+        note: "用于验证推算日期标识的测试数据。",
+        record: .init(expiresAt: CreditExpiryBatch.localDate("2031-07-24")!, source: "验收示例", confirmedAt: now, accountScope: "fixture"))
+    ]
+    let metadata = SourceReadMetadata(source: "验收示例", sampledAt: now, lastAttemptAt: now, lastSuccessAt: now)
+    for scheme in [ColorScheme.light, .dark] {
+      for width in [640, 680] {
+        let view = FlexibleCreditsView(balance: .init(hasCredits: true, balanceCredits: 12_345.0), isLoading: false,
+          tint: .green, expiryBatches: batches, metadata: metadata)
+          .environment(\.colorScheme, scheme)
+        try render(view, size: NSSize(width: width, height: 300),
+          file: folder.appendingPathComponent("credit-batches-\(scheme == .light ? "light" : "dark")-\(width).png"))
+      }
+    }
+    print("VISUAL_CREDIT_BATCHES rendered=4 output=\(folder.path)")
+  }
+
+  @Test(.enabled(if: ProcessInfo.processInfo.environment["CODEX_PULSE_RENDER_DIR"] != nil))
   @MainActor func renderAllStylesAndWindowSizes() throws {
     let folder = URL(fileURLWithPath: ProcessInfo.processInfo.environment["CODEX_PULSE_RENDER_DIR"]!)
     try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)

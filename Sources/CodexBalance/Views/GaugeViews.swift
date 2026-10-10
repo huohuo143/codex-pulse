@@ -132,6 +132,8 @@ struct ConcentricQuotaGaugeView: View {
   var fiveHourTint: Color
   var size: CGFloat
   var lineWidth: CGFloat
+  var showsResetCountdown: Bool = false
+  var resetsAt: Date? = nil
 
   private func progress(_ value: Double?) -> Double {
     max(0.008, min(1, (value ?? 0) / 100))
@@ -165,13 +167,11 @@ struct ConcentricQuotaGaugeView: View {
         )
       }
 
-      if displaysBoth {
-        VStack(spacing: max(2, size * 0.025)) {
+      VStack(spacing: displaysBoth ? max(2, size * 0.025) : 2) {
+        if displaysBoth {
           quotaValue(label: "7天", value: weeklyRemainingPercent, tint: weeklyTint)
           quotaValue(label: "5h", value: fiveHourRemainingPercent, tint: fiveHourTint)
-        }
-      } else {
-        VStack(spacing: 2) {
+        } else {
           Text(percentText(primaryValue))
             .font(.system(size: size * 0.25, weight: .heavy, design: .rounded))
             .foregroundStyle(primaryTint)
@@ -181,11 +181,30 @@ struct ConcentricQuotaGaugeView: View {
             .font(.system(size: max(8, size * 0.08), weight: .semibold))
             .foregroundStyle(DashboardColors.subtleText)
         }
+        if showsResetCountdown {
+          TimelineView(.periodic(from: .now, by: 60)) { context in
+            Text(resetCountdownText(now: context.date))
+              .font(.system(size: max(10, size * 0.09), weight: .semibold))
+              .foregroundStyle(DashboardColors.subtleText)
+              .monospacedDigit()
+              .lineLimit(1)
+              .minimumScaleFactor(0.85)
+              .frame(maxWidth: size * (displaysBoth ? 0.64 : 0.82))
+              .help(resetsAt?.formatted(date: .abbreviated, time: .shortened) ?? "暂无官方重置时间")
+          }
+        }
       }
     }
     .frame(width: size, height: size)
     .animation(.smooth(duration: 0.42), value: weeklyRemainingPercent)
     .animation(.smooth(duration: 0.42), value: fiveHourRemainingPercent)
+  }
+
+  private func resetCountdownText(now: Date) -> String {
+    guard let resetsAt else { return "重置时间待更新" }
+    guard resetsAt > now else { return "等待重置更新" }
+    let hours = Int(resetsAt.timeIntervalSince(now) / 3600)
+    return "距重置 \(hours / 24)天 \(hours % 24)小时"
   }
 
   private func quotaCircle(value: Double?, tint: Color, diameter: CGFloat, width: CGFloat) -> some View {

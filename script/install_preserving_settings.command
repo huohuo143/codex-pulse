@@ -33,7 +33,7 @@ fi
 mkdir -p "$DEST_DIR" "$BACKUP_DIR/config"
 /usr/bin/defaults export "$BUNDLE_ID" "$BACKUP_DIR/preferences.plist" >/dev/null 2>&1 || true
 for item in "$SUPPORT_DIR"/quota-history*.json "$SUPPORT_DIR"/project-budgets-v1.json \
-  "$SUPPORT_DIR"/credit-expiry-v1.json "$SUPPORT_DIR"/model-prices*.json \
+  "$SUPPORT_DIR"/credit-expiry-v1.json "$SUPPORT_DIR"/credit-expiry-v2.json "$SUPPORT_DIR"/model-prices*.json \
   "$SUPPORT_DIR"/radar-evaluation-v1 "$SUPPORT_DIR"/codex-radar-tibo-history.json \
   "$SUPPORT_DIR"/reliability-events-v1.json "$SUPPORT_DIR"/account-scope-salt.txt \
   "$SUPPORT_DIR"/widget-snapshot.json "$SUPPORT_DIR"/live-balance.json \
