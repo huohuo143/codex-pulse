@@ -36,6 +36,7 @@ final class DashboardStore: ObservableObject {
   @Published var codexRadarLastSyncAt: Date?
   @Published var codexRadarNextSyncAt: Date?
   @Published var quotaForecast: QuotaForecast?
+  @Published var quotaHistory: [QuotaSnapshot] = []
   @Published var usageAnalysis = UsageAnalysis()
   @Published var projectBudgets: [ProjectBudget] = []
   @Published var budgetMessage: String?
@@ -231,9 +232,11 @@ final class DashboardStore: ObservableObject {
   let reliabilityEventStore = ReliabilityEventStore()
   let localAutomationArchive = LocalAutomationArchive()
   let appUpdateService = GitHubReleaseUpdateService()
-  lazy var quotaNotificationService = QuotaNotificationService.shared
+  lazy var quotaNotificationService: any QuotaNotificationServing = QuotaNotificationService.shared
   let servicesEnabled: Bool
   var quotaAlertLedger: QuotaAlertLedger
+  var quotaAlertDeliveryState = QuotaAlertDeliveryState()
+  var quotaAlertDeliveryTask: Task<Void, Never>?
   var refreshTimer: Timer?
   var codexRadarRefreshTimer: Timer?
   var codexRadarEvaluationTimer: Timer?

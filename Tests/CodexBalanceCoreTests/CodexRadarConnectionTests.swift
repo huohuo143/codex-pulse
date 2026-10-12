@@ -59,11 +59,14 @@ struct CodexRadarConnectionTests {
     let (url, session) = RadarConnectionURLProtocol.session(for: scenario)
     defer { session.invalidateAndCancel() }
     let started = ContinuousClock.now
-    await #expect(throws: URLError(.timedOut)) {
-      try await CodexRadarService.fetch(
+    do {
+      _ = try await CodexRadarService.fetch(
         url: url, accept: "text/html", session: session,
         options: .init(maximumAttempts: 1, maximumDuration: 0.05, requestTimeout: 0.05)
       )
+      Issue.record("A stalled response unexpectedly succeeded")
+    } catch {
+      #expect((error as? URLError)?.code == .timedOut)
     }
     #expect(started.duration(to: .now) < .seconds(1))
     #expect(scenario.stopCount >= 1)
@@ -121,11 +124,14 @@ struct CodexRadarConnectionTests {
     let (url, session) = RadarConnectionURLProtocol.session(for: scenario)
     defer { session.invalidateAndCancel() }
     let started = ContinuousClock.now
-    await #expect(throws: URLError(.timedOut)) {
-      try await CodexRadarService.fetch(
+    do {
+      _ = try await CodexRadarService.fetch(
         url: url, accept: "text/html", session: session,
         options: .init(maximumAttempts: 3, maximumDuration: 0.18, requestTimeout: 0.1, retryDelays: [0.01])
       )
+      Issue.record("Stalled retries unexpectedly succeeded")
+    } catch {
+      #expect((error as? URLError)?.code == .timedOut)
     }
     #expect(started.duration(to: .now) < .seconds(0.5))
     #expect(scenario.requestCount == 2)

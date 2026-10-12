@@ -153,6 +153,7 @@ struct ExpandedDashboardView: View {
 
   private var trendsSection: some View {
     VStack(spacing: 16) {
+      QuotaHistoryView()
       usageTrendPanel
       modelPanel
       devicePanel

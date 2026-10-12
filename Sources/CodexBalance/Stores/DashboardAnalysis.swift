@@ -41,16 +41,18 @@ extension DashboardStore {
           current = QuotaSnapshot(recordedAt: event.timestamp, remainingPercent: window.remainingPercent,
             resetsAt: reset, windowMinutes: window.windowMinutes)
         }
-        return QuotaForecaster.forecast(snapshots: history, current: current, now: now)
+        return (history: history, forecast: QuotaForecaster.forecast(snapshots: history, current: current, now: now))
       }.value
       guard generation == forecastGeneration else { return }
-      quotaForecast = result
+      quotaHistory = result.history
+      quotaForecast = result.forecast
       evaluateQuotaAlerts(now: now)
     }
   }
 
   func evaluateQuotaAlerts(now: Date = Date()) {
-    guard quotaAlertsEnabled, notificationAuthorization == .authorized else { return }
+    guard quotaAlertsEnabled, notificationAuthorization == .authorized,
+      !quotaAlertDeliveryState.isDelivering else { return }
     let evaluation = QuotaAlertEvaluator.evaluate(
       remainingPercent: weekly?.remainingPercent,
       resetAt: weekly?.resetsAt,
@@ -63,25 +65,60 @@ extension DashboardStore {
       ledger: quotaAlertLedger,
       now: now
     )
-    quotaAlertLedger = evaluation.ledger
-    if let data = try? JSONEncoder().encode(quotaAlertLedger) {
-      PulsePreferences.shared.set(data, forKey: "quotaAlertLedger")
+    // Preserve a pending entry into critical until its notification is accepted. Otherwise a
+    // failed re-entry within the prior six-hour cooldown would lose its eligibility to retry.
+    if !evaluation.candidates.contains(where: { $0.kind == .forecastCritical }) {
+      quotaAlertLedger.lastRisk = evaluation.ledger.lastRisk
     }
-    guard !evaluation.candidates.isEmpty else { return }
+    persistQuotaAlertLedger()
+    guard !evaluation.candidates.isEmpty,
+      let attempt = quotaAlertDeliveryState.begin(at: now) else { return }
     let remaining = weekly?.remainingPercent
     let forecast = quotaForecast
-    Task {
-      for candidate in evaluation.candidates {
-        await quotaNotificationService.deliver(candidate, remainingPercent: remaining, forecast: forecast)
+    let account = status?.accountScope
+    quotaAlertDeliveryTask = Task {
+      var hadFailure = false
+      defer {
+        if quotaAlertDeliveryState.finish(attempt, hadFailure: hadFailure, at: Date()) {
+          quotaAlertDeliveryTask = nil
+        }
       }
+      for candidate in evaluation.candidates {
+        guard !Task.isCancelled, quotaAlertDeliveryState.isCurrent(attempt),
+          status?.accountScope == account, quotaAlertsEnabled,
+          notificationAuthorization == .authorized else { return }
+        do {
+          try await quotaNotificationService.deliver(candidate, remainingPercent: remaining, forecast: forecast)
+          guard !Task.isCancelled, quotaAlertDeliveryState.isCurrent(attempt),
+            status?.accountScope == account else { return }
+          QuotaAlertDeliveryCommit.accepted(candidate, ledger: &quotaAlertLedger, at: Date())
+          persistQuotaAlertLedger()
+        } catch {
+          guard quotaAlertDeliveryState.isCurrent(attempt), status?.accountScope == account else { return }
+          hadFailure = true
+          dashboardLogger.notice("额度通知暂未被系统接受，将在冷却后重试：\(error.localizedDescription, privacy: .private)")
+        }
+      }
+    }
+  }
+
+  private func persistQuotaAlertLedger() {
+    if let data = try? JSONEncoder().encode(quotaAlertLedger) {
+      PulsePreferences.shared.set(data, forKey: "quotaAlertLedger")
     }
   }
 
   func prepareAccount(_ account: String?) {
     guard account != status?.accountScope else { return }
+    quotaAlertDeliveryTask?.cancel()
+    quotaAlertDeliveryTask = nil
+    quotaAlertDeliveryState.invalidate()
     quotaHistoryStore = QuotaHistoryStore(url: PulsePaths.support.appendingPathComponent("quota-history-\(account ?? "unconfirmed").json"))
     quotaAlertLedger = QuotaAlertLedger()
+    quotaHistory = []
+    quotaForecast = nil
     lastForecastEvent = nil
+    lastForecastAt = nil
     forecastGeneration += 1
   }
 

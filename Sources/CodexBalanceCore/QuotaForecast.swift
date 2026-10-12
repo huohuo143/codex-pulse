@@ -461,10 +461,15 @@ public enum QuotaAlertKind: Equatable, Sendable {
 public struct QuotaAlertCandidate: Equatable, Sendable {
   public var identifier: String
   public var kind: QuotaAlertKind
+  /// Proposed changes are committed only after the notification system accepts the request.
+  public var ledgerKeys: Set<String>
+  public var forecastCycle: String?
 
-  public init(identifier: String, kind: QuotaAlertKind) {
+  public init(identifier: String, kind: QuotaAlertKind, ledgerKeys: Set<String> = [], forecastCycle: String? = nil) {
     self.identifier = identifier
     self.kind = kind
+    self.ledgerKeys = ledgerKeys
+    self.forecastCycle = forecastCycle
   }
 }
 
@@ -489,6 +494,7 @@ public struct QuotaAlertLedger: Codable, Equatable, Sendable {
 
 public struct QuotaAlertEvaluation: Equatable, Sendable {
   public var candidates: [QuotaAlertCandidate]
+  /// Prospective ledger if every candidate is accepted. Delivery code commits individual receipts.
   public var ledger: QuotaAlertLedger
 }
 
@@ -518,7 +524,8 @@ public enum QuotaAlertEvaluator {
         for threshold in crossed { ledger.sentKeys.insert("threshold.\(cycle).\(threshold)") }
         candidates.append(QuotaAlertCandidate(
           identifier: "quota-threshold-\(cycle)-\(mostUrgent)",
-          kind: .threshold(mostUrgent)
+          kind: .threshold(mostUrgent),
+          ledgerKeys: Set(crossed.map { "threshold.\(cycle).\($0)" })
         ))
       }
     }
@@ -531,7 +538,8 @@ public enum QuotaAlertEvaluator {
         if enteredCritical || newCycle || cooldownElapsed {
           candidates.append(QuotaAlertCandidate(
             identifier: "quota-forecast-critical-\(cycle)-\(Int(now.timeIntervalSince1970 / (6 * 3600)))",
-            kind: .forecastCritical
+            kind: .forecastCritical,
+            forecastCycle: cycle
           ))
           ledger.lastForecastCriticalAt = now
           ledger.lastForecastCycle = cycle
@@ -550,7 +558,8 @@ public enum QuotaAlertEvaluator {
         ledger.sentKeys.insert(key)
         candidates.append(QuotaAlertCandidate(
           identifier: "quota-credit-\(Int64(expiry.timeIntervalSince1970))",
-          kind: .resetCreditExpiring(title: credit.title, expiresAt: expiry)
+          kind: .resetCreditExpiring(title: credit.title, expiresAt: expiry),
+          ledgerKeys: [key]
         ))
       }
     }

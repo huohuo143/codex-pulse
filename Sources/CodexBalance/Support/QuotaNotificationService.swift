@@ -18,7 +18,15 @@ enum QuotaNotificationAuthorization: Equatable {
 }
 
 @MainActor
-final class QuotaNotificationService: NSObject, UNUserNotificationCenterDelegate {
+protocol QuotaNotificationServing: AnyObject {
+  func authorizationStatus() async -> QuotaNotificationAuthorization
+  func requestAuthorization() async -> QuotaNotificationAuthorization
+  func deliver(_ candidate: QuotaAlertCandidate, remainingPercent: Double?, forecast: QuotaForecast?) async throws
+  func openSystemNotificationSettings()
+}
+
+@MainActor
+final class QuotaNotificationService: NSObject, UNUserNotificationCenterDelegate, QuotaNotificationServing {
   static let shared = QuotaNotificationService()
 
   private override init() {
@@ -49,7 +57,7 @@ final class QuotaNotificationService: NSObject, UNUserNotificationCenterDelegate
     return await authorizationStatus()
   }
 
-  func deliver(_ candidate: QuotaAlertCandidate, remainingPercent: Double?, forecast: QuotaForecast?) async {
+  func deliver(_ candidate: QuotaAlertCandidate, remainingPercent: Double?, forecast: QuotaForecast?) async throws {
     let content = UNMutableNotificationContent()
     content.sound = .default
     content.userInfo = ["route": "overview"]
@@ -72,7 +80,7 @@ final class QuotaNotificationService: NSObject, UNUserNotificationCenterDelegate
     }
 
     let request = UNNotificationRequest(identifier: candidate.identifier, content: content, trigger: nil)
-    try? await UNUserNotificationCenter.current().add(request)
+    try await UNUserNotificationCenter.current().add(request)
   }
 
   func openSystemNotificationSettings() {

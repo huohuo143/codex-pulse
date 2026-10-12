@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-2.11.4-8b7cff">
+  <img alt="Version" src="https://img.shields.io/badge/version-2.12.0-8b7cff">
   <img alt="macOS" src="https://img.shields.io/badge/macOS-14%2B-111827?logo=apple">
   <img alt="Mac architectures" src="https://img.shields.io/badge/Mac-arm64%20%7C%20x86__64-111827">
   <img alt="Swift" src="https://img.shields.io/badge/Swift-6.0-f05138?logo=swift&logoColor=white">
@@ -18,7 +18,11 @@
 
 `Codex 脉动` 将 Codex 的额度、Token 消耗、重置节奏和 Full reset 权益集中到一套原生 macOS 界面中。它既可以作为常驻悬浮框，也可以完全隐藏悬浮框，仅使用主窗口或 7 款桌面小组件。
 
-> 当前开发版本：`2.11.4` build 2125。主应用兼容 macOS 13；桌面小组件要求 macOS 14 或更高版本；本地构建为 ad-hoc 签名、未公证版本。
+> 当前版本：[2.12.0 build 2126](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.0)。主应用兼容 macOS 13；桌面小组件要求 macOS 14 或更高版本；本地构建为 ad-hoc 签名、未公证版本。
+
+## 2.12.0 额度历史与完整导出
+
+趋势页新增当前账户的官方额度历史，支持 24 小时、7 天、30 天、悬停查看及独立导出。用量 CSV 增加完整小时日期、本机逐日和设备快照/逐日数据；通知只有系统接受后才记账，失败可重试且不会重复提交。详见 [2.12.0 更新说明](docs/RELEASE_2.12.0.md)。
 
 ## 2.11.4 悬浮倒计时与到期批次
 
@@ -64,6 +68,7 @@ Tibo 动态列表保留公开源收录的最新 Posts / Replies，并读取页�
 | 能力 | 展示内容 |
 | --- | --- |
 | 官方额度 | Codex 7 天额度外环、可选的 5 小时额度内环、已用比例和重置倒计时 |
+| 额度历史 | 当前账户本机官方采样的 24 小时、7 天、30 天曲线，悬停明细、周期/缺测断线及 CSV 导出 |
 | 额度预测 | 本地记录官方额度百分点，估算消耗速度、耗尽区间、均衡日上限和风险等级 |
 | 原生提醒 | 用户主动开启后，按额度阈值、预测高风险和 Full reset 到期发送 macOS 通知 |
 | Token 统计 | 滚动 24 小时、最近 30 天按日趋势、多设备分色堆叠、今日、近 7 天、本月 Token，以及 input、cached input、output 和 model |
@@ -87,7 +92,7 @@ Tibo 动态列表保留公开源收录的最新 Posts / Replies，并读取页�
 主窗口分为“概览、趋势、分析、设置”四个区域：
 
 - 概览：7 天额度外环与可选的 5 小时额度内环、Token 汇总、重置雷达、Full reset 权益和最近额度事件；5 小时内环与设置中的“5 小时额度”选项同步。
-- 趋势：24 小时逐时视图、可横向滚动的最近 30 天按日视图、多设备分色堆叠与悬停明细，以及模型构成。
+- 趋势：官方额度历史、24 小时逐时视图、可横向滚动的最近 30 天按日视图、多设备分色堆叠与悬停明细，以及模型构成。
 - 分析：同期对比、月末推演、稳健异常检测、缓存/模型/项目集中度、项目预算和最近调用。
 - 设置：刷新频率、额度提醒、可靠性/自动化、版本更新、悬浮框、主题、Touch Bar 和桌面小组件。
 
@@ -175,6 +180,8 @@ flowchart LR
 - 版本检测不读取 GitHub Token 或账号，不上传本地数据，也不会自动下载或安装。
 
 ## 安装
+
+本地开发版 2.12.0 的安装包为 `Codex-Pulse-v2.12.0-build2126-20261011-arm64.dmg`，使用包内“安装或更新（保留设置）”脚本可保留配置与回滚备份。此版本尚未发布到 GitHub；以下链接仍指已公开发布的 2.11.4。
 
 在 [Releases](https://github.com/huohuo143/codex-pulse/releases) 下载：
 
