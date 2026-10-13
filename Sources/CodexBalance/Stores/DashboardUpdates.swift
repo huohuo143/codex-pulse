@@ -22,12 +22,13 @@ extension DashboardStore {
 
   func checkForAppUpdate(manual: Bool = true) {
     guard !appUpdateIsChecking else { return }
-    if !manual,
+    if !manual, appUpdateLastCheckError == nil,
        let lastAppUpdateCheckAt,
        Date().timeIntervalSince(lastAppUpdateCheckAt) < 24 * 60 * 60 {
       return
     }
 
+    if let retryAt = appUpdateRetryAt, retryAt > Date() { return }
     appUpdateIsChecking = true
     if manual { appUpdateStatusMessage = "正在检查 GitHub Releases…" }
     let service = appUpdateService
@@ -36,10 +37,16 @@ extension DashboardStore {
         let result = try await service.check(currentVersion: AppInfo.version)
         applyAppUpdateResult(result)
       } catch {
+        appUpdateLastCheckError = error.localizedDescription
         if manual || latestAppRelease == nil {
-          appUpdateStatusMessage = "版本检查失败：\(error.localizedDescription)"
+          let retained = latestAppReleaseVersionText.map { " · 已保留 \($0) 的上次结果" } ?? ""
+          appUpdateStatusMessage = error.localizedDescription + retained
         }
       }
+      let retryState = await service.retryStateSnapshot()
+      appUpdateRetryAt = retryState.nextAttemptAt
+      if let data = try? JSONEncoder().encode(retryState) { PulsePreferences.shared.set(data, forKey: "appUpdateRetryState") }
+      scheduleAppUpdateRetry()
       appUpdateIsChecking = false
     }
   }
@@ -58,6 +65,8 @@ extension DashboardStore {
   }
 
   func restartAppUpdateChecks() {
+    appUpdateRetryTimer?.invalidate()
+    appUpdateRetryTimer = nil
     appUpdateTimer?.invalidate()
     appUpdateTimer = nil
     guard automaticUpdateChecksEnabled else {
@@ -69,7 +78,20 @@ extension DashboardStore {
     DispatchQueue.main.async { [weak self] in self?.startAppUpdateChecks() }
   }
 
+  func scheduleAppUpdateRetry() {
+    appUpdateRetryTimer?.invalidate()
+    appUpdateRetryTimer = nil
+    guard servicesEnabled, automaticUpdateChecksEnabled, let retryAt = appUpdateRetryAt else { return }
+    let timer = Timer(timeInterval: max(1, retryAt.timeIntervalSinceNow), repeats: false) { [weak self] _ in
+      Task { @MainActor in self?.checkForAppUpdate(manual: false) }
+    }
+    RunLoop.main.add(timer, forMode: .common)
+    appUpdateRetryTimer = timer
+  }
+
   func restoreCachedAppUpdate(defaults: UserDefaults) {
+    appUpdateRetryAt = AppUpdateRetryState(data: defaults.data(forKey: "appUpdateRetryState")).nextAttemptAt
+    if let retryAt = appUpdateRetryAt, retryAt > Date() { appUpdateLastCheckError = "暂未刷新版本信息"; scheduleAppUpdateRetry() }
     guard let data = defaults.data(forKey: "cachedAppRelease"),
           let release = try? JSONDecoder().decode(AppRelease.self, from: data),
           let currentVersion = SemanticVersion(AppInfo.version),
@@ -81,9 +103,14 @@ extension DashboardStore {
           )
     else { return }
     applyAppUpdateResult(result, persist: false)
+    if let retryAt = appUpdateRetryAt, retryAt > Date() {
+      appUpdateLastCheckError = "暂未刷新版本信息"
+      appUpdateStatusMessage = "暂未刷新版本信息 · 已保留 " + release.tagName + " 的上次结果"
+    }
   }
 
   func applyAppUpdateResult(_ result: AppUpdateResult, persist: Bool = true) {
+    appUpdateLastCheckError = nil
     latestAppRelease = result.release
     appUpdateAvailability = result.availability
     lastAppUpdateCheckAt = result.checkedAt

@@ -12,7 +12,7 @@ struct AppUpdateSettingsView: View {
           VStack(alignment: .leading, spacing: 3) {
             Text("版本更新")
               .font(.system(size: 15, weight: .bold))
-            Text("自动检测 GitHub Releases 的正式版本，不会自动下载或安装")
+            Text("自动检测正式版本，不会自动下载或安装")
               .font(.caption)
               .foregroundStyle(DashboardColors.subtleText)
           }
@@ -23,7 +23,7 @@ struct AppUpdateSettingsView: View {
         Toggle("自动检测版本更新", isOn: $store.automaticUpdateChecksEnabled)
           .font(.system(size: 12.5, weight: .bold))
 
-        Text("开启后在 APP 启动时检查，成功检查后 24 小时内不重复请求；网络失败会保留上次结果并稍后重试。")
+        Text("开启后在 APP 启动时检查，成功后 24 小时内不重复请求；限流或断网时保留上次结果，按重试时间恢复。")
           .font(.caption)
           .foregroundStyle(DashboardColors.subtleText)
 
@@ -65,9 +65,9 @@ struct AppUpdateSettingsView: View {
           Button("立即检查", systemImage: "arrow.triangle.2.circlepath") {
             store.checkForAppUpdate()
           }
-          .disabled(store.appUpdateIsChecking)
+          .disabled(store.appUpdateIsChecking || (store.appUpdateRetryAt.map { $0 > Date() } ?? false))
 
-          if store.latestAppRelease != nil {
+          Group {
             Button(store.appUpdateAvailable ? "查看并下载" : "查看发布页", systemImage: "safari") {
               store.openAppUpdatePage()
             }
@@ -84,12 +84,14 @@ struct AppUpdateSettingsView: View {
 
   private var checkDetail: String {
     let current = "当前 v\(AppInfo.version)"
+    if let retry = store.appUpdateRetryAt, retry > Date() { return current + " · 可重试于 " + retry.formatted(date: .omitted, time: .shortened) }
     guard let last = store.lastAppUpdateCheckAt else { return current + " · 尚无成功检查" }
     return current + " · 上次检查 " + last.formatted(date: .abbreviated, time: .shortened)
   }
 
   private var statusSymbol: String {
     if store.appUpdateIsChecking { return "arrow.clockwise" }
+    if store.appUpdateLastCheckError != nil { return "clock.arrow.circlepath" }
     return switch store.appUpdateAvailability {
     case .updateAvailable: "arrow.down.circle.fill"
     case .upToDate: "checkmark.seal.fill"
@@ -99,7 +101,8 @@ struct AppUpdateSettingsView: View {
   }
 
   private var statusColor: Color {
-    switch store.appUpdateAvailability {
+    if store.appUpdateLastCheckError != nil { return .orange }
+    return switch store.appUpdateAvailability {
     case .updateAvailable: store.palette.weekly
     case .upToDate: .green
     case .localVersionNewer: .blue
@@ -118,6 +121,7 @@ struct AppUpdateSettingsView: View {
 
   private var badgeText: String {
     if store.appUpdateIsChecking { return "检查中" }
+    if store.appUpdateLastCheckError != nil { return "待重试" }
     return switch store.appUpdateAvailability {
     case .updateAvailable: "有新版本"
     case .upToDate: "已是最新"

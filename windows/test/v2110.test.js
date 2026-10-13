@@ -606,6 +606,7 @@ test("semantic versions, release asset filtering and 24h throttling", async (t) 
   let calls = 0;
   const service = new UpdateService(new Store(await temp(t)), {
     version: "2.11.0",
+    manifestEndpoint: null,
     now: () => now,
     fetcher: async () => {
       calls++;

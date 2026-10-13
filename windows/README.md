@@ -1,16 +1,16 @@
-# Codex 脉动 Windows 2.12.2
+# Codex 脉动 Windows 2.12.3
 
-面向 Windows 10/11 x64 的 Codex 状态面板、独立悬浮框与七类桌面卡片。界面和功能继续对齐macOS 2.12.2，并保留 2.12.1 环形布局修复；验证状态见 [验收报告](docs/VALIDATION_2.12.2.md)。
+面向 Windows 10/11 x64 的 Codex 状态面板、独立悬浮框与七类桌面卡片。界面和功能继续对齐macOS 2.12.3，并保留 2.12.1 环形布局修复；验证状态见 [验收报告](docs/VALIDATION_2.12.3.md)。
 
-> 2.12.2 已完成 Windows 10 x64 原生测试、打包、备份升级和已安装界面检查。下载 [Windows 安装包](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.2)，查看 [验证范围](docs/VALIDATION_2.12.2.md)。
+> 2.12.3 已完成 Windows 10 x64 原生测试、打包、备份升级和已安装界面检查。下载 [Windows 安装包](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.3)，查看 [验证范围](docs/VALIDATION_2.12.3.md)。
 
 ## 安装与使用
 
-在 [v2.12.2 发布页](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.2) 下载；本地构建的交付文件位于 dist（本地仍使用中文“安装版／免安装”文件名）：
+在 [v2.12.3 发布页](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.3) 下载；本地构建的交付文件位于 dist：
 
-- Codex-Pulse-Windows-2.12.2-x64-Installer.exe：安装向导、桌面与开始菜单快捷方式。
-- Codex-Pulse-Windows-2.12.2-x64-Portable.exe：双击运行，无需安装 Node.js。
-- SHA256SUMS-2.12.2.txt：文件校验值。旧 2.12.1 产物保留。
+- Codex-Pulse-Windows-2.12.3-x64-Installer.exe：安装向导、桌面与开始菜单快捷方式。
+- Codex-Pulse-Windows-2.12.3-x64-Portable.exe：双击运行，无需安装 Node.js。
+- SHA256SUMS-2.12.3.txt：文件校验值。旧 2.12.1 产物保留。
 
 需要本机已安装并登录 Codex 桌面版或 CLI。首次打开显示主窗口；在设置中开启悬浮框、桌面卡片和通知。关闭窗口后继续托盘运行，从托盘选择“退出 Codex 脉动”才会结束全部窗口与后台任务。
 
@@ -73,4 +73,6 @@ npm run dist:win
 
 测试隔离环境变量：CODEX_PULSE_SUPPORT_DIR 指定独立数据目录；CODEX_PULSE_SESSION_ROOT 指定测试会话；CODEX_PULSE_OFFLINE=1 禁止测试实例联网和同步；CODEX_PULSE_ACCEPTANCE=1 每分钟写脱敏运行验收记录。正式使用无需设置这些变量。
 
-详见 [功能对齐](docs/v2.12.2-feature-parity.md)、[升级说明](docs/UPGRADE_2.12.2.md) 和 [验收报告](docs/VALIDATION_2.12.2.md)。
+详见 [功能对齐](docs/v2.12.3-feature-parity.md)、[升级说明](docs/UPGRADE_2.12.3.md) 和 [验收报告](docs/VALIDATION_2.12.3.md)。
+
+2.12.3 同步改进限流恢复：公开清单优先、API备用；持久化冷却，保留成功时间和缓存，失败时发布页仍可打开，成功后清除旧错误。

@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-2.12.2-8b7cff">
+  <img alt="Version" src="https://img.shields.io/badge/version-2.12.3-8b7cff">
   <img alt="macOS" src="https://img.shields.io/badge/macOS-14%2B-111827?logo=apple">
   <img alt="Mac architectures" src="https://img.shields.io/badge/Mac-arm64%20%7C%20x86__64-111827">
   <img alt="Swift" src="https://img.shields.io/badge/Swift-6.0-f05138?logo=swift&logoColor=white">
@@ -18,7 +18,11 @@
 
 `Codex 脉动` 将 Codex 的额度、Token 消耗、重置节奏和 Full reset 权益集中到一套原生 macOS 界面中。它既可以作为常驻悬浮框，也可以完全隐藏悬浮框，仅使用主窗口或 7 款桌面小组件。
 
-> 当前开发版本：`2.12.2` build 2128（本地版本）。主应用兼容 macOS 13；桌面小组件要求 macOS 14 或更高版本；本地构建为 ad-hoc 签名、未公证版本。
+> 当前版本：`2.12.3` build 2129。主应用兼容 macOS 13；桌面小组件要求 macOS 14 或更高版本；本地构建为 ad-hoc 签名、未公证版本。
+
+## 2.12.3 更新检查与限流恢复
+
+优先查询公开版本清单，GitHub API 作为备用；限流和断网时保留最近成功结果，按服务器恢复时间等待，重启后继续遵守冷却。Windows 安装包检查按钮保持正确状态。详见 [更新说明](docs/RELEASE_2.12.3.md)。
 
 ## 2.12.2 跨平台可靠性与操作反馈
 
@@ -189,13 +193,13 @@ flowchart LR
 
 ## 安装
 
-当前版本为 **2.12.2 / Build 2128**。在 [v2.12.2 发布页](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.2) 下载 Apple Silicon Mac 安装包或 Windows x64 安装版、免安装版。完整步骤见 [安装与升级](docs/INSTALL_UPGRADE_2.12.2.md)，测试范围见 [验证说明](docs/VALIDATION_2.12.2.md)。
+当前版本为 **2.12.3 / Build 2129**。在 [v2.12.3 发布页](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.3) 下载 Apple Silicon Mac 安装包或 Windows x64 安装版、免安装版。完整步骤见 [安装与升级](docs/INSTALL_UPGRADE_2.12.3.md)，测试范围见 [验证说明](docs/VALIDATION_2.12.3.md)。
 
 在 [Releases](https://github.com/huohuo143/codex-pulse/releases) 下载：
 
 ```text
-Codex-Pulse-v2.12.2-build2128-20261013-arm64.dmg
-Codex-Pulse-v2.12.2-build2128-20261013-arm64.dmg.sha256
+Codex-Pulse-v2.12.3-build2129-20261013-arm64.dmg
+Codex-Pulse-v2.12.3-build2129-20261013-arm64.dmg.sha256
 ```
 
 1. 打开 DMG。
@@ -207,7 +211,7 @@ Codex-Pulse-v2.12.2-build2128-20261013-arm64.dmg.sha256
 
 ## 与旧版并行
 
-| 项目 | Codex 脉动 2.12.2 | 旧算力码表 0.1.0 |
+| 项目 | Codex 脉动 2.12.3 | 旧算力码表 0.1.0 |
 | --- | --- | --- |
 | App | `Codex 脉动.app` | `算力码表.app` |
 | Bundle ID | `dev.codex.balance-dashboard.codex` | `dev.codex.balance-dashboard` |
@@ -331,3 +335,5 @@ ARCH=arm64 ./script/create_transfer_package.sh
 ## License
 
 本项目采用 [MIT License](LICENSE)。
+
+更新检查优先读取本项目 `updates/latest.json` 公开版本清单，GitHub API 为备用。维护者应在发布并核对附件后，运行 `python3 script/update_release_manifest.py --tag v2.12.3` 并同步清单，保持下载版本与正式发布一致。

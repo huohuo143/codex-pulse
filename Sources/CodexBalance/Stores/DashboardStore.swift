@@ -48,6 +48,8 @@ final class DashboardStore: ObservableObject {
   @Published var appUpdateIsChecking = false
   @Published var appUpdateStatusMessage = "尚未检查版本更新"
   @Published var lastAppUpdateCheckAt: Date?
+  @Published var appUpdateRetryAt: Date?
+  @Published var appUpdateLastCheckError: String?
   @Published var quotaAlertsEnabled: Bool
   @Published var notificationAuthorization: QuotaNotificationAuthorization = .notDetermined
   @Published var quotaAlertPreset: QuotaAlertPreset {
@@ -231,7 +233,7 @@ final class DashboardStore: ObservableObject {
   let projectBudgetStore = ProjectBudgetStore()
   let reliabilityEventStore = ReliabilityEventStore()
   let localAutomationArchive = LocalAutomationArchive()
-  let appUpdateService = GitHubReleaseUpdateService()
+  let appUpdateService = GitHubReleaseUpdateService(retryState: AppUpdateRetryState(data: PulsePreferences.shared.data(forKey: "appUpdateRetryState")))
   lazy var quotaNotificationService: any QuotaNotificationServing = QuotaNotificationService.shared
   let servicesEnabled: Bool
   let quotaAlertLedgerStore: QuotaAlertLedgerStore
@@ -248,6 +250,7 @@ final class DashboardStore: ObservableObject {
   var codexRadarNetworkRecoveryGate = CodexRadarNetworkRecoveryGate()
   var reliabilityTimer: Timer?
   var appUpdateTimer: Timer?
+  var appUpdateRetryTimer: Timer?
   var fullRefreshInFlight = false
   var isWindowDragging = false
   var refreshRequestedAfterDrag = false

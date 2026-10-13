@@ -150,10 +150,12 @@ $("#diagnostics").addEventListener("click", () =>
 $("#checkUpdates").addEventListener("click", async () => {
   const button = $("#checkUpdates");
   button.disabled = true;
+  let updates;
   try {
-    await window.suanli.checkUpdates();
+    updates = await window.suanli.checkUpdates();
   } finally {
-    button.disabled = false;
+    button.disabled =
+      Date.parse(updates?.nextRetryAt || status?.updates?.nextRetryAt) > Date.now();
   }
 });
 $("#downloadUpdate").addEventListener("click", () =>
@@ -363,7 +365,8 @@ function renderExtras(next) {
     .map((e) => formatDate(e.at) + " " + e.message)
     .join("\n");
   $("#updateState").textContent = next.updates?.message || "尚未检查更新";
-  $("#downloadUpdate").disabled = !next.updates?.available;
+  $("#downloadUpdate").disabled = false;
+  $("#checkUpdates").disabled = Date.parse(next.updates?.nextRetryAt) > Date.now();
   const expiry = next.creditExpiry,
     es = JSON.stringify(expiry);
   if (es !== expirySignature) {

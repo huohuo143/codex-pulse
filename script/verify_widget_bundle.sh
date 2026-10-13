@@ -2,8 +2,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VERSION="${VERSION:-2.12.2}"
-BUILD_NUMBER="${BUILD_NUMBER:-2128}"
+VERSION="${VERSION:-2.12.3}"
+BUILD_NUMBER="${BUILD_NUMBER:-2129}"
 ARCH="${ARCH:-$(uname -m)}"
 BUNDLE_ID="${CODEX_PULSE_BUNDLE_ID:-dev.codex.balance-dashboard.codex}"
 APP_BUNDLE="${1:-$ROOT_DIR/dist/build-v$VERSION-build$BUILD_NUMBER-$ARCH/Codex 脉动.app}"
