@@ -91,6 +91,98 @@ struct ReliabilityAutomationTests {
   }
 
   @Test
+  func emptyBackupRetriesAfterFirstSourceAppears() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let source = root.appendingPathComponent("quota-history-account-a.json")
+    let archive = LocalAutomationArchive(root: root.appendingPathComponent("automation"))
+    let now = Date()
+    let empty = try archive.backup(sourceURLs: [source], now: now)
+    #expect(empty.itemCount == 0)
+    #expect(!archive.hasBackup(for: now, sourceURLs: [source]))
+    #expect(!archive.hasBackup(for: now))
+
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    try Data("{\"sample\":1}".utf8).write(to: source)
+    _ = try archive.backup(sourceURLs: [source], now: now)
+    #expect(archive.hasBackup(for: now, sourceURLs: [source]))
+  }
+
+  @Test
+  func failedWriteDoesNotMarkDirectoryCompleteAndCanRetry() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let source = root.appendingPathComponent("source/history.json")
+    try FileManager.default.createDirectory(at: source.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try Data("{\"sample\":1}".utf8).write(to: source)
+    let archive = LocalAutomationArchive(root: root.appendingPathComponent("automation"))
+    let now = Date()
+    let empty = try archive.backup(sourceURLs: [], now: now)
+    let blockedTarget = empty.outputURL.appendingPathComponent(source.lastPathComponent, isDirectory: true)
+    try FileManager.default.createDirectory(at: blockedTarget, withIntermediateDirectories: true)
+    try Data("keep".utf8).write(to: blockedTarget.appendingPathComponent("blocker"))
+    #expect(throws: (any Error).self) { try archive.backup(sourceURLs: [source], now: now) }
+    #expect(!archive.hasBackup(for: now, sourceURLs: [source]))
+    #expect(!archive.hasBackup(for: now))
+
+    try FileManager.default.removeItem(at: blockedTarget)
+    let result = try archive.backup(sourceURLs: [source], now: now)
+    #expect(result.itemCount == 1)
+    #expect(archive.hasBackup(for: now, sourceURLs: [source]))
+  }
+
+  @Test
+  func sameDayBackupAddsNewAccountAndLaterHistoryWithoutRequiringUnchangedSources() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    let budgets = root.appendingPathComponent("project-budgets-v1.json")
+    let accountA = root.appendingPathComponent("quota-history-account-a.json")
+    let accountB = root.appendingPathComponent("quota-history-account-b.json")
+    try Data("{\"budget\":1}".utf8).write(to: budgets)
+    let archive = LocalAutomationArchive(root: root.appendingPathComponent("automation"))
+    let now = Date()
+    _ = try archive.backup(sourceURLs: [accountA, budgets], now: now)
+    #expect(archive.hasBackup(for: now, sourceURLs: [accountA, budgets]))
+
+    try Data("{\"account\":\"a\"}".utf8).write(to: accountA)
+    #expect(!archive.hasBackup(for: now, sourceURLs: [accountA, budgets]))
+    _ = try archive.backup(sourceURLs: [accountA, budgets], now: now)
+    try Data("{\"account\":\"b\"}".utf8).write(to: accountB)
+    #expect(!archive.hasBackup(for: now, sourceURLs: [accountB, budgets]))
+    let result = try archive.backup(sourceURLs: [accountB, budgets], now: now)
+    #expect(archive.hasBackup(for: now, sourceURLs: [accountA, budgets]))
+    #expect(archive.hasBackup(for: now, sourceURLs: [accountB, budgets]))
+
+    try Data("{\"account\":\"a\",\"newSample\":2}".utf8).write(to: accountA)
+    #expect(archive.hasBackup(for: now, sourceURLs: [accountA, budgets]))
+    let savedA = result.outputURL.appendingPathComponent(accountA.lastPathComponent)
+    #expect(try String(contentsOf: savedA, encoding: .utf8) == "{\"account\":\"a\"}")
+    try Data("truncated".utf8).write(to: savedA)
+    #expect(!archive.hasBackup(for: now, sourceURLs: [accountA, budgets]))
+    #expect(archive.hasBackup(for: now, sourceURLs: [accountB, budgets]))
+  }
+
+  @Test
+  func legacyBackupDirectoryDoesNotBlockVerifiedRetryOrLoseUnrelatedFiles() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let archive = LocalAutomationArchive(root: root.appendingPathComponent("automation"))
+    let now = Date()
+    let empty = try archive.backup(sourceURLs: [], now: now)
+    try FileManager.default.createDirectory(at: empty.outputURL, withIntermediateDirectories: true)
+    let legacy = empty.outputURL.appendingPathComponent("old-account-history.json")
+    let original = Data("{\"legacy\":true}".utf8)
+    try original.write(to: legacy)
+    #expect(!archive.hasBackup(for: now))
+    let source = root.appendingPathComponent("quota-history-account-a.json")
+    try Data("{\"current\":true}".utf8).write(to: source)
+    _ = try archive.backup(sourceURLs: [source], now: now)
+    #expect(archive.hasBackup(for: now, sourceURLs: [source]))
+    #expect(try Data(contentsOf: legacy) == original)
+  }
+
+  @Test
   func eventStoreIsBoundedAndRecoversFromCorruption() throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }

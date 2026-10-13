@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:; connect-src 'none'"
+    />
+    <title>Codex 脉动桌面卡片</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="card.css" />
+  </head>
+  <body>
+    <main id="desktopCard">
+      <header class="drag-region">
+        <strong id="cardTitle">Codex 脉动</strong>
+        <div class="no-drag">
+          <button id="pin" title="切换置顶">◇</button
+          ><button id="open" title="打开主窗口">↗</button
+          ><button id="close" title="隐藏卡片">×</button>
+        </div>
+      </header>
+      <section id="content"><p>正在读取共享数据…</p></section>
+      <footer id="freshness">等待数据</footer>
+    </main>
+    <script src="../core/display-labels.js"></script>
+    <script src="error-message.js"></script>
+    <script src="card.js"></script>
+  </body>
+</html>

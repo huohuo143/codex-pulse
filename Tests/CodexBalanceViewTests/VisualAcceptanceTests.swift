@@ -12,18 +12,18 @@ struct VisualAcceptanceTests {
     try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
     let now = Date()
     let batches = [
-      CreditExpiryBatch(id: "grant-a", title: "测试额度 A", grantedCredits: 10_000, expiryDate: "2030-12-31",
-        note: "用于验证明确到期日期的测试数据。",
-        record: .init(expiresAt: CreditExpiryBatch.localDate("2030-12-31")!, source: "验收示例", confirmedAt: now, accountScope: "fixture")),
-      CreditExpiryBatch(id: "grant-b", title: "测试额度 B", grantedCredits: 500, grantedAmountUSD: 20,
-        expiryDate: "2031-07-24", basis: .oneYearFromNotice,
-        note: "用于验证推算日期标识的测试数据。",
-        record: .init(expiresAt: CreditExpiryBatch.localDate("2031-07-24")!, source: "验收示例", confirmedAt: now, accountScope: "fixture"))
+      CreditExpiryBatch(id: "september", title: "9月额度", grantedCredits: 62_500, expiryDate: "2026-12-31",
+        note: "9月30日官方邮件明确注明到期日。",
+        record: .init(expiresAt: CreditExpiryBatch.localDate("2026-12-31")!, source: "验收示例", confirmedAt: now, accountScope: "fixture")),
+      CreditExpiryBatch(id: "july", title: "7月活动赠送", grantedCredits: 2_500, grantedAmountUSD: 100,
+        expiryDate: "2027-07-24", basis: .oneYearFromNotice,
+        note: "发放后一年过期；按7月24日邮件日期推算，实际发放日期待核实。",
+        record: .init(expiresAt: CreditExpiryBatch.localDate("2027-07-24")!, source: "验收示例", confirmedAt: now, accountScope: "fixture"))
     ]
     let metadata = SourceReadMetadata(source: "验收示例", sampledAt: now, lastAttemptAt: now, lastSuccessAt: now)
     for scheme in [ColorScheme.light, .dark] {
       for width in [640, 680] {
-        let view = FlexibleCreditsView(balance: .init(hasCredits: true, balanceCredits: 12_345.0), isLoading: false,
+        let view = FlexibleCreditsView(balance: .init(hasCredits: true, balanceCredits: 64_710.1), isLoading: false,
           tint: .green, expiryBatches: batches, metadata: metadata)
           .environment(\.colorScheme, scheme)
         try render(view, size: NSSize(width: width, height: 300),

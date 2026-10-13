@@ -1,0 +1,53 @@
+{
+  "name": "suanli-dashboard-windows",
+  "version": "2.12.2",
+  "description": "Codex 脉动 Windows：额度预测、Token、预算、雷达与桌面卡片",
+  "main": "src/main.js",
+  "author": "Tilo Liang",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "test": "node --test test/*.test.js",
+    "pack:win": "electron-builder --win portable --x64",
+    "dist:win": "electron-builder --win nsis portable --x64",
+    "test:performance": "node --test test/performance.test.js"
+  },
+  "devDependencies": {
+    "electron": "43.1.0",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "dev.codex.balance-dashboard.codex.windows",
+    "productName": "Codex 脉动",
+    "artifactName": "Codex脉动-Windows-${version}-${arch}-免安装.${ext}",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "artifactName": "Codex脉动-Windows-${version}-${arch}-安装版.${ext}",
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Codex 脉动"
+    },
+    "portable": {
+      "artifactName": "Codex脉动-Windows-${version}-${arch}-免安装.${ext}"
+    }
+  }
+}

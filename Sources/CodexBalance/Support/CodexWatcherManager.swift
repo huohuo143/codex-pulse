@@ -3,6 +3,7 @@ import Darwin
 
 enum CodexWatcherManager {
   private static let label = "dev.codex.balance-dashboard.codex.watch-codex"
+  private static let scriptVersion = 2
 
   private static var applicationSupportURL: URL {
     FileManager.default.homeDirectoryForCurrentUser
@@ -82,20 +83,22 @@ enum CodexWatcherManager {
     }
   }
 
-  private static func watcherScript(appPath: String) -> String {
+  static func watcherScript(appPath: String) -> String {
     """
     #!/bin/zsh
     set -u
 
+    WATCHER_SCRIPT_VERSION=\(scriptVersion)
     APP_PATH=\(shellQuote(appPath))
     BUILD_LOCK="$HOME/Library/Application Support/CodexSuanliMeter/build.lock"
-    WATCH_LOCK_DIR="$HOME/Library/Application Support/CodexSuanliMeter/watch.lock"
+    WATCH_LOCK_FILE="$HOME/Library/Application Support/CodexSuanliMeter/watch-process.lock"
     BUNDLE_ID="dev.codex.balance-dashboard.codex"
 
-    if ! /bin/mkdir "$WATCH_LOCK_DIR" 2>/dev/null; then
-      exit 0
-    fi
-    trap '/bin/rmdir "$WATCH_LOCK_DIR" 2>/dev/null || true' EXIT
+    # A kernel-owned lock is released even after SIGKILL or a crash. Leave the
+    # legacy watch.lock directory untouched; it no longer controls startup.
+    zmodload zsh/system || exit 1
+    : >> "$WATCH_LOCK_FILE" || exit 1
+    zsystem flock -t 0 -f WATCH_LOCK_FD "$WATCH_LOCK_FILE" || exit 0
     trap 'exit 0' HUP INT TERM
 
     resolve_dashboard_app() {
@@ -195,14 +198,18 @@ enum CodexWatcherManager {
     guard let script = try? String(contentsOf: scriptURL, encoding: .utf8) else {
       return false
     }
+    return isCurrentInstallation(script: script, appURL: appURL)
+  }
 
+  static func isCurrentInstallation(script: String, appURL: URL) -> Bool {
     let appPath = appURL.standardizedFileURL.path
-    return script.contains("APP_PATH=\(shellQuote(appPath))") &&
+    return script.contains("WATCHER_SCRIPT_VERSION=\(scriptVersion)") &&
+      script.contains("APP_PATH=\(shellQuote(appPath))") &&
       script.contains("resolve_dashboard_app()") &&
       script.contains("is_codex_running()") &&
       script.contains("/ChatGPT[.]app/Contents/MacOS/ChatGPT") &&
       script.contains("trap 'exit 0' HUP INT TERM") &&
-      script.contains("WATCH_LOCK_DIR=") &&
+      script.contains("zsystem flock -t 0 -f WATCH_LOCK_FD") &&
       script.contains("--background")
   }
 

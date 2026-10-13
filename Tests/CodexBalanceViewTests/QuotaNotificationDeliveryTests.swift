@@ -9,7 +9,9 @@ struct QuotaNotificationDeliveryTests {
     let now = Date()
     let service = TestQuotaNotificationService()
     service.shouldFail = true
-    let store = makeStore(service: service, now: now)
+    let ledger = TestQuotaLedgerDefaults()
+    defer { ledger.clean() }
+    let store = makeStore(service: service, now: now, ledgerStore: ledger.store)
     store.evaluateQuotaAlerts(now: now)
     let first = try #require(store.quotaAlertDeliveryTask)
     await first.value
@@ -32,7 +34,9 @@ struct QuotaNotificationDeliveryTests {
     let now = Date()
     let service = TestQuotaNotificationService()
     service.suspendDelivery = true
-    let store = makeStore(service: service, now: now)
+    let ledger = TestQuotaLedgerDefaults()
+    defer { ledger.clean() }
+    let store = makeStore(service: service, now: now, ledgerStore: ledger.store)
     store.evaluateQuotaAlerts(now: now)
     let pending = try #require(store.quotaAlertDeliveryTask)
     await service.waitForDelivery()
@@ -47,7 +51,9 @@ struct QuotaNotificationDeliveryTests {
   @MainActor @Test func failedCriticalReentryRetriesWithinPriorSixHourCooldownThenDeduplicates() async throws {
     let now = Date()
     let service = TestQuotaNotificationService()
-    let store = makeStore(service: service, now: now)
+    let ledger = TestQuotaLedgerDefaults()
+    defer { ledger.clean() }
+    let store = makeStore(service: service, now: now, ledgerStore: ledger.store)
     store.quotaThresholdAlertsEnabled = false
     store.quotaForecastAlertsEnabled = true
     let reset = try #require(store.weekly?.resetsAt)
@@ -91,7 +97,9 @@ struct QuotaNotificationDeliveryTests {
     let now = Date()
     let service = TestQuotaNotificationService()
     service.suspendDelivery = true
-    let store = makeStore(service: service, now: now)
+    let ledger = TestQuotaLedgerDefaults()
+    defer { ledger.clean() }
+    let store = makeStore(service: service, now: now, ledgerStore: ledger.store)
     store.quotaHistory = [.init(recordedAt: now, remainingPercent: 14,
       resetsAt: now.addingTimeInterval(86400), windowMinutes: 10080)]
     store.quotaForecast = QuotaForecast(generatedAt: now)
@@ -113,7 +121,9 @@ struct QuotaNotificationDeliveryTests {
 
   @MainActor @Test func disabledAlertsNeverSubmitOrRequestAuthorization() {
     let service = TestQuotaNotificationService()
-    let store = makeStore(service: service, now: Date())
+    let ledger = TestQuotaLedgerDefaults()
+    defer { ledger.clean() }
+    let store = makeStore(service: service, now: Date(), ledgerStore: ledger.store)
     store.quotaAlertsEnabled = false
     store.evaluateQuotaAlerts()
     #expect(store.quotaAlertDeliveryTask == nil)
@@ -121,8 +131,65 @@ struct QuotaNotificationDeliveryTests {
     #expect(service.authorizationRequests == 0)
   }
 
-  @MainActor private func makeStore(service: TestQuotaNotificationService, now: Date) -> DashboardStore {
-    let store = DashboardStore(startServices: false)
+  @MainActor @Test func acceptedThresholdSurvivesRestartAndAccountRoundTrip() async throws {
+    let now = Date()
+    let ledger = TestQuotaLedgerDefaults()
+    defer { ledger.clean() }
+    let firstService = TestQuotaNotificationService()
+    let first = makeStore(service: firstService, now: now, ledgerStore: ledger.store, account: "account-a")
+    first.evaluateQuotaAlerts(now: now)
+    await (try #require(first.quotaAlertDeliveryTask)).value
+    #expect(firstService.deliveries.count == 1)
+
+    let restartedService = TestQuotaNotificationService()
+    let restarted = makeStore(service: restartedService, now: now, ledgerStore: ledger.store, account: "account-a")
+    restarted.evaluateQuotaAlerts(now: now)
+    #expect(restartedService.deliveries.isEmpty)
+    #expect(restarted.quotaAlertLedger.sentKeys == first.quotaAlertLedger.sentKeys)
+
+    restarted.prepareAccount("account-b")
+    restarted.status?.accountScope = "account-b"
+    restarted.evaluateQuotaAlerts(now: now)
+    await (try #require(restarted.quotaAlertDeliveryTask)).value
+    #expect(restartedService.deliveries.count == 1)
+    restarted.prepareAccount("account-a")
+    restarted.status?.accountScope = "account-a"
+    restarted.evaluateQuotaAlerts(now: now)
+    #expect(restarted.quotaAlertDeliveryTask == nil)
+    #expect(restartedService.deliveries.count == 1)
+  }
+
+  @MainActor @Test func unscopedLegacyReceiptsArePreservedWithoutBindingToNewAccount() async throws {
+    let now = Date()
+    let ledger = TestQuotaLedgerDefaults()
+    defer { ledger.clean() }
+    let cycle = String(Int64(now.addingTimeInterval(86400).timeIntervalSince1970 / 60))
+    let old = QuotaAlertLedger(sentKeys: ["threshold.\(cycle).30", "threshold.\(cycle).15"])
+    let legacyData = try JSONEncoder().encode(old)
+    ledger.defaults.set(legacyData, forKey: "quotaAlertLedger")
+    let service = TestQuotaNotificationService()
+    let store = makeStore(service: service, now: now, ledgerStore: ledger.store, account: "new-account")
+    #expect(store.quotaAlertLedger.sentKeys.isEmpty)
+    store.evaluateQuotaAlerts(now: now)
+    await (try #require(store.quotaAlertDeliveryTask)).value
+    #expect(service.deliveries.count == 1)
+    #expect(ledger.defaults.data(forKey: "quotaAlertLedger") == legacyData)
+  }
+
+  @MainActor @Test func unconfirmedAccountDoesNotDeliverOrAdoptReceipts() {
+    let ledger = TestQuotaLedgerDefaults()
+    defer { ledger.clean() }
+    let service = TestQuotaNotificationService()
+    let store = makeStore(service: service, now: Date(), ledgerStore: ledger.store, account: nil)
+    store.evaluateQuotaAlerts()
+    #expect(store.quotaAlertDeliveryTask == nil)
+    #expect(service.deliveries.isEmpty)
+    #expect(store.quotaAlertLedger.sentKeys.isEmpty)
+  }
+
+  @MainActor private func makeStore(service: TestQuotaNotificationService, now: Date,
+                                    ledgerStore: QuotaAlertLedgerStore, account: String? = "test-account") -> DashboardStore {
+    let store = DashboardStore(startServices: false, alertLedgerStore: ledgerStore)
     store.quotaNotificationService = service
     store.quotaAlertsEnabled = true
     store.notificationAuthorization = .authorized
@@ -130,13 +197,13 @@ struct QuotaNotificationDeliveryTests {
     store.quotaThresholdAlertsEnabled = true
     store.quotaForecastAlertsEnabled = false
     store.quotaResetCreditAlertsEnabled = false
-    store.quotaAlertLedger = QuotaAlertLedger()
     let event = RateLimitEvent(timestamp: now, sourceName: "test", sourcePath: "", limitID: "quota",
       limitName: "quota", primary: .init(usedPercent: 86, remainingPercent: 14,
         windowMinutes: 10080, resetsAt: now.addingTimeInterval(86400)))
     var status = CodexStatus(generatedAt: now, codexHome: "", sessionsRoot: "", main: event)
-    status.accountScope = "test-account"
+    status.accountScope = account
     status.quotaRead = .init(sampledAt: now, lastSuccessAt: now)
+    store.prepareAccount(account)
     store.status = status
     return store
   }
@@ -175,4 +242,17 @@ private final class TestQuotaNotificationService: QuotaNotificationServing {
     resumeWaiter?.resume()
     resumeWaiter = nil
   }
+}
+
+private struct TestQuotaLedgerDefaults {
+  let suiteName: String
+  let defaults: UserDefaults
+
+  init() {
+    suiteName = "dev.codex.pulse.notification-tests.\(UUID().uuidString)"
+    defaults = UserDefaults(suiteName: suiteName)!
+  }
+
+  var store: QuotaAlertLedgerStore { QuotaAlertLedgerStore(defaults: defaults) }
+  func clean() { defaults.removePersistentDomain(forName: suiteName) }
 }

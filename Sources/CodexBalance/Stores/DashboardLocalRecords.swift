@@ -58,7 +58,7 @@ extension DashboardStore {
   }
 
   func copyUsageSummary() {
-    guard hasUsageData else { exportMessage = "用量首次统计中，请稍后复制"; return }
+    guard hasUsageData else { operationFeedback = .init(.information, "用量首次统计中，请稍后复制"); return }
     let stats = tokenStats
     let weeklyText = weekly.map { "\(Int($0.remainingPercent.rounded()))%" } ?? "--"
     var lines = [
@@ -91,12 +91,15 @@ extension DashboardStore {
     }
     let pasteboard = NSPasteboard.general
     pasteboard.clearContents()
-    pasteboard.setString(lines.joined(separator: "\n"), forType: .string)
-    exportMessage = "用量摘要已复制"
+    if pasteboard.setString(lines.joined(separator: "\n"), forType: .string) {
+      operationFeedback = .init(.success, "用量摘要已复制")
+    } else {
+      operationFeedback = .init(.failure, "复制失败，请重试")
+    }
   }
 
   func exportUsageCSV() {
-    guard hasUsageData else { exportMessage = "用量首次统计中，请稍后导出"; return }
+    guard hasUsageData else { operationFeedback = .init(.information, "用量首次统计中，请稍后导出"); return }
     let panel = NSSavePanel()
     panel.title = "导出 Codex 用量"
     panel.prompt = "导出"
@@ -112,12 +115,18 @@ extension DashboardStore {
       cnyRate: exchangeRate?.rate,
       generatedAt: Date()
     )
-    do {
-      try csv.write(to: url, atomically: true, encoding: .utf8)
-      exportMessage = "已导出：\(url.lastPathComponent)"
-    } catch {
-      exportMessage = "导出失败：\(error.localizedDescription)"
-    }
+    writeExport(csv, to: url, successMessage: "已导出：\(url.lastPathComponent)")
   }
 
+  @discardableResult
+  func writeExport(_ content: String, to url: URL, successMessage: String, failurePrefix: String = "导出失败") -> Bool {
+    do {
+      try content.write(to: url, atomically: true, encoding: .utf8)
+      operationFeedback = .init(.success, successMessage)
+      return true
+    } catch {
+      operationFeedback = .init(.failure, "\(failurePrefix)：\(error.localizedDescription)")
+      return false
+    }
+  }
 }

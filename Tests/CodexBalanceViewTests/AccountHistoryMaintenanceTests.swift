@@ -15,13 +15,16 @@ struct AccountHistoryMaintenanceTests {
       resetsAt: now.addingTimeInterval(86400)), at: now, now: now)
     let store = DashboardStore(startServices: false)
     store.quotaHistoryStore = history
+    let backupRoot = root.appendingPathComponent("archive")
+    let archive = LocalAutomationArchive(root: backupRoot)
+    #expect(!store.shouldPerformAutomaticBackup(now: now, archive: archive))
     store.runReliabilityCheck(allowAutomation: false)
     #expect(store.reliabilitySnapshot.checks.first { $0.id == .quotaHistory }?.level == .healthy)
-    let backupRoot = root.appendingPathComponent("archive")
-    store.performLocalBackup(manual: false, now: now, archive: LocalAutomationArchive(root: backupRoot))
+    store.performLocalBackup(manual: false, now: now, archive: archive)
     let enumerator = try #require(FileManager.default.enumerator(at: backupRoot, includingPropertiesForKeys: nil))
     let copied = try #require(enumerator.allObjects.compactMap { $0 as? URL }.first { $0.lastPathComponent == historyURL.lastPathComponent })
     #expect(try Data(contentsOf: copied) == Data(contentsOf: historyURL))
     #expect(store.reliabilityMessage?.contains("已备份") == true)
+    #expect(archive.hasBackup(for: now, sourceURLs: [historyURL]))
   }
 }

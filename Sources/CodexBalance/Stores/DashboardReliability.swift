@@ -56,7 +56,7 @@ extension DashboardStore {
     lastReliabilityLevel = next.overall
 
     guard allowAutomation else { return }
-    if reliabilityBackupsEnabled, !localAutomationArchive.hasBackup(for: now) {
+    if shouldPerformAutomaticBackup(now: now) {
       performLocalBackup(manual: false, now: now)
     }
     if reliabilityDailySummaryEnabled,
@@ -69,6 +69,15 @@ extension DashboardStore {
     }
   }
 
+  func shouldPerformAutomaticBackup(now: Date, archive: LocalAutomationArchive? = nil) -> Bool {
+    // The first asynchronous quota read selects the account-specific history.
+    // Do not let a startup backup of the legacy path consume the day's attempt.
+    guard reliabilityBackupsEnabled, status?.accountScope?.isEmpty == false else { return false }
+    return !(archive ?? localAutomationArchive).hasBackup(
+      for: now, sourceURLs: [quotaHistoryStore.storageURL, ProjectBudgetStore.defaultURL]
+    )
+  }
+
   func performLocalBackup(manual: Bool = true, now: Date = Date(), archive: LocalAutomationArchive? = nil) {
     do {
       let result = try (archive ?? localAutomationArchive).backup(
@@ -79,12 +88,14 @@ extension DashboardStore {
       reliabilityMessage = result.itemCount > 0
         ? "已备份 \(result.itemCount) 个关键数据文件"
         : "当前没有可备份的关键数据文件"
-      appendReliabilityEvent(.init(
-        timestamp: now,
-        kind: .info,
-        title: manual ? "手动备份完成" : "每日备份完成",
-        detail: "已保存 \(result.itemCount) 个文件，保留最近 7 天"
-      ))
+      if result.itemCount > 0 {
+        appendReliabilityEvent(.init(
+          timestamp: now,
+          kind: .info,
+          title: manual ? "手动备份完成" : "每日备份完成",
+          detail: "已验证保存 \(result.itemCount) 个文件，保留最近 7 天"
+        ))
+      }
     } catch {
       reliabilityMessage = "备份失败：\(error.localizedDescription)"
       appendReliabilityEvent(.init(timestamp: now, kind: .failure, title: "关键数据备份失败", detail: "本地归档未完成"))

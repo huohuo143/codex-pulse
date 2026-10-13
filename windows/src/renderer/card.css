@@ -1,0 +1,159 @@
+body {
+  padding: 0;
+  background: transparent;
+  font-size: 14px;
+}
+#desktopCard {
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(var(--weekly-rgb), 0.12),
+      transparent 65%
+    ),
+    var(--bg);
+}
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 14px;
+  border-bottom: 1px solid var(--border);
+  gap: 8px;
+}
+header strong {
+  font-size: 15px;
+  font-weight: 600;
+}
+header button {
+  padding: 3px 8px;
+  border: 0;
+  background: transparent;
+}
+#content {
+  overflow: auto;
+  flex: 1;
+  padding: 16px;
+  line-height: 1.5;
+  min-height: 0;
+}
+footer {
+  padding: 8px 14px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.card-value {
+  font-size: 40px;
+  font-weight: 700;
+  color: var(--weekly);
+  letter-spacing: -1px;
+}
+.card-caption {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 5px;
+}
+.card-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.card-grid b {
+  font-size: 24px;
+  color: var(--usage);
+  display: block;
+}
+.card-grid small {
+  font-size: 13px;
+  color: var(--muted);
+}
+.card-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+}
+.card-row b {
+  overflow-wrap: anywhere;
+}
+.card-row span {
+  white-space: nowrap;
+  color: var(--usage);
+}
+.mini-bars {
+  height: 130px;
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+}
+.mini-bars i {
+  flex: 1;
+  background: var(--usage);
+  min-height: 1px;
+  border-radius: 3px;
+}
+.card-ring {
+  width: 165px;
+  height: 165px;
+  position: relative;
+  margin: auto;
+}
+.card-ring svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+.card-ring circle {
+  fill: none;
+  stroke-width: 10;
+}
+.card-ring .track {
+  stroke: var(--border);
+}
+.card-ring .value {
+  stroke: var(--weekly);
+  stroke-linecap: round;
+}
+.card-ring .inner {
+  stroke: #eba047;
+  stroke-width: 7;
+}
+.card-ring .center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+.card-ring .center b {
+  font-size: 28px;
+  color: var(--weekly);
+}
+.card-ring .center small {
+  font-size: 13px;
+  color: var(--muted);
+}
+.card-ring.with-five .center { line-height: 1.2; gap: 2px; }
+.card-ring.with-five .center b { font-size: 22px; }
+.card-ring.with-five .center small { font-size: 12px; }
+.card-note {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+@media (min-width: 430px) {
+  .card-ring {
+    width: 190px;
+    height: 190px;
+  }
+  .card-value {
+    font-size: 48px;
+  }
+}

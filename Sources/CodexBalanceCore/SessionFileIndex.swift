@@ -57,8 +57,15 @@ public final class SessionFileIndex: @unchecked Sendable {
       for path in dirty {
         let url = URL(fileURLWithPath: path).standardizedFileURL
         guard roots.contains(where: { url.path == $0.path || url.path.hasPrefix($0.path + "/") }) else { continue }
-        entries = entries.filter { $0.key != url.path && !$0.key.hasPrefix(url.path + "/") }
-        if url.pathExtension == "jsonl" { register(url) } else { scan(url) }
+        if url.pathExtension == "jsonl" {
+          // File events only invalidate this entry. Filtering the complete
+          // index for every append makes a batch of D events cost O(files * D).
+          entries.removeValue(forKey: url.path)
+          register(url)
+        } else {
+          entries = entries.filter { $0.key != url.path && !$0.key.hasPrefix(url.path + "/") }
+          scan(url)
+        }
       }
     }
     if entries != previous {

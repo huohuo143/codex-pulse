@@ -16,7 +16,8 @@ struct AdvancedInsightsView: View {
     .sheet(item: $budgetEditorProject) { project in
       ProjectBudgetEditor(
         project: project,
-        existingLimit: store.projectBudgets.first(where: { $0.id == project.id })?.monthlyTokenLimit
+        form: ProjectBudgetEditorState(limitText:
+          store.projectBudgets.first(where: { $0.id == project.id }).map { String($0.monthlyTokenLimit) } ?? "")
       ) { limit in
         store.setProjectBudget(project: project, monthlyTokenLimit: limit)
       }
@@ -114,7 +115,7 @@ struct AdvancedInsightsView: View {
               Text("暂无已识别项目")
             } else {
               ForEach(stats.monthTopProjects) { project in
-                Button(project.projectName) { budgetEditorProject = project }
+                Button(ProjectDisplayLabel.name(project.projectName, path: project.projectPath)) { budgetEditorProject = project }
               }
             }
           }
@@ -147,9 +148,9 @@ struct AdvancedInsightsView: View {
     VStack(alignment: .leading, spacing: 7) {
       HStack(spacing: 10) {
         VStack(alignment: .leading, spacing: 2) {
-          Text(row.budget.projectName).font(.system(size: 12, weight: .bold))
+          Text(ProjectDisplayLabel.name(row.budget.projectName, path: row.budget.projectPath)).font(.system(size: 12, weight: .bold))
           if !row.budget.projectPath.isEmpty {
-            Text(row.budget.projectPath)
+            Text(ProjectDisplayLabel.path(row.budget.projectPath))
               .font(.system(size: 9, weight: .medium, design: .monospaced))
               .foregroundStyle(DashboardColors.subtleText)
               .lineLimit(1)
@@ -262,52 +263,74 @@ struct AdvancedInsightsView: View {
   }
 }
 
-private struct ProjectBudgetEditor: View {
+struct ProjectBudgetEditorState {
+  var limitText: String
+  var saveError: String?
+
+  var parsedLimit: Int? { try? ProjectBudgetInput.parse(limitText).get() }
+
+  var validationMessage: String? {
+    guard case .failure(let error) = ProjectBudgetInput.parse(limitText), error != .empty else { return nil }
+    return error.localizedDescription
+  }
+
+  /// The view dismisses only after a successful write; failures preserve the exact input for retry.
+  mutating func save(using action: (Int) -> Result<Void, Error>) -> Bool {
+    guard let value = parsedLimit else { return false }
+    switch action(value) {
+    case .success:
+      saveError = nil
+      return true
+    case .failure(let error):
+      saveError = "预算保存失败：\(error.localizedDescription)"
+      return false
+    }
+  }
+}
+
+struct ProjectBudgetEditor: View {
   @Environment(\.dismiss) private var dismiss
   let project: TokenProjectBucket
-  let existingLimit: Int?
-  let onSave: (Int) -> Void
-  @State private var limitText = ""
+  @State var form: ProjectBudgetEditorState
+  let onSave: (Int) -> Result<Void, Error>
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
       Text("项目月度预算").font(.system(size: 19, weight: .bold))
       VStack(alignment: .leading, spacing: 4) {
-        Text(project.projectName).font(.system(size: 13, weight: .bold))
+        Text(ProjectDisplayLabel.name(project.projectName, path: project.projectPath)).font(.system(size: 13, weight: .bold))
         if !project.projectPath.isEmpty {
-          Text(project.projectPath)
+          Text(ProjectDisplayLabel.path(project.projectPath))
             .font(.system(size: 10, design: .monospaced))
             .foregroundStyle(.secondary)
             .lineLimit(2)
         }
       }
-      TextField("例如 2,000,000", text: $limitText)
+      TextField("例如 2,000,000", text: $form.limitText)
         .textFieldStyle(.roundedBorder)
-      Text("输入每月 Token 上限。可使用纯数字或千位分隔符。")
+        .accessibilityLabel("每月 Token 上限")
+        .onChange(of: form.limitText) { _ in form.saveError = nil }
+      Text("输入大于 0 的整数，可使用英文逗号分隔千位。")
         .font(.caption)
         .foregroundStyle(.secondary)
+      if let message = form.validationMessage ?? form.saveError {
+        Label(message, systemImage: "exclamationmark.triangle.fill")
+          .font(.caption)
+          .foregroundStyle(.red)
+          .fixedSize(horizontal: false, vertical: true)
+      }
       HStack {
         Spacer()
         Button("取消") { dismiss() }
+          .keyboardShortcut(.cancelAction)
         Button("保存") {
-          guard let value = parsedLimit, value > 0 else { return }
-          onSave(value)
-          dismiss()
+          if form.save(using: onSave) { dismiss() }
         }
         .keyboardShortcut(.defaultAction)
-        .disabled(parsedLimit == nil)
+        .disabled(form.parsedLimit == nil)
       }
     }
     .padding(22)
     .frame(width: 420)
-    .onAppear {
-      limitText = existingLimit.map { NumberFormatter.localizedString(from: NSNumber(value: $0), number: .decimal) } ?? ""
-    }
-  }
-
-  private var parsedLimit: Int? {
-    let normalized = limitText.filter(\.isNumber)
-    guard !normalized.isEmpty else { return nil }
-    return Int(normalized)
   }
 }

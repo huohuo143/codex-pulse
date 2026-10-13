@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-2.12.0-8b7cff">
+  <img alt="Version" src="https://img.shields.io/badge/version-2.12.2-8b7cff">
   <img alt="macOS" src="https://img.shields.io/badge/macOS-14%2B-111827?logo=apple">
   <img alt="Mac architectures" src="https://img.shields.io/badge/Mac-arm64%20%7C%20x86__64-111827">
   <img alt="Swift" src="https://img.shields.io/badge/Swift-6.0-f05138?logo=swift&logoColor=white">
@@ -18,7 +18,15 @@
 
 `Codex 脉动` 将 Codex 的额度、Token 消耗、重置节奏和 Full reset 权益集中到一套原生 macOS 界面中。它既可以作为常驻悬浮框，也可以完全隐藏悬浮框，仅使用主窗口或 7 款桌面小组件。
 
-> 当前版本：[2.12.0 build 2126](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.0)。主应用兼容 macOS 13；桌面小组件要求 macOS 14 或更高版本；本地构建为 ad-hoc 签名、未公证版本。
+> 当前开发版本：`2.12.2` build 2128（本地版本）。主应用兼容 macOS 13；桌面小组件要求 macOS 14 或更高版本；本地构建为 ad-hoc 签名、未公证版本。
+
+## 2.12.2 跨平台可靠性与操作反馈
+
+继续改善预算保存、账户提醒回执、备份校验和增量统计，并同步 Windows 版；修复守护程序异常退出后的锁残留，优化中文项目名称和导出提示。详见 [2.12.2 更新说明](docs/RELEASE_2.12.2.md)。
+
+## 2.12.1 稳定性与增量性能
+
+修复预算输入误解析和保存失败丢失表单；提醒记录按账户恢复，自动备份校验实际完成情况，并加快多日志文件同时更新时的索引处理。详见 [2.12.1 更新说明](docs/RELEASE_2.12.1.md)。
 
 ## 2.12.0 额度历史与完整导出
 
@@ -181,17 +189,17 @@ flowchart LR
 
 ## 安装
 
-本地开发版 2.12.0 的安装包为 `Codex-Pulse-v2.12.0-build2126-20261011-arm64.dmg`，使用包内“安装或更新（保留设置）”脚本可保留配置与回滚备份。此版本尚未发布到 GitHub；以下链接仍指已公开发布的 2.11.4。
+当前版本为 **2.12.2 / Build 2128**。在 [v2.12.2 发布页](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.2) 下载 Apple Silicon Mac 安装包或 Windows x64 安装版、免安装版。完整步骤见 [安装与升级](docs/INSTALL_UPGRADE_2.12.2.md)，测试范围见 [验证说明](docs/VALIDATION_2.12.2.md)。
 
 在 [Releases](https://github.com/huohuo143/codex-pulse/releases) 下载：
 
 ```text
-Codex-Pulse-v2.11.4-build2125-20261010-arm64.dmg
-Codex-Pulse-v2.11.4-build2125-20261010-arm64.dmg.sha256
+Codex-Pulse-v2.12.2-build2128-20261013-arm64.dmg
+Codex-Pulse-v2.12.2-build2128-20261013-arm64.dmg.sha256
 ```
 
 1. 打开 DMG。
-2. 将 `Codex 脉动.app` 拖入 Applications；也可以运行 DMG 内的“安装并启用自动启动”脚本。
+2. 运行 DMG 内的“安装或更新（保留设置）.command”，保留配置并创建回滚备份。
 3. 首次打开若被 Gatekeeper 拦截，在“系统设置 → 隐私与安全性”中选择“仍要打开”。
 4. 打开一次 App，等待首次历史数据解析完成。
 
@@ -199,7 +207,7 @@ Codex-Pulse-v2.11.4-build2125-20261010-arm64.dmg.sha256
 
 ## 与旧版并行
 
-| 项目 | Codex 脉动 2.11.4 | 旧算力码表 0.1.0 |
+| 项目 | Codex 脉动 2.12.2 | 旧算力码表 0.1.0 |
 | --- | --- | --- |
 | App | `Codex 脉动.app` | `算力码表.app` |
 | Bundle ID | `dev.codex.balance-dashboard.codex` | `dev.codex.balance-dashboard` |
@@ -259,7 +267,7 @@ ARCH=arm64 ./script/create_transfer_package.sh
 
 ## 已知边界
 
-- DMG 按架构分别发布为 arm64 与 x86_64；请下载与 Mac 处理器匹配的文件。安装包采用 ad-hoc 签名且尚未公证。
+- 本次 DMG 提供 Apple Silicon arm64 版本；历史 Intel x86_64 包不代表本次更新。安装包采用 ad-hoc 签名且尚未公证。
 - 本地 Token 统计来自 Codex 会话日志，不包含无法在本机日志中观察到的网页端用量。
 - 未知模型不会猜测价格，而会保持“未计价”。
 - WidgetKit 的实际刷新时刻仍受 macOS 桌面小组件预算控制。

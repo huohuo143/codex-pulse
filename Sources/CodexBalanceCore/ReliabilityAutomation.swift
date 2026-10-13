@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 public enum ReliabilityHealthLevel: String, Codable, Sendable {
@@ -347,6 +348,12 @@ public struct LocalAutomationResult: Equatable, Sendable {
 public final class LocalAutomationArchive: @unchecked Sendable {
   public static let defaultRoot = PulsePaths.support.appendingPathComponent("automation", isDirectory: true)
 
+  private struct BackupManifest: Codable {
+    var schemaVersion = 1
+    var files: [String: String] = [:]
+  }
+
+  private static let manifestName = "backup-manifest-v1.json"
   private let root: URL
   private let fileManager: FileManager
   private let calendar: Calendar
@@ -368,15 +375,35 @@ public final class LocalAutomationArchive: @unchecked Sendable {
   ) throws -> LocalAutomationResult {
     let day = dayKey(now)
     let destination = root.appendingPathComponent("backups/\(day)", isDirectory: true)
-    try fileManager.createDirectory(at: destination, withIntermediateDirectories: true)
-    var count = 0
+    // Read every available source before changing the archive. An unavailable input
+    // must leave the day eligible for another attempt, including on first launch.
+    var sources: [String: Data] = [:]
     for source in sourceURLs where fileManager.fileExists(atPath: source.path) {
-      let data = try Data(contentsOf: source)
-      try data.write(to: destination.appendingPathComponent(source.lastPathComponent), options: .atomic)
-      count += 1
+      guard sources[source.lastPathComponent] == nil,
+        source.lastPathComponent != Self.manifestName else {
+        throw CocoaError(.fileWriteFileExists)
+      }
+      sources[source.lastPathComponent] = try Data(contentsOf: source)
+    }
+    guard !sources.isEmpty else { return LocalAutomationResult(outputURL: destination, itemCount: 0) }
+
+    try fileManager.createDirectory(at: destination, withIntermediateDirectories: true)
+    var manifest = loadBackupManifest(at: destination) ?? BackupManifest()
+    for (name, data) in sources {
+      let target = destination.appendingPathComponent(name)
+      try data.write(to: target, options: .atomic)
+      let digest = Self.backupDigest(data)
+      guard let saved = try? Data(contentsOf: target), Self.backupDigest(saved) == digest else {
+        throw CocoaError(.fileWriteUnknown)
+      }
+      manifest.files[name] = digest
     }
     try pruneBackups(now: now, retentionDays: retentionDays)
-    return LocalAutomationResult(outputURL: destination, itemCount: count)
+    // Only a fully verified write gets a receipt. Existing receipts for other
+    // accounts in the same day are retained so switching back does not lose them.
+    try JSONEncoder.reliability.encode(manifest)
+      .write(to: destination.appendingPathComponent(Self.manifestName), options: .atomic)
+    return LocalAutomationResult(outputURL: destination, itemCount: sources.count)
   }
 
   public func archiveDailySummary(_ markdown: String, now: Date = Date()) throws -> URL {
@@ -387,8 +414,33 @@ public final class LocalAutomationArchive: @unchecked Sendable {
     return target
   }
 
-  public func hasBackup(for date: Date) -> Bool {
-    fileManager.fileExists(atPath: root.appendingPathComponent("backups/\(dayKey(date))").path)
+  public func hasBackup(for date: Date, sourceURLs: [URL]? = nil) -> Bool {
+    let destination = root.appendingPathComponent("backups/\(dayKey(date))", isDirectory: true)
+    guard let manifest = loadBackupManifest(at: destination), !manifest.files.isEmpty else { return false }
+    let requiredNames: Set<String>
+    if let sourceURLs {
+      requiredNames = Set(sourceURLs.filter { fileManager.fileExists(atPath: $0.path) }.map(\.lastPathComponent))
+    } else {
+      requiredNames = Set(manifest.files.keys)
+    }
+    guard !requiredNames.isEmpty else { return false }
+    return requiredNames.allSatisfy { name in
+      guard name == URL(fileURLWithPath: name).lastPathComponent,
+        let expected = manifest.files[name],
+        let data = try? Data(contentsOf: destination.appendingPathComponent(name)) else { return false }
+      return Self.backupDigest(data) == expected
+    }
+  }
+
+  private func loadBackupManifest(at destination: URL) -> BackupManifest? {
+    guard let data = try? Data(contentsOf: destination.appendingPathComponent(Self.manifestName)),
+      let manifest = try? JSONDecoder().decode(BackupManifest.self, from: data),
+      manifest.schemaVersion == 1 else { return nil }
+    return manifest
+  }
+
+  private static func backupDigest(_ data: Data) -> String {
+    SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
   }
 
   public func hasDailySummary(for date: Date) -> Bool {

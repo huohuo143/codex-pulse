@@ -21,7 +21,7 @@ final class DashboardStore: ObservableObject {
   @Published var isLoading = false
   @Published var isFullRefreshing = false
   @Published var lastFullRefresh: Date?
-  @Published var exportMessage: String?
+  @Published var operationFeedback: DashboardOperationFeedback?
   @Published var radarEvaluation = RadarEvaluationSummary()
   @Published var radarEvaluationMessage: String?
   @Published var creditExpiry = CreditExpiryLedgerStore().load()
@@ -234,6 +234,8 @@ final class DashboardStore: ObservableObject {
   let appUpdateService = GitHubReleaseUpdateService()
   lazy var quotaNotificationService: any QuotaNotificationServing = QuotaNotificationService.shared
   let servicesEnabled: Bool
+  let quotaAlertLedgerStore: QuotaAlertLedgerStore
+  var quotaAlertAccountScope: String?
   var quotaAlertLedger: QuotaAlertLedger
   var quotaAlertDeliveryState = QuotaAlertDeliveryState()
   var quotaAlertDeliveryTask: Task<Void, Never>?
@@ -263,9 +265,11 @@ final class DashboardStore: ObservableObject {
   var lastAutomaticRecoveryAt: Date?
   var automaticRecoveryAttempts = 0
 
-  init(startServices: Bool = true, radarService: CodexRadarService = CodexRadarService()) {
+  init(startServices: Bool = true, radarService: CodexRadarService = CodexRadarService(),
+       alertLedgerStore: QuotaAlertLedgerStore = QuotaAlertLedgerStore()) {
     codexRadarService = radarService
     servicesEnabled = startServices
+    quotaAlertLedgerStore = alertLedgerStore
     let defaults = PulsePreferences.shared
     quotaAlertsEnabled = defaults.object(forKey: "quotaAlertsEnabled") as? Bool ?? false
     quotaAlertPreset = defaults.string(forKey: "quotaAlertPreset").flatMap(QuotaAlertPreset.init) ?? .standard
@@ -282,8 +286,7 @@ final class DashboardStore: ObservableObject {
     automaticUpdateChecksEnabled = defaults.object(forKey: "automaticUpdateChecksEnabled") as? Bool ?? true
     lastAutomaticRecoveryAt = defaults.object(forKey: "lastAutomaticRecoveryAt") as? Date
     automaticRecoveryAttempts = defaults.object(forKey: "automaticRecoveryAttempts") as? Int ?? 0
-    quotaAlertLedger = defaults.data(forKey: "quotaAlertLedger")
-      .flatMap { try? JSONDecoder().decode(QuotaAlertLedger.self, from: $0) } ?? QuotaAlertLedger()
+    quotaAlertLedger = QuotaAlertLedger()
     let persistedFloatingPanelEnabled = defaults.object(forKey: "floatingPanelEnabled") as? Bool ?? true
     let launchedInBackground = CommandLine.arguments.contains("--background")
     floatingPanelEnabled = persistedFloatingPanelEnabled
@@ -615,10 +618,12 @@ final class DashboardStore: ObservableObject {
     quotaNotificationService.openSystemNotificationSettings()
   }
 
-  func setProjectBudget(project: TokenProjectBucket, monthlyTokenLimit: Int) {
+  @discardableResult
+  func setProjectBudget(project: TokenProjectBucket, monthlyTokenLimit: Int,
+    storage: ProjectBudgetStore? = nil) -> Result<Void, Error> {
     guard monthlyTokenLimit > 0 else {
       budgetMessage = "预算必须大于 0 Token"
-      return
+      return .failure(ProjectBudgetInputError.nonPositive)
     }
     let budget = ProjectBudget(
       projectName: project.projectName,
@@ -626,12 +631,14 @@ final class DashboardStore: ObservableObject {
       monthlyTokenLimit: monthlyTokenLimit
     )
     do {
-      projectBudgets = try projectBudgetStore.upsert(budget)
+      projectBudgets = try (storage ?? projectBudgetStore).upsert(budget)
       budgetMessage = "已保存 \(project.projectName) 的月度预算"
       lastAnalysisStats = nil
       updateUsageAnalysis()
+      return .success(())
     } catch {
       budgetMessage = "预算保存失败：\(error.localizedDescription)"
+      return .failure(error)
     }
   }
 

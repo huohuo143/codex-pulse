@@ -1,0 +1,15 @@
+#!/bin/sh
+# Minimal npm-list compatibility shim used only by cross-platform packaging when
+# Codex's bundled Node runtime is available without an npm executable.
+if [ "$1" = "list" ]; then
+  printf '%s\n' '{"name":"suanli-dashboard-windows","version":"0.1.0","path":".","dependencies":{},"_dependencies":{}}'
+  exit 0
+fi
+
+if [ "$1" = "config" ] && [ "$2" = "list" ]; then
+  printf '%s\n' 'node-linker=hoisted'
+  exit 0
+fi
+
+printf '%s\n' "This packaging shim only supports npm list/config." >&2
+exit 1

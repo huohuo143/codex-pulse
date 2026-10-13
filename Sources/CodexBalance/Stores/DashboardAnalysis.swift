@@ -52,6 +52,7 @@ extension DashboardStore {
 
   func evaluateQuotaAlerts(now: Date = Date()) {
     guard quotaAlertsEnabled, notificationAuthorization == .authorized,
+      let account = status?.accountScope, account == quotaAlertAccountScope,
       !quotaAlertDeliveryState.isDelivering else { return }
     let evaluation = QuotaAlertEvaluator.evaluate(
       remainingPercent: weekly?.remainingPercent,
@@ -75,7 +76,7 @@ extension DashboardStore {
       let attempt = quotaAlertDeliveryState.begin(at: now) else { return }
     let remaining = weekly?.remainingPercent
     let forecast = quotaForecast
-    let account = status?.accountScope
+    let submittedLedger = quotaAlertLedger
     quotaAlertDeliveryTask = Task {
       var hadFailure = false
       defer {
@@ -89,10 +90,12 @@ extension DashboardStore {
           notificationAuthorization == .authorized else { return }
         do {
           try await quotaNotificationService.deliver(candidate, remainingPercent: remaining, forecast: forecast)
+          // Cancellation cannot revoke a notification the system has already accepted.
+          // Attribute its receipt to the submitting account before stopping a stale batch.
+          acceptQuotaAlertReceipt(candidate, account: account, submittedLedger: submittedLedger,
+            isCurrentAttempt: quotaAlertDeliveryState.isCurrent(attempt), at: Date())
           guard !Task.isCancelled, quotaAlertDeliveryState.isCurrent(attempt),
             status?.accountScope == account else { return }
-          QuotaAlertDeliveryCommit.accepted(candidate, ledger: &quotaAlertLedger, at: Date())
-          persistQuotaAlertLedger()
         } catch {
           guard quotaAlertDeliveryState.isCurrent(attempt), status?.accountScope == account else { return }
           hadFailure = true
@@ -103,18 +106,43 @@ extension DashboardStore {
   }
 
   private func persistQuotaAlertLedger() {
-    if let data = try? JSONEncoder().encode(quotaAlertLedger) {
-      PulsePreferences.shared.set(data, forKey: "quotaAlertLedger")
+    quotaAlertLedgerStore.save(quotaAlertLedger, account: quotaAlertAccountScope)
+  }
+
+  private func acceptQuotaAlertReceipt(_ candidate: QuotaAlertCandidate, account: String,
+                                      submittedLedger: QuotaAlertLedger, isCurrentAttempt: Bool, at now: Date) {
+    let isActiveAccount = quotaAlertAccountScope == account
+    // Reload an inactive account, and use the live ledger after an A -> B -> A switch.
+    // A captured ledger snapshot could discard receipts accepted by a newer batch.
+    var ledger = isActiveAccount ? quotaAlertLedger : quotaAlertLedgerStore.load(account: account)
+    let priorLedger = ledger
+    QuotaAlertDeliveryCommit.accepted(candidate, ledger: &ledger, at: now)
+    if candidate.kind == .forecastCritical, !isCurrentAttempt {
+      if priorLedger.lastForecastCriticalAt != submittedLedger.lastForecastCriticalAt
+          || priorLedger.lastForecastCycle != submittedLedger.lastForecastCycle {
+        // A newer batch has already established its forecast cooldown or cycle.
+        ledger.lastForecastCriticalAt = priorLedger.lastForecastCriticalAt
+        ledger.lastForecastCycle = priorLedger.lastForecastCycle
+        ledger.lastRisk = priorLedger.lastRisk
+      } else if isActiveAccount, let currentRisk = quotaForecast?.risk {
+        ledger.lastRisk = currentRisk
+      } else if priorLedger.lastRisk != submittedLedger.lastRisk {
+        ledger.lastRisk = priorLedger.lastRisk
+      }
     }
+    quotaAlertLedgerStore.save(ledger, account: account)
+    if isActiveAccount { quotaAlertLedger = ledger }
   }
 
   func prepareAccount(_ account: String?) {
-    guard account != status?.accountScope else { return }
+    guard account != status?.accountScope || account != quotaAlertAccountScope else { return }
+    persistQuotaAlertLedger()
     quotaAlertDeliveryTask?.cancel()
     quotaAlertDeliveryTask = nil
     quotaAlertDeliveryState.invalidate()
     quotaHistoryStore = QuotaHistoryStore(url: PulsePaths.support.appendingPathComponent("quota-history-\(account ?? "unconfirmed").json"))
-    quotaAlertLedger = QuotaAlertLedger()
+    quotaAlertAccountScope = account
+    quotaAlertLedger = quotaAlertLedgerStore.load(account: account)
     quotaHistory = []
     quotaForecast = nil
     lastForecastEvent = nil

@@ -113,11 +113,11 @@ struct InsightsDashboardView: View {
                 .frame(width: 25, height: 25)
                 .background(index == 0 ? palette.weekly : DashboardColors.faintFill, in: Circle())
               VStack(alignment: .leading, spacing: 2) {
-                Text(row.projectName)
+                Text(ProjectDisplayLabel.name(row.projectName, path: row.projectPath))
                   .font(.system(size: 12, weight: .bold))
                   .lineLimit(1)
                 if !row.projectPath.isEmpty {
-                  Text(row.projectPath)
+                  Text(ProjectDisplayLabel.path(row.projectPath))
                     .font(.system(size: 9, weight: .medium, design: .monospaced))
                     .foregroundStyle(DashboardColors.subtleText)
                     .lineLimit(1)
@@ -157,7 +157,7 @@ struct InsightsDashboardView: View {
               Text(event.model)
                 .lineLimit(1)
                 .frame(width: 108, alignment: .leading)
-              Text(event.projectName).lineLimit(1)
+              Text(ProjectDisplayLabel.name(event.projectName, path: event.projectPath)).lineLimit(1)
               Spacer()
               Text("in \(BalanceFormatters.compactNumber(event.inputTokens))")
               Text("cache \(BalanceFormatters.compactNumber(event.cachedInputTokens))")

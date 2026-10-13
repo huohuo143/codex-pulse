@@ -52,6 +52,11 @@ struct ExpandedDashboardView: View {
           .padding(.horizontal, 20)
           .padding(.top, 18)
           .padding(.bottom, 12)
+        if let feedback = store.operationFeedback {
+          DashboardOperationBanner(feedback: feedback) { store.operationFeedback = nil }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 10)
+        }
         Divider().overlay(DashboardColors.separator)
         ScrollViewReader { proxy in
           ScrollView {
@@ -170,7 +175,6 @@ struct ExpandedDashboardView: View {
   }
 
   private var refreshStatusText: String {
-    if let exportMessage = store.exportMessage { return exportMessage }
     if store.isFullRefreshing { return "正在汇总会话用量" }
     if store.isLoading { return "正在读取最新额度" }
     if let date = store.lastFullRefresh {
@@ -180,7 +184,6 @@ struct ExpandedDashboardView: View {
   }
 
   private var refreshStatusSymbol: String {
-    if store.exportMessage != nil { return "checkmark.circle.fill" }
     if store.isLoading || store.isFullRefreshing { return "arrow.triangle.2.circlepath" }
     return "checkmark.circle"
   }
@@ -402,6 +405,7 @@ struct ExpandedDashboardView: View {
       .buttonStyle(.plain)
       .background(RoundedRectangle(cornerRadius: 9).fill(DashboardColors.faintFill))
       .help(help)
+      .accessibilityLabel(help)
   }
 
   private func valuePair(_ label: String, _ value: String) -> some View {

@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:; connect-src 'none'"
+    />
+    <title>Codex 脉动</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="mac-aligned.css" />
+  </head>
+  <body
+    class="loading"
+    data-palette="mintDawn"
+    data-appearance="aurora"
+    data-compact-style="rings"
+    data-ring-orientation="horizontal"
+    data-size="standard"
+  >
+    <main class="compact-view drag-region" aria-label="Codex 7 天额度浮窗">
+      <div class="compact-controls no-drag">
+        <button id="floatingClose" title="隐藏悬浮框">×</button
+        ><button id="compactRefresh" title="刷新">↻</button
+        ><button id="compactExpand" title="打开主界面">↗</button>
+      </div>
+      <section class="compact-layout layout-rings">
+        <div class="compact-ring-main">
+          <div class="gauge compact-gauge">
+            <svg viewBox="0 0 180 180">
+              <circle class="gauge-track" cx="90" cy="90" r="68" />
+              <circle class="gauge-value js-gauge" cx="90" cy="90" r="68" />
+              <circle class="five-track" cx="90" cy="90" r="49" />
+              <circle class="five-value js-five" cx="90" cy="90" r="49" />
+            </svg>
+            <div class="gauge-center">
+              <strong data-bind="weekly">--%</strong><span>7天剩余</span
+              ><small class="five-label"
+                >5h <b data-bind="fiveHour">--%</b></small
+              >
+            </div>
+          </div>
+          <div class="rolling">
+            <label>◷ 滚动24h</label><strong data-bind="rolling24">0</strong
+            ><span>Token</span><small data-bind="cost24">$0.00 · ¥--</small>
+          </div>
+        </div>
+        <div class="compact-radar">
+          <span>◎ 24h 重置概率</span
+          ><strong data-bind="radarProbability">--%</strong>
+        </div>
+        <div id="compactCredits" class="compact-credits">
+          <span>Full reset</span><strong data-bind="creditCount">-- 次</strong
+          ><small data-bind="creditExpiry">等待权益数据</small>
+        </div>
+      </section>
+      <section class="compact-layout layout-circle">
+        <div class="gauge compact-gauge">
+          <svg viewBox="0 0 180 180">
+            <circle class="gauge-track" cx="90" cy="90" r="68" />
+            <circle class="gauge-value js-gauge" cx="90" cy="90" r="68" />
+            <circle class="five-track" cx="90" cy="90" r="49" />
+            <circle class="five-value js-five" cx="90" cy="90" r="49" />
+          </svg>
+          <div class="gauge-center">
+            <strong data-bind="weekly">--%</strong><span>7天剩余</span
+            ><small class="five-label">5h <b data-bind="fiveHour">--%</b></small
+            ><small>24h · <b data-bind="rolling24">0</b></small
+            ><small>重置 · <b data-bind="radarProbability">--%</b></small>
+          </div>
+        </div>
+      </section>
+      <section class="compact-layout layout-square">
+        <label>CODEX · 7天</label><strong data-bind="weekly">--%</strong>
+        <div class="quota-bar"><i class="js-quota-bar"></i></div>
+        <div><span>◎ 24h重置</span><b data-bind="radarProbability">--%</b></div>
+        <div><span>滚动24h</span><b data-bind="rolling24">0</b></div>
+        <div><span>Full reset</span><b data-bind="creditCount">-- 次</b></div>
+      </section>
+      <section class="compact-layout layout-pill">
+        <div class="pill-ring"><b data-bind="weeklyNumber">--</b></div>
+        <div>
+          <strong>7天剩余 · <b data-bind="weekly">--%</b></strong
+          ><span>24h · <b data-bind="rolling24">0</b> Token</span>
+        </div>
+        <i></i>
+        <div>
+          <span>重置概率</span><strong data-bind="radarProbability">--%</strong>
+        </div>
+      </section>
+      <section class="compact-layout layout-bars">
+        <div>
+          <span>Codex · 7天剩余</span><b data-bind="radarMicro">R --%</b
+          ><strong data-bind="weekly">--%</strong>
+        </div>
+        <div class="quota-bar"><i class="js-quota-bar"></i></div>
+      </section>
+      <section class="compact-layout layout-barsQuad">
+        <div>
+          <span>Codex · 7天剩余</span><b data-bind="radarMicro">R --%</b
+          ><strong data-bind="weekly">--%</strong>
+        </div>
+        <div class="quota-bar"><i class="js-quota-bar"></i></div>
+        <footer>
+          <span>24h <b data-bind="rolling24">0</b></span
+          ><span data-bind="cost24">$0.00 · ¥--</span>
+        </footer>
+      </section>
+      <section class="compact-layout layout-badge">
+        <i>C</i><strong data-bind="weekly">--%</strong><em></em
+        ><b data-bind="radarMicro">R --%</b>
+      </section>
+      <section class="compact-layout layout-badgeQuad">
+        <i>C</i><strong data-bind="weekly">--%</strong><em></em
+        ><b data-bind="radarMicro">R --%</b><em></em
+        ><span>24h <b data-bind="rolling24">0</b></span>
+      </section>
+    </main>
+
+    <main class="expanded-view" aria-label="Codex 脉动主界面">
+      <header class="titlebar drag-region">
+        <div class="brand">
+          <div>
+            <h1>Codex 脉动</h1>
+            <p id="subtitle">v2.12.2 · 顺滑浮窗与本地工作分析</p>
+          </div>
+        </div>
+        <div class="window-actions no-drag">
+          <button id="copyButton" class="toolbar-button icon-button" title="复制用量摘要" aria-label="复制用量摘要"><svg viewBox="0 0 24 24"><rect x="8" y="7" width="12" height="15" rx="2"/><path d="M16 7V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h4"/></svg></button>
+          <button id="exportButton" class="toolbar-button icon-button" title="导出用量 CSV" aria-label="导出用量 CSV"><svg viewBox="0 0 24 24"><path d="M12 16V2m-4 4 4-4 4 4M7 9H4v12h16V9h-3"/></svg></button>
+          <button id="refreshButton" class="toolbar-button icon-button" title="刷新额度、用量与雷达" aria-label="刷新全部数据"><svg viewBox="0 0 24 24"><path d="M20 10a8 8 0 1 0 0 6M20 3v7h-7"/></svg></button>
+          <button id="collapseButton" class="toolbar-button icon-button" title="打开独立悬浮框" aria-label="打开独立悬浮框"><svg viewBox="0 0 24 24"><path d="m5 15 7-7 7 7"/></svg></button>
+          <div class="window-chrome"><button id="minimizeButton" class="window-button" title="最小化" aria-label="最小化">—</button><button id="maximizeButton" class="window-button" title="最大化或还原" aria-label="最大化或还原">□</button><button id="closeButton" class="window-button close" title="关闭到托盘" aria-label="关闭到托盘">×</button></div>
+        </div>
+      </header>
+      <nav class="section-nav no-drag">
+        <div class="segmented-control"><button data-section="overview" class="selected">概览</button><button data-section="trends">趋势</button><button data-section="insights">分析</button><button data-section="settings">设置</button></div><span id="refreshState" role="status">正在读取额度</span>
+      </nav>
+      <div class="scroll-area">
+        <section class="dashboard-section selected" data-panel="overview">
+          <article class="card summary-card">
+            <div class="gauge hero-gauge">
+              <svg viewBox="0 0 220 220">
+                <circle class="gauge-track" cx="110" cy="110" r="84" />
+                <circle
+                  class="gauge-value js-hero-gauge"
+                  cx="110"
+                  cy="110"
+                  r="84"
+                />
+                <circle class="five-track" cx="110" cy="110" r="65" />
+                <circle
+                  class="five-value js-five-hero"
+                  cx="110"
+                  cy="110"
+                  r="65"
+                />
+              </svg>
+              <div class="gauge-center">
+                <strong data-bind="weekly">--%</strong><span>7天剩余</span
+                ><small class="five-label"
+                  >5h <b data-bind="fiveHour">--%</b></small
+                >
+              </div>
+            </div>
+            <div class="summary-copy">
+              <label>◷ 滚动24小时消耗</label
+              ><strong data-bind="rolling24">0</strong><span>Token</span>
+              <div class="cost-pair">
+                <div><label>USD</label><b data-bind="cost24Usd">$0.00</b></div><div><label>CNY</label><b data-bind="cost24Cny">¥--</b></div>
+              </div>
+              <small id="summaryCostCoverage">等待用量统计</small>
+              <small id="summaryUnpriced"></small>
+              <small id="summaryQuotaState">等待官方数据</small>
+              <small>↻ Full reset <b data-bind="creditCount">-- 次</b> · <span id="summaryResetState"></span></small>
+              <small data-bind="weeklyReset">7天额度暂无官方窗口数据</small>
+              <small class="five-reset" data-bind="fiveReset"></small>
+            </div>
+          </article>
+          <article class="card list-card">
+            <div class="section-heading">
+              <div><h3>额度节奏与预测</h3><p>仅根据官方 7 天额度百分点变化计算</p></div>
+              <span id="quotaFreshness"></span>
+            </div>
+            <div id="flexibleBalance"></div>
+            <div id="forecastSummary"></div>
+            <details id="forecastDetails">
+              <summary>查看预测依据</summary>
+              <div id="forecastEvidence"></div>
+            </details>
+          </article>
+          <div class="radar-stack">
+            <article class="card radar-card">
+              <header>
+                <h2>重置概览雷达</h2>
+                <b>24H RESET</b>
+              </header>
+              <div class="radar-main">
+                <div class="radar-graphic">
+                  <i></i><i></i><i></i><span></span><b>◎</b>
+                </div>
+                <div>
+                  <label>Codex</label
+                  ><small data-bind="radarLevel">等待公开摘要</small
+                  ><strong data-bind="radarProbability">--%</strong>
+                  <p data-bind="radarSummary">
+                    正在读取 Codex Radar / Tibo 公开动态…
+                  </p>
+                  <footer>
+                    <span data-bind="radarUpdated">暂无更新时间</span
+                    ><button id="radarRefresh">立即同步</button>
+                  </footer>
+                </div>
+              </div>
+              <div class="attribution">
+                <button class="link-button radarSource">
+                  公开资料来自 Codex Radar / Tibo · 概率为本机估算 ↗</button
+                ><span>每 30 分钟自动同步</span>
+              </div>
+            </article>
+            <article class="card tibo-card">
+              <header>
+                <h2>Tibo 雷达</h2>
+                <b>@thsottiaux · PT</b>
+              </header>
+              <div class="tibo-clock">
+                <strong id="tiboTime">--:--</strong
+                ><span id="tiboPeriod">PT 当地时间</span>
+              </div>
+              <div class="tibo-presence">
+                <i>●</i>
+                <div>
+                  <strong data-bind="tiboLocation">旧金山湾区 / PT</strong
+                  ><span data-bind="tiboEvidence">等待公开摘要</span>
+                </div>
+              </div>
+              <div class="tibo-latest">
+                <label>最新动态 / 研判</label>
+                <p data-bind="tiboActivity">公开摘要尚未返回最新动态。</p>
+              </div>
+              <footer>仅显示 Codex 相关内容</footer>
+            </article>
+          </div>
+          <article class="card credits-card">
+            <header>
+              <div>
+                <h3>Full reset 权益</h3>
+                <p>
+                  <span id="resetFreshness">等待官方权益</span> ·
+                  只读展示，不提供兑换操作
+                </p>
+              </div>
+              <strong data-bind="creditCount">-- 次</strong>
+            </header>
+            <div id="creditsList" class="credits-list">
+              <div class="empty">等待权益数据</div>
+            </div>
+          </article>
+          <section class="metric-grid">
+            <article class="card metric">
+              <label>滚动24h</label><strong data-bind="rolling24">0</strong
+              ><span data-bind="cost24">$0.00 · ¥--</span>
+            </article>
+            <article class="card metric">
+              <label>近7天</label><strong data-bind="last7">0</strong
+              ><span data-bind="cost7">$0.00 · ¥--</span>
+            </article>
+            <article class="card metric">
+              <label>本月</label><strong data-bind="month">0</strong
+              ><span data-bind="costMonth">$0.00 · ¥--</span>
+            </article>
+          </section>
+          <div class="disclaimer" id="costNote">
+            金额为 API 等价预估，不是 ChatGPT/Codex 订阅实际账单。
+          </div>
+        </section>
+
+        <section class="dashboard-section" data-panel="trends">
+          <article class="card chart-card">
+            <div class="section-heading">
+              <div>
+                <h3>最近24小时</h3>
+                <p>按本机时区显示；滚动值按精确时间戳计算</p>
+              </div>
+              <strong data-bind="rolling24">0</strong>
+            </div>
+            <div id="hourlyChart" class="bar-chart"></div>
+          </article>
+          <div class="two-column">
+            <article class="card list-card">
+              <div class="section-heading">
+                <div>
+                  <h3>本月模型构成</h3>
+                  <p>schema 4 按模型小时桶；未知模型不猜价</p>
+                </div>
+              </div>
+              <div id="models" class="model-list">
+                <div class="empty">暂无模型级用量</div>
+              </div>
+            </article>
+            <article class="card list-card">
+              <div class="section-heading">
+                <div>
+                  <h3>OneDrive 设备统计</h3>
+                  <p>读取 schema 2/3/4；新版只写 codex-v2 文件</p>
+                </div>
+                <span id="deviceCount" class="pill">本机</span>
+              </div>
+              <div id="devices" class="device-list">
+                <div class="empty">未检测到 OneDrive</div>
+              </div>
+            </article>
+          </div>
+          <article class="card chart-card">
+            <div class="section-heading">
+              <div>
+                <h3>近30天趋势</h3>
+                <p>每日 Token 消耗</p>
+              </div>
+              <strong id="dailyPeak">峰值 0</strong>
+            </div>
+            <div class="trend-scroll">
+              <div id="stackedDaily" class="stacked-chart"></div>
+            </div>
+            <div id="deviceLegend" class="device-legend"></div>
+            <canvas id="dailyChart" width="950" height="190" hidden></canvas>
+          </article>
+        </section>
+
+        <section class="dashboard-section" data-panel="insights">
+          <article class="card list-card">
+            <h3>高级分析</h3>
+            <div id="advancedAnalysis"></div>
+          </article>
+          <article class="card list-card">
+            <h3>项目月度预算</h3>
+            <p>选择已识别项目，设置正整数 Token 上限，可使用英文逗号分隔千位。</p>
+            <div class="budget-form">
+              <select id="budgetProject" aria-label="项目"></select
+              ><input
+                id="budgetLimit"
+                type="text"
+                inputmode="numeric"
+                aria-label="月度 Token 上限"
+                aria-describedby="budgetFeedback"
+                placeholder="月度 Token 上限"
+              /><button id="saveBudget">保存</button>
+              <button id="removeBudget" disabled>删除预算</button>
+            </div>
+            <p id="budgetFeedback" class="form-feedback" role="status" aria-live="polite"></p>
+            <div id="budgetStatuses"></div>
+          </article>
+          <section class="metric-grid">
+            <article class="card metric">
+              <label>本月调用</label><strong id="monthCalls">0</strong
+              ><span id="modelCount">已识别 0 个模型</span>
+            </article>
+            <article class="card metric">
+              <label>缓存输入占比</label><strong id="cacheRate">--</strong
+              ><span>cached input / input</span>
+            </article>
+            <article class="card metric">
+              <label>主要工作类型</label><strong id="topCategory">--</strong
+              ><span id="topCategoryDetail">等待完整统计</span>
+            </article>
+          </section>
+          <article class="card list-card">
+            <div class="section-heading">
+              <div>
+                <h3>工作类型构成</h3>
+                <p>根据本月会话上下文在本机归类，仅用于趋势参考</p>
+              </div>
+            </div>
+            <div id="categories" class="category-list">
+              <div class="empty">正在建立工作类型统计…</div>
+            </div>
+          </article>
+          <article class="card list-card">
+            <div class="section-heading">
+              <div>
+                <h3>项目 Top</h3>
+                <p>按 Token 汇总本机 Codex 工作区</p>
+              </div>
+              <div class="period-toggle">
+                <button data-period="today" class="selected">今日</button
+                ><button data-period="month">本月</button>
+              </div>
+            </div>
+            <div id="projects" class="rank-list">
+              <div class="empty">当前时段暂无项目数据</div>
+            </div>
+          </article>
+          <article class="card list-card">
+            <div class="section-heading">
+              <div>
+                <h3>最近调用</h3>
+                <p>模型、项目与输入/缓存/输出 Token</p>
+              </div>
+              <button id="openLogs" class="text-button">打开日志目录 ↗</button>
+            </div>
+            <div id="recentUsage" class="usage-list">
+              <div class="empty">正在读取 Codex 会话日志…</div>
+            </div>
+          </article>
+        </section>
+
+        <section
+          class="dashboard-section settings-section"
+          data-panel="settings"
+        >
+          <div id="newSettings"></div>
+          <article class="card settings-card">
+            <h3>全局外观</h3>
+            <div id="appearancePicker" class="choice-grid three">
+              <button data-appearance-value="aurora">
+                <i></i><b>极光</b><span>渐变、鲜明、层次丰富</span></button
+              ><button data-appearance-value="glass">
+                <i></i><b>玻璃</b><span>通透、轻盈、细描边</span></button
+              ><button data-appearance-value="graphite">
+                <i></i><b>石墨</b><span>克制、紧凑、低干扰</span>
+              </button>
+            </div>
+            <div id="palettePicker" class="palette-picker">
+              <button data-palette-value="mintDawn" title="薄荷晨光"></button
+              ><button
+                data-palette-value="seaSaltBlue"
+                title="海盐蓝风"
+              ></button
+              ><button data-palette-value="forestSoda" title="森林气泡"></button
+              ><button
+                data-palette-value="peachSunset"
+                title="桃桃晚霞"
+              ></button
+              ><button
+                data-palette-value="wisteriaNight"
+                title="紫藤星夜"
+              ></button
+              ><button
+                data-palette-value="lemonHarbor"
+                title="柠檬海岸"
+              ></button>
+            </div>
+          </article>
+          <article class="card settings-card">
+            <h3>浮窗</h3>
+            <div id="stylePicker" class="choice-grid styles">
+              <button data-style-value="rings">
+                ◉<b>额度环</b><span>7天余额 + 24h</span></button
+              ><button data-style-value="circle">
+                ◯<b>圆形</b><span>纯圆双指标</span></button
+              ><button data-style-value="square">
+                ▣<b>方形</b><span>紧凑双指标</span></button
+              ><button data-style-value="pill">
+                ▭<b>胶囊</b><span>横向极简状态</span></button
+              ><button data-style-value="bars">
+                ☰<b>横条</b><span>7天余额横条</span></button
+              ><button data-style-value="barsQuad">
+                ☷<b>横条·详细</b><span>余额、Token 与金额</span></button
+              ><button data-style-value="badge">
+                ⓒ<b>徽章</b><span>只看7天余额</span></button
+              ><button data-style-value="badgeQuad">
+                ▤<b>徽章·详细</b><span>7天余额 + 24h</span>
+              </button>
+            </div>
+            <div class="setting-row">
+              <label>尺寸</label
+              ><select id="compactSize">
+                <option value="standard">标准</option>
+                <option value="mini">迷你</option>
+              </select>
+            </div>
+            <div id="ringSettings">
+              <div class="setting-row">
+                <label>额度环方向</label
+                ><select id="ringOrientation">
+                  <option value="horizontal">横向长方形</option>
+                  <option value="vertical">竖向长方形</option>
+                </select>
+              </div>
+              <label class="setting-row"
+                ><span>显示 Full reset 权益</span
+                ><input id="showCredits" type="checkbox"
+              /></label>
+            </div>
+            <div class="setting-row">
+              <label>背景透明度</label
+              ><input id="opacity" type="range" min="30" max="94" />
+            </div>
+            <label class="setting-row"
+              ><span>始终置顶</span><input id="alwaysOnTop" type="checkbox"
+            /></label>
+          </article>
+          <article class="card settings-card">
+            <h3>刷新与快捷操作</h3>
+            <div class="setting-row">
+              <div>
+                <label>本地额度刷新间隔</label
+                ><small>建议 30s；雷达固定每 30 分钟同步</small>
+              </div>
+              <select id="refreshSeconds">
+                <option value="5">5s</option>
+                <option value="10">10s</option>
+                <option value="30">30s</option>
+              </select>
+            </div>
+            <div class="button-row">
+              <button id="settingsRefresh">↻ 立即刷新</button
+              ><button id="settingsCopy">▣ 复制用量摘要</button>
+            </div>
+          </article>
+          <article class="card settings-card">
+            <h3>Codex 重置雷达</h3>
+            <p>
+              读取 Codex Radar / Tibo 公开动态，本机每 5 分钟重评，30
+              分钟同步，超过 90 分钟未成功读取时停止展示概率。无需 API Key 或 X
+              Cookie。
+            </p>
+            <div class="button-row">
+              <button id="settingsRadarRefresh">↻ 立即同步重置雷达</button
+              ><button class="radarSource">打开数据源 ↗</button>
+            </div>
+            <small id="radarStatusText">每 30 分钟同步 · 数据来自公开源</small>
+          </article>
+          <article class="card settings-card">
+            <h3>自动启动与同步</h3>
+            <label class="setting-row"
+              ><span
+                >打开 Codex 时自动显示
+                <small
+                  >Windows 登录后在后台等待 Codex，检测到后显示浮窗</small
+                ></span
+              ><input id="launchWithCodex" type="checkbox" /></label
+            ><label class="setting-row"
+              ><span
+                >OneDrive 聚合同步
+                <small>只同步小时、日、月、模型与 Token 数字</small></span
+              ><input id="oneDriveSync" type="checkbox"
+            /></label>
+          </article>
+          <article class="card settings-card">
+            <h3>关于</h3>
+            <p>Codex 脉动 Windows 2.12.2</p>
+            <small
+              >dev.codex.balance-dashboard.codex.windows ·
+              日志和凭据不会被上传</small
+            >
+          </article>
+        </section>
+        <footer class="privacy-footer">
+          Codex 脉动 Windows · 会话解析、归类和费用预估均在本机完成
+        </footer>
+      </div>
+    </main>
+    <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+    <script src="../core/budget-input.js"></script>
+    <script src="../core/display-labels.js"></script>
+    <script src="error-message.js"></script>
+    <script src="budget-editor.js"></script>
+    <script src="app.js"></script>
+    <script src="../core/quota-history.js"></script>
+    <script src="enhanced.js"></script>
+    <script src="mac-aligned.js"></script>
+  </body>
+</html>
