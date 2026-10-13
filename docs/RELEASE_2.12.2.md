@@ -9,7 +9,7 @@ macOS 与 Windows 同步更新，重点改善预算保存、提醒记录、刷�
 - Windows 补齐按文件校验的每日备份、同日增补及日志路径增量索引，并保留上一版圆环文字布局修复。
 - Mac 自动守护采用随进程释放的系统文件锁，改善异常退出后的恢复；未开启守护的用户不会被自动开启。
 
-本次提供 Apple Silicon（arm64）Mac DMG，以及 Windows x64 安装版和免安装版。优先使用 Mac 包内“安装或更新（保留设置）.command”或 Windows 安装版升级。安装要求、设置保留与回退方法见随附 INSTALL_UPGRADE_2.12.2.md；验证范围与未测项目见 VALIDATION_2.12.2.md。
+本次提供 Apple Silicon（arm64）Mac DMG，以及 Windows x64 的 `Installer.exe` 安装版和 `Portable.exe` 免安装版。GitHub 附件采用英文文件名，程序内容与本机构建的中文文件名版本一致。优先使用 Mac 包内“安装或更新（保留设置）.command”或 Windows 安装版升级。安装要求、设置保留与回退方法见随附 INSTALL_UPGRADE_2.12.2.md；验证范围与未测项目见 VALIDATION_2.12.2.md。
 
 Mac 安装包为 ad-hoc 签名、未公证版本；Windows 安装包没有商业 Authenticode 签名。Mac DMG 内“本地版本；未发布到 GitHub”是构建时保存的说明快照，本次发布状态以此 Release 页面为准。
 

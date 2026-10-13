@@ -13,8 +13,9 @@ Mac（Apple Silicon）
 
 Windows（x64）
 
-- 安装版：Codex脉动-Windows-2.12.2-x64-安装版.exe。
-- 免安装版：Codex脉动-Windows-2.12.2-x64-免安装.exe。
+- 安装版：Codex-Pulse-Windows-2.12.2-x64-Installer.exe。
+- 免安装版：Codex-Pulse-Windows-2.12.2-x64-Portable.exe。
+- GitHub 附件使用英文文件名；本机构建仍可显示中文“安装版／免安装”名称，两者程序内容相同。
 - 校验文件：SHA256SUMS-2.12.2.txt。面向 Windows 10/11 x64，无需另行安装 Node.js。
 - 已安装旧版时，从托盘退出 Codex 脉动，运行安装版并沿用原安装位置。保留原有应用数据目录，不删除设置或历史记录；免安装版适合直接运行。
 - 本轮已验证从 2.12.1 升级到 2.12.2，安装前后设置文件一致；首次启动时窗口尺寸记录可能按当前显示环境调整，用户偏好保持。

@@ -6,10 +6,10 @@
 
 ## 安装与使用
 
-在 [v2.12.2 发布页](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.2) 下载；本地构建的交付文件位于 dist：
+在 [v2.12.2 发布页](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.2) 下载；本地构建的交付文件位于 dist（本地仍使用中文“安装版／免安装”文件名）：
 
-- Codex脉动-Windows-2.12.2-x64-安装版.exe：安装向导、桌面与开始菜单快捷方式。
-- Codex脉动-Windows-2.12.2-x64-免安装.exe：双击运行，无需安装 Node.js。
+- Codex-Pulse-Windows-2.12.2-x64-Installer.exe：安装向导、桌面与开始菜单快捷方式。
+- Codex-Pulse-Windows-2.12.2-x64-Portable.exe：双击运行，无需安装 Node.js。
 - SHA256SUMS-2.12.2.txt：文件校验值。旧 2.12.1 产物保留。
 
 需要本机已安装并登录 Codex 桌面版或 CLI。首次打开显示主窗口；在设置中开启悬浮框、桌面卡片和通知。关闭窗口后继续托盘运行，从托盘选择“退出 Codex 脉动”才会结束全部窗口与后台任务。
