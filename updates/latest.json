@@ -1,71 +1,47 @@
 {
-  "tag_name": "v2.12.2",
-  "name": "Codex 脉动 2.12.2 · Mac / Windows · Build 2128",
-  "body": "Codex 脉动 2.12.2 · Build 2128\n\nmacOS 与 Windows 同步更新，重点改善预算保存、提醒记录、刷新反馈和中文项目显示。\n\n- 预算仅接受正整数，支持英文千位逗号；保存失败时保留输入，后台刷新不会覆盖草稿，删除使用独立入口。\n- 提醒回执晚于账户切换时仍记入原账户，减少重复提醒和旧状态覆盖。\n- 操作结果与刷新进度分别显示；失败后可重试，恢复成功后清除对应旧错误。\n- file URL 中的中文项目名显示更清晰，原始项目标识和预算关联保持不变。\n- Windows 补齐按文件校验的每日备份、同日增补及日志路径增量索引，并保留上一版圆环文字布局修复。\n- Mac 自动守护采用随进程释放的系统文件锁，改善异常退出后的恢复；未开启守护的用户不会被自动开启。\n\n本次提供 Apple Silicon（arm64）Mac DMG，以及 Windows x64 的 `Installer.exe` 安装版和 `Portable.exe` 免安装版。GitHub 附件采用英文文件名，程序内容与本机构建的中文文件名版本一致。优先使用 Mac 包内“安装或更新（保留设置）.command”或 Windows 安装版升级。安装要求、设置保留与回退方法见随附 INSTALL_UPGRADE_2.12.2.md；验证范围与未测项目见 VALIDATION_2.12.2.md。\n\nMac 安装包为 ad-hoc 签名、未公证版本；Windows 安装包没有商业 Authenticode 签名。Mac DMG 内“本地版本；未发布到 GitHub”是构建时保存的说明快照，本次发布状态以此 Release 页面为准。\n\n下载与后续更新：https://github.com/huohuo143/codex-pulse/releases\n",
-  "html_url": "https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.2",
-  "published_at": "2026-10-13T04:03:28Z",
+  "tag_name": "v2.12.5",
+  "name": "Codex 脉动 2.12.5 · macOS · Build 2131",
+  "body": "# Codex 脉动 2.12.5 · Build 2131\n\n改进灵活额度到期记录的保存、数据保护与恢复，包含 2.12.4 的保存可靠性修复。\n\n- 无法读取、损坏或不支持的记录会显示原因并停止保存，避免空列表覆盖原文件。\n- 每次保存前重新校验当前文件，先保留上一份有效记录；备份失败时保持原记录。\n- 提供“重新读取”“恢复上次有效记录”和“打开记录文件夹”；恢复前保留损坏原件。\n- 恢复旧备份和保存失败后保留未保存输入、记录身份、原数量、金额和通知日期。\n- 保存期间显示进度并阻止重复提交；账户变化时保留草稿，写入仍归属提交时的账户。\n- 严格校验数量千位分组；编辑时保留原数量精度，日期选择遵循记录时区。\n- 每日备份和安装备份包含分笔额度记录、上一份有效记录与损坏原件。\n\n本次提供 Apple Silicon（arm64）Mac DMG。主应用最低 macOS 13，小组件最低 macOS 14。安装包为 ad-hoc 签名，尚未公证。本次没有新 Intel 或 Windows 安装包；Windows 公开安装包继续使用 [v2.12.2](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.2)。\n\n运行镜像内“安装或更新（保留设置）.command”升级。镜像内“本地版本／未发布”的说明是构建时的快照，发布状态以 GitHub Release 页面为准。安装与已知服务登记问题见 [安装说明](https://github.com/huohuo143/codex-pulse/blob/main/docs/INSTALL_UPGRADE_2.12.5.md)，验证范围见 [验证说明](https://github.com/huohuo143/codex-pulse/blob/main/docs/VALIDATION_2.12.5.md)。\n\n验证：已记录的最终源码回归为 278 项通过、5 项可选截图跳过、0 失败；本次核对构建输入与源码一致，并实际安装验证版本、签名、设置保留及官方数据读取。\n\nDMG SHA-256：`1f8942d8e6b78395e50ce8242ee0c37d239e3d7ab706136a8d24f2cd7f49d657`\n",
+  "html_url": "https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.5",
+  "published_at": "2026-10-15T07:07:27Z",
   "draft": false,
   "prerelease": false,
   "schemaVersion": 1,
   "assets": [
     {
-      "name": "Codex-Pulse-v2.12.2-build2128-20261013-arm64.dmg",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.2/Codex-Pulse-v2.12.2-build2128-20261013-arm64.dmg",
-      "size": 7098494,
+      "name": "Codex-Pulse-v2.12.5-build2131-20261015-arm64.dmg",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.5/Codex-Pulse-v2.12.5-build2131-20261015-arm64.dmg",
+      "size": 7135800,
       "state": "uploaded"
     },
     {
-      "name": "Codex-Pulse-v2.12.2-build2128-20261013-arm64.dmg.sha256",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.2/Codex-Pulse-v2.12.2-build2128-20261013-arm64.dmg.sha256",
+      "name": "Codex-Pulse-v2.12.5-build2131-20261015-arm64.dmg.sha256",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.5/Codex-Pulse-v2.12.5-build2131-20261015-arm64.dmg.sha256",
       "size": 115,
       "state": "uploaded"
     },
     {
-      "name": "Codex-Pulse-Windows-2.12.2-source-native-verified.zip",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.2/Codex-Pulse-Windows-2.12.2-source-native-verified.zip",
-      "size": 1542538,
+      "name": "INSTALL_UPGRADE_2.12.5.md",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.5/INSTALL_UPGRADE_2.12.5.md",
+      "size": 2085,
       "state": "uploaded"
     },
     {
-      "name": "Codex-Pulse-Windows-2.12.2-source-native-verified.zip.sha256",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.2/Codex-Pulse-Windows-2.12.2-source-native-verified.zip.sha256",
-      "size": 120,
+      "name": "RELEASE_NOTES_2.12.5.md",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.5/RELEASE_NOTES_2.12.5.md",
+      "size": 1954,
       "state": "uploaded"
     },
     {
-      "name": "Codex-Pulse-Windows-2.12.2-x64-Installer.exe",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.2/Codex-Pulse-Windows-2.12.2-x64-Installer.exe",
-      "size": 101264231,
+      "name": "SHA256SUMS-2.12.5.txt",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.5/SHA256SUMS-2.12.5.txt",
+      "size": 506,
       "state": "uploaded"
     },
     {
-      "name": "Codex-Pulse-Windows-2.12.2-x64-Portable.exe",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.2/Codex-Pulse-Windows-2.12.2-x64-Portable.exe",
-      "size": 100938050,
-      "state": "uploaded"
-    },
-    {
-      "name": "INSTALL_UPGRADE_2.12.2.md",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.2/INSTALL_UPGRADE_2.12.2.md",
-      "size": 2583,
-      "state": "uploaded"
-    },
-    {
-      "name": "RELEASE_NOTES_2.12.2.md",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.2/RELEASE_NOTES_2.12.2.md",
-      "size": 1651,
-      "state": "uploaded"
-    },
-    {
-      "name": "SHA256SUMS-2.12.2.txt",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.2/SHA256SUMS-2.12.2.txt",
-      "size": 725,
-      "state": "uploaded"
-    },
-    {
-      "name": "VALIDATION_2.12.2.md",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.2/VALIDATION_2.12.2.md",
-      "size": 2111,
+      "name": "VALIDATION_2.12.5.md",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.5/VALIDATION_2.12.5.md",
+      "size": 2314,
       "state": "uploaded"
     }
   ]
