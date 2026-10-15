@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-2.12.3-8b7cff">
+  <img alt="Version" src="https://img.shields.io/badge/version-2.12.5-8b7cff">
   <img alt="macOS" src="https://img.shields.io/badge/macOS-14%2B-111827?logo=apple">
   <img alt="Mac architectures" src="https://img.shields.io/badge/Mac-arm64%20%7C%20x86__64-111827">
   <img alt="Swift" src="https://img.shields.io/badge/Swift-6.0-f05138?logo=swift&logoColor=white">
@@ -18,11 +18,15 @@
 
 `Codex 脉动` 将 Codex 的额度、Token 消耗、重置节奏和 Full reset 权益集中到一套原生 macOS 界面中。它既可以作为常驻悬浮框，也可以完全隐藏悬浮框，仅使用主窗口或 7 款桌面小组件。
 
-> 当前版本：`2.12.3` build 2129。主应用兼容 macOS 13；桌面小组件要求 macOS 14 或更高版本；本地构建为 ad-hoc 签名、未公证版本。
+> 最新 macOS 发布版本：`2.12.5` build 2131，提供 Apple Silicon（arm64）安装包。主应用兼容 macOS 13；桌面小组件要求 macOS 14 或更高版本；安装包为 ad-hoc 签名、未公证版本。Windows 公开安装包仍见 v2.12.2 发布页。
 
-## 2.12.3 更新检查与限流恢复
+## 2.12.5 额度记录保护与恢复
 
-优先查询公开版本清单，GitHub API 作为备用；限流和断网时保留最近成功结果，按服务器恢复时间等待，重启后继续遵守冷却。Windows 安装包检查按钮保持正确状态。详见 [更新说明](docs/RELEASE_2.12.3.md)。
+损坏或不支持的记录会停止保存并提示原因；每次保存保留上一份有效记录，支持显式恢复且保留损坏原件及未保存输入。详见 [2.12.5 更新说明](docs/RELEASE_2.12.5.md)。
+
+## 2.12.4 额度记录保存与备份
+
+修复连续保存相互覆盖、数量分组误解析和编辑数量精度丢失；保存失败与账户变化保留输入，灵活额度记录纳入每日备份。详见 [2.12.4 更新说明](docs/RELEASE_2.12.4.md)。
 
 ## 2.12.2 跨平台可靠性与操作反馈
 
@@ -30,7 +34,7 @@
 
 ## 2.12.1 稳定性与增量性能
 
-修复预算输入误解析和保存失败丢失表单；提醒记录按账户恢复，自动备份校验实际完成情况，并加快多日志文件同时更新时的索引处理。详见 [2.12.1 更新说明](docs/RELEASE_2.12.1.md)。
+修复预算输入误解析和保存失败丢失表单；提醒记录按账户恢复，自动备份校验实际完成情况，并加快多日志文件同时更新时的索引处理。这些改进已合入 [2.12.2](docs/RELEASE_2.12.2.md)。
 
 ## 2.12.0 额度历史与完整导出
 
@@ -186,20 +190,20 @@ flowchart LR
 - 会话解析缓存位于独立 Application Support 目录，只保存增量聚合所需结果。
 - 额度历史按本机匿名账户标识分开保存在 `~/Library/Application Support/CodexSuanliMeter/quota-history-<匿名标识>.json`（旧文件保留），不包含对话、项目路径或账户凭据。
 - 项目预算只保存项目识别名/本地路径和用户设定的 Token 上限，不上传、不写入 iCloud 或 Widget 快照。
-- 自动化备份仅复制额度历史和项目预算；每日摘要不包含对话正文或项目路径。
+- 自动化备份仅复制额度历史、项目预算和额度到期记录；每日摘要不包含对话正文或项目路径。
 - 脱敏诊断报告不包含账号、对话、项目路径、凭据或 API Key。
 - 原生提醒默认关闭；只有用户主动开启后才申请 macOS 通知权限。
 - 版本检测不读取 GitHub Token 或账号，不上传本地数据，也不会自动下载或安装。
 
 ## 安装
 
-当前版本为 **2.12.3 / Build 2129**。在 [v2.12.3 发布页](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.3) 下载 Apple Silicon Mac 安装包或 Windows x64 安装版、免安装版。完整步骤见 [安装与升级](docs/INSTALL_UPGRADE_2.12.3.md)，测试范围见 [验证说明](docs/VALIDATION_2.12.3.md)。
+在 [v2.12.5 发布页](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.5) 下载 Apple Silicon Mac 安装包。完整步骤见 [安装与升级](docs/INSTALL_UPGRADE_2.12.5.md)，测试范围见 [验证说明](docs/VALIDATION_2.12.5.md)。本次发布针对 macOS；Windows x64 安装版、免安装版继续从 [v2.12.2 发布页](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.2) 下载。
 
 在 [Releases](https://github.com/huohuo143/codex-pulse/releases) 下载：
 
 ```text
-Codex-Pulse-v2.12.3-build2129-20261013-arm64.dmg
-Codex-Pulse-v2.12.3-build2129-20261013-arm64.dmg.sha256
+Codex-Pulse-v2.12.5-build2131-20261015-arm64.dmg
+Codex-Pulse-v2.12.5-build2131-20261015-arm64.dmg.sha256
 ```
 
 1. 打开 DMG。
@@ -211,7 +215,7 @@ Codex-Pulse-v2.12.3-build2129-20261013-arm64.dmg.sha256
 
 ## 与旧版并行
 
-| 项目 | Codex 脉动 2.12.3 | 旧算力码表 0.1.0 |
+| 项目 | Codex 脉动 2.12.5 | 旧算力码表 0.1.0 |
 | --- | --- | --- |
 | App | `Codex 脉动.app` | `算力码表.app` |
 | Bundle ID | `dev.codex.balance-dashboard.codex` | `dev.codex.balance-dashboard` |
@@ -242,7 +246,7 @@ Codex-Pulse-v2.12.3-build2129-20261013-arm64.dmg.sha256
 
 ```bash
 ./script/generate_app_icon.sh
-swift test --parallel
+swift test --no-parallel
 OPEN_APP=0 ./script/build_and_run.sh
 ./script/verify_widget_bundle.sh
 ./script/package_release.sh
@@ -335,5 +339,3 @@ ARCH=arm64 ./script/create_transfer_package.sh
 ## License
 
 本项目采用 [MIT License](LICENSE)。
-
-更新检查优先读取本项目 `updates/latest.json` 公开版本清单，GitHub API 为备用。维护者应在发布并核对附件后，运行 `python3 script/update_release_manifest.py --tag v2.12.3` 并同步清单，保持下载版本与正式发布一致。

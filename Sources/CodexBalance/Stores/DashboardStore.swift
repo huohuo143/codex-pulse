@@ -24,8 +24,11 @@ final class DashboardStore: ObservableObject {
   @Published var operationFeedback: DashboardOperationFeedback?
   @Published var radarEvaluation = RadarEvaluationSummary()
   @Published var radarEvaluationMessage: String?
-  @Published var creditExpiry = CreditExpiryLedgerStore().load()
+  @Published var creditExpiry = CreditExpiryLedger()
   @Published var expiryMessage: String?
+  @Published var isSavingCreditExpiry = false
+  @Published var creditExpiryStorageIssue: CreditExpiryStorageError?
+  @Published var creditExpiryRecovery: CreditExpiryRecovery?
   @Published var pricingMessage = ModelPricingStore.shared.snapshot().description
   @Published var launchWithCodexEnabled = CodexWatcherManager.isEnabled()
   @Published var settingsMessage: String?
@@ -216,7 +219,7 @@ final class DashboardStore: ObservableObject {
   let codexRadarService: CodexRadarService
   let radarEvaluationArchive = RadarEvaluationArchive()
   var quotaHistoryStore = QuotaHistoryStore()
-  let creditExpiryStore = CreditExpiryLedgerStore()
+  let creditExpiryStore: CreditExpiryLedgerStore
   var analysisGeneration = 0
   var forecastGeneration = 0
   var lastAnalysisStats: TokenStats?
@@ -269,8 +272,10 @@ final class DashboardStore: ObservableObject {
   var automaticRecoveryAttempts = 0
 
   init(startServices: Bool = true, radarService: CodexRadarService = CodexRadarService(),
-       alertLedgerStore: QuotaAlertLedgerStore = QuotaAlertLedgerStore()) {
+       alertLedgerStore: QuotaAlertLedgerStore = QuotaAlertLedgerStore(),
+       expiryStore: CreditExpiryLedgerStore = CreditExpiryLedgerStore()) {
     codexRadarService = radarService
+    creditExpiryStore = expiryStore
     servicesEnabled = startServices
     quotaAlertLedgerStore = alertLedgerStore
     let defaults = PulsePreferences.shared
@@ -327,6 +332,10 @@ final class DashboardStore: ObservableObject {
 
     let cacheURL = PulsePaths.support.appendingPathComponent("exchange-rate-usd-cny.json")
     exchangeRateService = ExchangeRateService(cacheURL: cacheURL)
+    let expiryRead = expiryStore.loadResult()
+    creditExpiry = expiryRead.ledger
+    creditExpiryStorageIssue = expiryRead.issue
+    creditExpiryRecovery = expiryRead.recovery
     projectBudgets = projectBudgetStore.load()
     reliabilityEvents = reliabilityEventStore.load()
     restoreCachedAppUpdate(defaults: defaults)

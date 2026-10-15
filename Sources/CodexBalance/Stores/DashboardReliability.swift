@@ -74,14 +74,19 @@ extension DashboardStore {
     // Do not let a startup backup of the legacy path consume the day's attempt.
     guard reliabilityBackupsEnabled, status?.accountScope?.isEmpty == false else { return false }
     return !(archive ?? localAutomationArchive).hasBackup(
-      for: now, sourceURLs: [quotaHistoryStore.storageURL, ProjectBudgetStore.defaultURL]
+      for: now, sourceURLs: localBackupSourceURLs
     )
+  }
+
+  var localBackupSourceURLs: [URL] {
+    [quotaHistoryStore.storageURL, ProjectBudgetStore.defaultURL,
+      creditExpiryStore.url, creditExpiryStore.legacyURL, creditExpiryStore.previousURL]
   }
 
   func performLocalBackup(manual: Bool = true, now: Date = Date(), archive: LocalAutomationArchive? = nil) {
     do {
       let result = try (archive ?? localAutomationArchive).backup(
-        sourceURLs: [quotaHistoryStore.storageURL, ProjectBudgetStore.defaultURL],
+        sourceURLs: localBackupSourceURLs,
         now: now,
         retentionDays: 7
       )

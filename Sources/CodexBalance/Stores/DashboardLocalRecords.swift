@@ -7,30 +7,104 @@ import UniformTypeIdentifiers
 import WidgetKit
 
 extension DashboardStore {
-  func saveCreditExpiry(batch: CreditExpiryBatch, confirmed: Bool) {
+  @discardableResult
+  func saveCreditExpiry(batch: CreditExpiryBatch, confirmed: Bool,
+    persist: (@Sendable (CreditExpiryLedger) async throws -> Void)? = nil) async -> Bool {
+    // Claim the write before suspending so rapid submissions cannot each save
+    // a snapshot that omits the other submission.
+    guard !isSavingCreditExpiry else { return false }
+    guard creditExpiryStorageIssue == nil else {
+      expiryMessage = creditExpiryStorageIssue?.localizedDescription
+      return false
+    }
+    let account = status?.accountScope
     let cleanSource = batch.record.source.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !confirmed || (status?.accountScope != nil && !cleanSource.isEmpty) else {
-      expiryMessage = "确认前需要读取当前账户，并填写到期日来源"; return
+    guard !confirmed || (account?.isEmpty == false && !cleanSource.isEmpty) else {
+      expiryMessage = "确认前需要读取当前账户，并填写到期日来源"; return false
     }
     guard let date = CreditExpiryBatch.localDate(batch.expiryDate),
       !batch.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
       batch.grantedCredits.map({ $0.isFinite && $0 > 0 }) ?? true else {
-      expiryMessage = "请填写名称、有效日期和正确的发放数量"; return
+      expiryMessage = "请填写名称、有效日期和正确的发放数量"; return false
     }
     var saved = batch
+    saved.title = batch.title.trimmingCharacters(in: .whitespacesAndNewlines)
     saved.record = CreditExpiryRecord(expiresAt: date, source: cleanSource,
-      confirmedAt: confirmed ? Date() : nil, accountScope: confirmed ? status?.accountScope : nil)
-    Task {
-      do {
+      confirmedAt: confirmed ? Date() : nil, accountScope: confirmed ? account : nil)
+    var ledger = creditExpiry
+    ledger.upsert(saved)
+    let updatedLedger = ledger
+    isSavingCreditExpiry = true
+    expiryMessage = "正在保存这一笔记录…"
+    defer { isSavingCreditExpiry = false }
+    do {
+      if let persist {
+        try await persist(updatedLedger)
+      } else {
         let storage = creditExpiryStore
-        var ledger = creditExpiry
-        ledger.upsert(saved)
-        let updatedLedger = ledger
         try await Task.detached(priority: .utility) { try storage.save(updatedLedger) }.value
-        creditExpiry = updatedLedger; expiryMessage = confirmed ? "已保存当前账户的这一笔记录" : "已保存这一笔，等待核实"
-        writeWidgetSnapshotFile()
-      } catch { expiryMessage = "记录保存失败：\(error.localizedDescription)" }
+      }
+      creditExpiry = updatedLedger
+      expiryMessage = confirmed && status?.accountScope != account
+        ? "已保存到提交时的账户；当前账户已变化，请重新核对"
+        : (confirmed ? "已保存当前账户的这一笔记录" : "已保存这一笔，等待核实")
+      writeWidgetSnapshotFile()
+      return true
+    } catch {
+      await updateCreditExpiryReadIssue()
+      expiryMessage = "记录保存失败：\(error.localizedDescription)"
+      return false
     }
+  }
+
+  func reloadCreditExpiry() async -> CreditExpiryLedger? {
+    guard !isSavingCreditExpiry else { return nil }
+    isSavingCreditExpiry = true
+    expiryMessage = "正在重新读取到期记录…"
+    defer { isSavingCreditExpiry = false }
+    let storage = creditExpiryStore
+    let read = await Task.detached(priority: .utility) { storage.loadResult() }.value
+    creditExpiryStorageIssue = read.issue
+    creditExpiryRecovery = read.recovery
+    guard read.issue == nil else { expiryMessage = read.issue?.localizedDescription; return nil }
+    creditExpiry = read.ledger
+    expiryMessage = "已重新读取到期记录"
+    writeWidgetSnapshotFile()
+    return read.ledger
+  }
+
+  func restoreCreditExpiryBackup() async -> CreditExpiryLedger? {
+    guard !isSavingCreditExpiry else { return nil }
+    isSavingCreditExpiry = true
+    expiryMessage = "正在恢复上次有效记录…"
+    defer { isSavingCreditExpiry = false }
+    let storage = creditExpiryStore
+    do {
+      let result = try await Task.detached(priority: .utility) { try storage.restorePrevious() }.value
+      creditExpiry = result.ledger
+      creditExpiryStorageIssue = nil
+      creditExpiryRecovery = nil
+      expiryMessage = "已恢复备份中的 \(result.ledger.batches.count) 笔记录"
+        + (result.preservedOriginalURL == nil ? "" : "；原文件已单独保留")
+      writeWidgetSnapshotFile()
+      return result.ledger
+    } catch {
+      await updateCreditExpiryReadIssue()
+      expiryMessage = "恢复未完成：\(error.localizedDescription)"
+      return nil
+    }
+  }
+
+  private func updateCreditExpiryReadIssue() async {
+    let storage = creditExpiryStore
+    let read = await Task.detached(priority: .utility) { storage.loadResult() }.value
+    creditExpiryStorageIssue = read.issue
+    creditExpiryRecovery = read.recovery
+  }
+
+  func openCreditExpiryFolder() {
+    NSWorkspace.shared.selectFile(creditExpiryStore.url.path,
+      inFileViewerRootedAtPath: creditExpiryStore.url.deletingLastPathComponent().path)
   }
 
   func importModelPrices() {

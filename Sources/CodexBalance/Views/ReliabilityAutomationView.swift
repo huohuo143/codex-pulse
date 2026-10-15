@@ -51,7 +51,7 @@ struct ReliabilityAutomationSettingsView: View {
             .foregroundStyle(DashboardColors.subtleText)
 
           Divider().overlay(DashboardColors.separator)
-          Toggle("每日备份额度历史和项目预算", isOn: $store.reliabilityBackupsEnabled)
+          Toggle("每日备份额度历史、项目预算和到期记录", isOn: $store.reliabilityBackupsEnabled)
           Text("保留最近 7 天；仅复制关键本地 JSON，不备份对话或凭据。")
             .font(.caption)
             .foregroundStyle(DashboardColors.subtleText)

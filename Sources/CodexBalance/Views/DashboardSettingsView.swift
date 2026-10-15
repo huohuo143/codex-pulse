@@ -75,7 +75,14 @@ struct DashboardSettingsView: View {
         Toggle("自动避让其他窗口", isOn: $store.autoDodgeEnabled)
       }
 
-      CreditExpirySettingsView(ledger: store.creditExpiry, account: store.status?.accountScope, message: store.expiryMessage, save: store.saveCreditExpiry)
+      CreditExpirySettingsView(ledger: store.creditExpiry, account: store.status?.accountScope,
+        message: store.expiryMessage, isSaving: store.isSavingCreditExpiry,
+        storageIssue: store.creditExpiryStorageIssue, recovery: store.creditExpiryRecovery,
+        reload: store.reloadCreditExpiry, restore: store.restoreCreditExpiryBackup,
+        openFolder: store.openCreditExpiryFolder) { batch, confirmed in
+        guard await store.saveCreditExpiry(batch: batch, confirmed: confirmed) else { return nil }
+        return store.creditExpiry.batches.first { $0.id == batch.id }
+      }
 
       settingsSection("模型价格与金额估算") {
         Text(store.pricingMessage).font(.caption).foregroundStyle(DashboardColors.subtleText)

@@ -123,7 +123,6 @@ struct CodexRadarConnectionTests {
     let scenario = RadarConnectionScenario([.stall, .stall, .stall])
     let (url, session) = RadarConnectionURLProtocol.session(for: scenario)
     defer { session.invalidateAndCancel() }
-    let started = ContinuousClock.now
     do {
       _ = try await CodexRadarService.fetch(
         url: url, accept: "text/html", session: session,
@@ -133,9 +132,21 @@ struct CodexRadarConnectionTests {
     } catch {
       #expect((error as? URLError)?.code == .timedOut)
     }
-    #expect(started.duration(to: .now) < .seconds(0.5))
-    #expect(scenario.requestCount == 2)
-    #expect(scenario.stopCount >= 2)
+    // Under load the first timeout can resume after the entire budget has
+    // elapsed, so a second attempt is not guaranteed. Verify the requested
+    // transfer budgets instead of measuring the test executor's scheduling lag.
+    let timeouts = scenario.requestTimeouts
+    #expect((1...2).contains(timeouts.count))
+    #expect(timeouts.allSatisfy { $0 > 0 && $0 <= 0.1 })
+    #expect(timeouts.reduce(0, +) <= 0.18)
+    if timeouts.count == 2 { #expect(timeouts[1] < timeouts[0]) }
+    // URLSession delivers URLProtocol.stopLoading asynchronously, even after
+    // the awaiting task has observed cancellation.
+    let cancellationDeadline = ContinuousClock.now.advanced(by: .seconds(2))
+    while scenario.stopCount < timeouts.count, ContinuousClock.now < cancellationDeadline {
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(scenario.stopCount == timeouts.count)
   }
 
   @Test
@@ -219,14 +230,17 @@ private final class RadarConnectionScenario: @unchecked Sendable {
   private var results: [Result]
   private var count = 0
   private var stops = 0
+  private var timeouts: [TimeInterval] = []
 
   init(_ results: [Result]) { self.results = results }
   var requestCount: Int { lock.withLock { count } }
   var stopCount: Int { lock.withLock { stops } }
+  var requestTimeouts: [TimeInterval] { lock.withLock { timeouts } }
   func stopped() { lock.withLock { stops += 1 } }
-  func next() -> Result {
+  func next(timeout: TimeInterval) -> Result {
     lock.withLock {
       count += 1
+      timeouts.append(timeout)
       return results.isEmpty ? .failure(URLError(.cannotConnectToHost)) : results.removeFirst()
     }
   }
@@ -260,7 +274,7 @@ private final class RadarConnectionURLProtocol: URLProtocol, @unchecked Sendable
       return
     }
     self.scenario = scenario
-    switch scenario.next() {
+    switch scenario.next(timeout: request.timeoutInterval) {
     case .failure(let error):
       client?.urlProtocol(self, didFailWithError: error)
     case .response(let status, let data, let headers):
