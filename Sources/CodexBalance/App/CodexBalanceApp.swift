@@ -44,6 +44,11 @@ struct CodexBalanceApp: App {
         }
         .keyboardShortcut("3", modifiers: .command)
 
+        Button("打开重置日历") {
+          store.showResetCalendar()
+        }
+        .keyboardShortcut("4", modifiers: .command)
+
         Divider()
 
         Button("刷新全部数据") {

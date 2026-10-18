@@ -111,7 +111,7 @@ struct ExpandedDashboardView: View {
         }
         .labelsHidden()
         .pickerStyle(.segmented)
-        .frame(width: 420)
+        .frame(width: 460)
         Spacer()
         Label(refreshStatusText, systemImage: refreshStatusSymbol)
           .font(.system(size: 10, weight: .semibold))
@@ -131,6 +131,9 @@ struct ExpandedDashboardView: View {
       trendsSection
     case .insights:
       InsightsDashboardView(stats: stats, palette: store.palette)
+    case .resetCalendar:
+      ResetCalendarView(snapshot: store.codexRadarSnapshot?.resetCalendar, tint: store.palette.weekly,
+        isLoading: store.codexRadarIsLoading, refresh: { store.refreshCodexRadar(force: true) })
     case .settings:
       DashboardSettingsView()
     }

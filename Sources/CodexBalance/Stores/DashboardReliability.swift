@@ -80,7 +80,8 @@ extension DashboardStore {
 
   var localBackupSourceURLs: [URL] {
     [quotaHistoryStore.storageURL, ProjectBudgetStore.defaultURL,
-      creditExpiryStore.url, creditExpiryStore.legacyURL, creditExpiryStore.previousURL]
+      creditExpiryStore.url, creditExpiryStore.legacyURL, creditExpiryStore.previousURL,
+      PulsePaths.support.appendingPathComponent("codex-reset-calendar-v1.json")]
   }
 
   func performLocalBackup(manual: Bool = true, now: Date = Date(), archive: LocalAutomationArchive? = nil) {

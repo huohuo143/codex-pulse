@@ -610,6 +610,14 @@ final class DashboardStore: ObservableObject {
     AppWindowRouter.shared.ensureMainWindow()
   }
 
+  func showResetCalendar() {
+    selectedSection = .resetCalendar
+    isCompact = false
+    isWindowVisible = true
+    AppWindowRouter.shared.ensureMainWindow()
+    refreshCodexRadar()
+  }
+
   func setQuotaAlertsEnabled(_ enabled: Bool) {
     quotaAlertsEnabled = enabled
     save(enabled, "quotaAlertsEnabled")

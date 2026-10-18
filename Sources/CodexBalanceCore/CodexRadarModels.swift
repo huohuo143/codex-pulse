@@ -19,6 +19,7 @@ public struct CodexRadarSnapshot: Equatable, Decodable, Sendable {
   public var stationInsights: CodexRadarStationInsights?
   public var efficiency: CodexRadarEfficiencySnapshot?
   public var syncState: CodexRadarSyncState? = nil
+  public var resetCalendar: CodexResetCalendarSnapshot? = nil
 
   public var probability24hPercent: Int? {
     if syncState?.isStale == true { return nil }

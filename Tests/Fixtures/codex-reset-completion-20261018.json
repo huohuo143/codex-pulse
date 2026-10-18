@@ -1,0 +1,21 @@
+{
+  "completion_observation": {
+    "event_id": "codex-speed-window-2026-10-18-codex",
+    "announcement_event_id": "x:2111492738025959922",
+    "kind": "direct_reset",
+    "status": "completed",
+    "confirmation_level": "stationmaster_confirmed",
+    "occurred_on": "2026-10-18",
+    "occurred_at": null,
+    "time_precision": "date",
+    "timezone": "Asia/Shanghai",
+    "occurrences": 1,
+    "source": "站长转述社区反馈：社区反馈已经全部重置了",
+    "announcement_url": "https://x.com/thsottiaux/status/2111492738025959922",
+    "official_completion_url": null,
+    "title_zh": "Day 13 重置完成 · 社区反馈确认",
+    "title_en": "Day 13 reset complete · confirmed through community feedback",
+    "evidence_zh": "站长根据社区反馈确认本次额度重置已完成，当前没有开启的速蹬窗口；各账号具体到账时分未知。",
+    "evidence_en": "The stationmaster confirms from community feedback that this reset is complete and no speed window is open. Exact per-account delivery times are unknown."
+  }
+}

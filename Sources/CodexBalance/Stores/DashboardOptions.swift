@@ -145,6 +145,7 @@ enum DashboardSection: String, CaseIterable, Identifiable, Hashable {
   case overview
   case trends
   case insights
+  case resetCalendar
   case settings
 
   var id: String { rawValue }
@@ -153,6 +154,7 @@ enum DashboardSection: String, CaseIterable, Identifiable, Hashable {
     case .overview: "概览"
     case .trends: "趋势"
     case .insights: "分析"
+    case .resetCalendar: "重置日历"
     case .settings: "设置"
     }
   }
@@ -161,6 +163,7 @@ enum DashboardSection: String, CaseIterable, Identifiable, Hashable {
     case .overview: "gauge.with.dots.needle.50percent"
     case .trends: "chart.xyaxis.line"
     case .insights: "square.grid.2x2.fill"
+    case .resetCalendar: "calendar"
     case .settings: "gearshape.fill"
     }
   }

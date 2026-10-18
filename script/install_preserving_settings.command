@@ -35,7 +35,7 @@ mkdir -p "$DEST_DIR" "$BACKUP_DIR/config"
 for item in "$SUPPORT_DIR"/quota-history*.json "$SUPPORT_DIR"/project-budgets-v1.json \
   "$SUPPORT_DIR"/credit-expiry-v1.json "$SUPPORT_DIR"/credit-expiry-v2.json \
   "$SUPPORT_DIR"/credit-expiry-v2.previous.json "$SUPPORT_DIR"/credit-expiry-v2.damaged-*.json "$SUPPORT_DIR"/model-prices*.json \
-  "$SUPPORT_DIR"/radar-evaluation-v1 "$SUPPORT_DIR"/codex-radar-tibo-history.json \
+  "$SUPPORT_DIR"/radar-evaluation-v1 "$SUPPORT_DIR"/codex-radar-tibo-history.json "$SUPPORT_DIR"/codex-reset-calendar-v1.json \
   "$SUPPORT_DIR"/reliability-events-v1.json "$SUPPORT_DIR"/account-scope-salt.txt \
   "$SUPPORT_DIR"/widget-snapshot.json "$SUPPORT_DIR"/live-balance.json \
   "$SUPPORT_DIR"/session-event-cache-v*.plist "$SUPPORT_DIR"/watch-codex.sh; do

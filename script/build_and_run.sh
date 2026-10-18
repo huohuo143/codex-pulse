@@ -7,8 +7,8 @@ EXECUTABLE_NAME="CodexSuanliMeter"
 WIDGET_EXECUTABLE_NAME="CodexSuanliWidgets"
 BUNDLE_ID="${CODEX_PULSE_BUNDLE_ID:-dev.codex.balance-dashboard.codex}"
 WIDGET_BUNDLE_ID="$BUNDLE_ID.widgets"
-VERSION="${VERSION:-2.12.5}"
-BUILD_NUMBER="${BUILD_NUMBER:-2131}"
+VERSION="${VERSION:-2.12.8}"
+BUILD_NUMBER="${BUILD_NUMBER:-2134}"
 ARCH="${ARCH:-$(uname -m)}"
 # macOS 13 可运行主应用；桌面小组件只在 macOS 14 及以后提供。发布完整
 # 小组件扩展的独立部署目标保持 macOS 14，不抬高主应用要求。
@@ -122,6 +122,7 @@ if [[ ! -f "$ICON_PATH" ]]; then
 fi
 cp "$ICON_PATH" "$APP_CONTENTS/Resources/AppIcon.icns"
 cp "$ROOT_DIR/Sources/CodexBalanceCore/Resources/model-prices-v1.json" "$APP_CONTENTS/Resources/model-prices-v1.json"
+cp "$ROOT_DIR/Sources/CodexBalanceCore/Resources/codex-reset-history.json" "$APP_CONTENTS/Resources/codex-reset-history.json"
 
 if [[ "$INCLUDE_WIDGETS" == "1" ]]; then
   if [[ ! -f "$WIDGET_ENTITLEMENTS" || ! -d "$WIDGET_XCODE_BUNDLE" ]]; then

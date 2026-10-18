@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-2.12.5-8b7cff">
+  <img alt="Version" src="https://img.shields.io/badge/version-2.12.8-8b7cff">
   <img alt="macOS" src="https://img.shields.io/badge/macOS-14%2B-111827?logo=apple">
   <img alt="Mac architectures" src="https://img.shields.io/badge/Mac-arm64%20%7C%20x86__64-111827">
   <img alt="Swift" src="https://img.shields.io/badge/Swift-6.0-f05138?logo=swift&logoColor=white">
@@ -18,7 +18,19 @@
 
 `Codex 脉动` 将 Codex 的额度、Token 消耗、重置节奏和 Full reset 权益集中到一套原生 macOS 界面中。它既可以作为常驻悬浮框，也可以完全隐藏悬浮框，仅使用主窗口或 7 款桌面小组件。
 
-> 最新 macOS 发布版本：`2.12.5` build 2131，提供 Apple Silicon（arm64）安装包。主应用兼容 macOS 13；桌面小组件要求 macOS 14 或更高版本；安装包为 ad-hoc 签名、未公证版本。Windows 公开安装包仍见 v2.12.2 发布页。
+> 最新 macOS 发布版本：`2.12.8` build 2134，提供 Apple Silicon（arm64）安装包。主应用兼容 macOS 13；桌面小组件要求 macOS 14 或更高版本；安装包为 ad-hoc 签名、未公证版本。Windows 公开安装包仍见 v2.12.2 发布页。
+
+## 2.12.8 多来源历史补录
+
+另从公开历史档案核对补入 4 月、6—9 月 16 条记录，并为已有记录增加佐证。预告及无法核实日期的记录继续排除；同帖硬重置与发卡分别计数。详见 [逐条来源与未采用线索](docs/RESET_HISTORY_SOURCES.md)。
+
+## 2.12.7 往月重置历史补录
+
+补入 2026 年 5—9 月 16 条有日期依据的历史记录，并补齐 10 月 3 日记录；随 App 离线保存。来源角色、确认日期和未知时分均明确标注，已有联网更正不被旧补录覆盖。详见 [历史来源](docs/RESET_HISTORY_SOURCES.md) 和 [2.12.7 更新说明](docs/RELEASE_2.12.7.md)。
+
+## 2.12.6 Tibo 历史重置月历
+
+新增独立的“重置日历”页面（⌘4），按北京时间查看硬重置和重置卡，支持月份切换、类型筛选、同日多事件与原帖链接。日历独立保留历史，区分实际发生日期、确认日期和发帖时间；只有月度总数的记录单独展示。详见 [2.12.6 更新说明](docs/RELEASE_2.12.6.md)。
 
 ## 2.12.5 额度记录保护与恢复
 
@@ -89,6 +101,7 @@ Tibo 动态列表保留公开源收录的最新 Posts / Replies，并读取页�
 | 原生提醒 | 用户主动开启后，按额度阈值、预测高风险和 Full reset 到期发送 macOS 通知 |
 | Token 统计 | 滚动 24 小时、最近 30 天按日趋势、多设备分色堆叠、今日、近 7 天、本月 Token，以及 input、cached input、output 和 model |
 | 重置雷达 | Codex 24h 重置概率、研判、公开摘要、更新时间和 Tibo PT 时钟 |
+| 重置日历 | 北京时间历史月历、硬重置与重置卡筛选、确认来源、日期精度及独立离线历史 |
 | Full reset | 可用次数、获得时间和逐次到期日，只读展示，不提供消耗操作 |
 | 高级分析 | 最近 14 天、同期对比、月末推演、异常高峰、缓存/模型/项目集中度及智能诊断 |
 | 项目预算 | 为已识别项目设置月度 Token 上限，追踪已用、剩余、月末预计和风险 |
@@ -105,11 +118,12 @@ Tibo 动态列表保留公开源收录的最新 Posts / Replies，并读取页�
 
 ### 1. 完整主面板
 
-主窗口分为“概览、趋势、分析、设置”四个区域：
+主窗口分为“概览、趋势、分析、重置日历、设置”五个区域：
 
 - 概览：7 天额度外环与可选的 5 小时额度内环、Token 汇总、重置雷达、Full reset 权益和最近额度事件；5 小时内环与设置中的“5 小时额度”选项同步。
 - 趋势：官方额度历史、24 小时逐时视图、可横向滚动的最近 30 天按日视图、多设备分色堆叠与悬停明细，以及模型构成。
 - 分析：同期对比、月末推演、稳健异常检测、缓存/模型/项目集中度、项目预算和最近调用。
+- 重置日历：北京时间月历、月份切换、硬重置与重置卡筛选、日期详情与来源链接（⌘4）。
 - 设置：刷新频率、额度提醒、可靠性/自动化、版本更新、悬浮框、主题、Touch Bar 和桌面小组件。
 
 ### 2. 菜单栏状态面板
@@ -190,20 +204,20 @@ flowchart LR
 - 会话解析缓存位于独立 Application Support 目录，只保存增量聚合所需结果。
 - 额度历史按本机匿名账户标识分开保存在 `~/Library/Application Support/CodexSuanliMeter/quota-history-<匿名标识>.json`（旧文件保留），不包含对话、项目路径或账户凭据。
 - 项目预算只保存项目识别名/本地路径和用户设定的 Token 上限，不上传、不写入 iCloud 或 Widget 快照。
-- 自动化备份仅复制额度历史、项目预算和额度到期记录；每日摘要不包含对话正文或项目路径。
+- 自动化备份仅复制额度历史、项目预算、额度到期记录和重置日历；每日摘要不包含对话正文或项目路径。
 - 脱敏诊断报告不包含账号、对话、项目路径、凭据或 API Key。
 - 原生提醒默认关闭；只有用户主动开启后才申请 macOS 通知权限。
 - 版本检测不读取 GitHub Token 或账号，不上传本地数据，也不会自动下载或安装。
 
 ## 安装
 
-在 [v2.12.5 发布页](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.5) 下载 Apple Silicon Mac 安装包。完整步骤见 [安装与升级](docs/INSTALL_UPGRADE_2.12.5.md)，测试范围见 [验证说明](docs/VALIDATION_2.12.5.md)。本次发布针对 macOS；Windows x64 安装版、免安装版继续从 [v2.12.2 发布页](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.2) 下载。
+在 [v2.12.8 发布页](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.8) 下载 Apple Silicon Mac 安装包。完整步骤见 [安装与升级](docs/INSTALL_UPGRADE_2.12.8.md)，测试范围见 [验证说明](docs/VALIDATION_2.12.8.md)。本次发布针对 macOS；Windows x64 安装版、免安装版继续从 [v2.12.2 发布页](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.2) 下载。
 
 在 [Releases](https://github.com/huohuo143/codex-pulse/releases) 下载：
 
 ```text
-Codex-Pulse-v2.12.5-build2131-20261015-arm64.dmg
-Codex-Pulse-v2.12.5-build2131-20261015-arm64.dmg.sha256
+Codex-Pulse-v2.12.8-build2134-20261018-arm64.dmg
+Codex-Pulse-v2.12.8-build2134-20261018-arm64.dmg.sha256
 ```
 
 1. 打开 DMG。
@@ -215,7 +229,7 @@ Codex-Pulse-v2.12.5-build2131-20261015-arm64.dmg.sha256
 
 ## 与旧版并行
 
-| 项目 | Codex 脉动 2.12.5 | 旧算力码表 0.1.0 |
+| 项目 | Codex 脉动 2.12.8 | 旧算力码表 0.1.0 |
 | --- | --- | --- |
 | App | `Codex 脉动.app` | `算力码表.app` |
 | Bundle ID | `dev.codex.balance-dashboard.codex` | `dev.codex.balance-dashboard` |

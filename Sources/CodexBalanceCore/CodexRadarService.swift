@@ -53,6 +53,7 @@ public actor CodexRadarService {
   private var cachedAt: Date?
   private var historyLoaded = false
   private var tiboHistory = CodexRadarTiboHistory(resetAt: nil, posts: [])
+  private var resetCalendarArchive: CodexResetCalendarArchive
 
   public init(
     fetcher: Fetcher? = nil,
@@ -61,12 +62,17 @@ public actor CodexRadarService {
     efficiencyFetcher: Fetcher? = nil,
     now: @escaping @Sendable () -> Date = Date.init,
     cacheDuration: TimeInterval = CodexRadarService.refreshInterval,
-    historyURL: URL? = nil
+    historyURL: URL? = nil,
+    calendarHistoryURL: URL? = nil
   ) {
     self.now = now
     self.cacheDuration = cacheDuration
     self.usesLegacyPublicSummary = fetcher == nil
     self.historyURL = historyURL ?? (fetcher == nil ? CodexRadarTiboHistoryStore.defaultURL : nil)
+    self.resetCalendarArchive = CodexResetCalendarArchive(url: calendarHistoryURL
+      ?? (fetcher == nil ? PulsePaths.support.appendingPathComponent("codex-reset-calendar-v1.json")
+        : historyURL?.appendingPathExtension("calendar.json")),
+      historicalEvents: fetcher == nil ? CodexResetCalendarHistory.events(asOf: now()) : [])
     if let fetcher {
       self.fetcher = fetcher
       self.publicPageFetcher = publicPageFetcher
@@ -107,6 +113,7 @@ public actor CodexRadarService {
   public func current(force: Bool = false) async throws -> CodexRadarSnapshot {
     let checkedAt = now()
     var storedHistory = loadTiboHistory()
+    resetCalendarArchive.load()
     if publicPageFetcher != nil,
        let retryNotBefore = storedHistory.retryNotBefore,
        checkedAt < retryNotBefore {
@@ -118,6 +125,7 @@ public actor CodexRadarService {
         from: storedHistory, at: checkedAt, usingCache: true,
         failureMessage: storedHistory.lastFailureMessage
       )
+      snapshot.resetCalendar = resetCalendarArchive.snapshot
       cachedSnapshot = snapshot
       return reevaluate(snapshot: snapshot, at: checkedAt)
     }
@@ -136,9 +144,13 @@ public actor CodexRadarService {
     async let efficiencyData = optionalFetch(efficiencyFetcher)
 
     var baseError: Error?
+    var calendarJSON: Data?
+    var calendarHTML: Data?
     var snapshot: CodexRadarSnapshot?
     do {
-      snapshot = try CodexRadarCodec.decode(try await baseData)
+      let data = try await baseData
+      calendarJSON = data
+      snapshot = try CodexRadarCodec.decode(data)
       if usesLegacyPublicSummary {
         // The production current.json percentage is a stale remote judgement.
         // Keep only its reset-window anchor; all displayed probability is local.
@@ -153,10 +165,12 @@ public actor CodexRadarService {
     if publicPageFetcher != nil {
       do {
         guard let pageData = try await publicPageData else { throw CodexRadarError.invalidPayload }
+        calendarHTML = pageData
         let decoded = try CodexRadarPublicPageParser.decode(pageData, now: checkedAt)
         if let incomingUpdate = decoded.tiboFeed.updatedAt,
            let storedUpdate = storedHistory.feedUpdatedAt,
            incomingUpdate < storedUpdate.addingTimeInterval(-60) {
+          calendarHTML = nil
           throw CodexRadarError.invalidPayload
         }
         page = decoded
@@ -166,6 +180,7 @@ public actor CodexRadarService {
     }
     try Task.checkCancellation()
     let completedAt = now()
+    resetCalendarArchive.update(json: calendarJSON, html: calendarHTML, at: completedAt)
     if var enrichedPage = page {
       if let completedAt = snapshot?.window?.closedAt {
         enrichedPage.resetAt = [enrichedPage.resetAt, completedAt]
@@ -270,6 +285,7 @@ public actor CodexRadarService {
         failureMessage: storedHistory.lastFailureMessage
       )
     }
+    snapshot.resetCalendar = resetCalendarArchive.snapshot
     cachedSnapshot = snapshot
     cachedAt = now()
     return snapshot

@@ -222,6 +222,7 @@ struct MenuBarStatusView: View {
           store.showDashboard()
         }
         Button("立即刷新") { store.refreshAll() }
+        Button("重置日历") { store.showResetCalendar() }
         Button("提醒设置") { store.showSettings() }
         Spacer()
         Button("退出") { NSApplication.shared.terminate(nil) }
