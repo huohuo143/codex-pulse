@@ -1,47 +1,53 @@
 {
-  "tag_name": "v2.12.5",
-  "name": "Codex 脉动 2.12.5 · macOS · Build 2131",
-  "body": "# Codex 脉动 2.12.5 · Build 2131\n\n改进灵活额度到期记录的保存、数据保护与恢复，包含 2.12.4 的保存可靠性修复。\n\n- 无法读取、损坏或不支持的记录会显示原因并停止保存，避免空列表覆盖原文件。\n- 每次保存前重新校验当前文件，先保留上一份有效记录；备份失败时保持原记录。\n- 提供“重新读取”“恢复上次有效记录”和“打开记录文件夹”；恢复前保留损坏原件。\n- 恢复旧备份和保存失败后保留未保存输入、记录身份、原数量、金额和通知日期。\n- 保存期间显示进度并阻止重复提交；账户变化时保留草稿，写入仍归属提交时的账户。\n- 严格校验数量千位分组；编辑时保留原数量精度，日期选择遵循记录时区。\n- 每日备份和安装备份包含分笔额度记录、上一份有效记录与损坏原件。\n\n本次提供 Apple Silicon（arm64）Mac DMG。主应用最低 macOS 13，小组件最低 macOS 14。安装包为 ad-hoc 签名，尚未公证。本次没有新 Intel 或 Windows 安装包；Windows 公开安装包继续使用 [v2.12.2](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.2)。\n\n运行镜像内“安装或更新（保留设置）.command”升级。镜像内“本地版本／未发布”的说明是构建时的快照，发布状态以 GitHub Release 页面为准。安装与已知服务登记问题见 [安装说明](https://github.com/huohuo143/codex-pulse/blob/main/docs/INSTALL_UPGRADE_2.12.5.md)，验证范围见 [验证说明](https://github.com/huohuo143/codex-pulse/blob/main/docs/VALIDATION_2.12.5.md)。\n\n验证：已记录的最终源码回归为 278 项通过、5 项可选截图跳过、0 失败；本次核对构建输入与源码一致，并实际安装验证版本、签名、设置保留及官方数据读取。\n\nDMG SHA-256：`1f8942d8e6b78395e50ce8242ee0c37d239e3d7ab706136a8d24f2cd7f49d657`\n",
-  "html_url": "https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.5",
-  "published_at": "2026-10-15T07:07:27Z",
+  "tag_name": "v2.12.8",
+  "name": "Codex 脉动 2.12.8 · 重置月历与历史补录",
+  "body": "Codex 脉动 **2.12.8 / Build 2134**（macOS Apple Silicon）。\n\n- 新增 Tibo 历史重置月历（⌘4）：北京时间月视图、月份切换、硬重置/重置卡筛选、同日多事件、来源详情和离线历史。\n- 补录 2026 年 4—9 月公开历史，本轮另核对新增 16 条；历史补录库共 33 条。未核实日期及预告继续排除，未知实际发生时间不补造。\n- 保留原有设置、历史和旧版备份；295 项完整测试执行通过，另完成原生安装、明暗模式和重启验收。\n\n下载 `.dmg` 与 `.sha256`，运行镜像内“安装或更新（保留设置）.command”。安装包采用 ad-hoc 签名，未公证；主应用 macOS 13+，桌面小组件 macOS 14+。Windows 公开包继续见 [v2.12.2](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.2)。\n\n详见附件的安装说明、验证范围和逐条历史来源；本日历仍非完整官方全历史。部分历史资料改编自 [codex-reset.com](https://codex-reset.com/) 的 CC BY 4.0 数据集，保留来源、许可及核实限制。\n",
+  "html_url": "https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.8",
+  "published_at": "2026-10-18T07:39:08Z",
   "draft": false,
   "prerelease": false,
   "schemaVersion": 1,
   "assets": [
     {
-      "name": "Codex-Pulse-v2.12.5-build2131-20261015-arm64.dmg",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.5/Codex-Pulse-v2.12.5-build2131-20261015-arm64.dmg",
-      "size": 7135800,
+      "name": "Codex-Pulse-v2.12.8-build2134-20261018-arm64.dmg",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.8/Codex-Pulse-v2.12.8-build2134-20261018-arm64.dmg",
+      "size": 7343156,
       "state": "uploaded"
     },
     {
-      "name": "Codex-Pulse-v2.12.5-build2131-20261015-arm64.dmg.sha256",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.5/Codex-Pulse-v2.12.5-build2131-20261015-arm64.dmg.sha256",
+      "name": "Codex-Pulse-v2.12.8-build2134-20261018-arm64.dmg.sha256",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.8/Codex-Pulse-v2.12.8-build2134-20261018-arm64.dmg.sha256",
       "size": 115,
       "state": "uploaded"
     },
     {
-      "name": "INSTALL_UPGRADE_2.12.5.md",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.5/INSTALL_UPGRADE_2.12.5.md",
-      "size": 2085,
+      "name": "INSTALL_UPGRADE_2.12.8.md",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.8/INSTALL_UPGRADE_2.12.8.md",
+      "size": 2150,
       "state": "uploaded"
     },
     {
-      "name": "RELEASE_NOTES_2.12.5.md",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.5/RELEASE_NOTES_2.12.5.md",
-      "size": 1954,
+      "name": "RELEASE_NOTES_2.12.8.md",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.8/RELEASE_NOTES_2.12.8.md",
+      "size": 1678,
       "state": "uploaded"
     },
     {
-      "name": "SHA256SUMS-2.12.5.txt",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.5/SHA256SUMS-2.12.5.txt",
-      "size": 506,
+      "name": "RESET_HISTORY_SOURCES.md",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.8/RESET_HISTORY_SOURCES.md",
+      "size": 11449,
       "state": "uploaded"
     },
     {
-      "name": "VALIDATION_2.12.5.md",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.5/VALIDATION_2.12.5.md",
-      "size": 2314,
+      "name": "SHA256SUMS-2.12.8.txt",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.8/SHA256SUMS-2.12.8.txt",
+      "size": 597,
+      "state": "uploaded"
+    },
+    {
+      "name": "VALIDATION_2.12.8.md",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.8/VALIDATION_2.12.8.md",
+      "size": 3256,
       "state": "uploaded"
     }
   ]
