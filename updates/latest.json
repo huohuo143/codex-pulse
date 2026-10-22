@@ -1,53 +1,53 @@
 {
-  "tag_name": "v2.12.25",
-  "name": "Codex 脉动 2.12.25 · 重置预告与醒目截止时间",
-  "body": "Codex 脉动 **2.12.25 / Build 2152**（macOS Apple Silicon）。\n\n- Tibo公开发帖与回复每10分钟检查一次，使用GPT-6 Astra / High分析明确预告，移除概率预测；只保留七天动态。\n- 修复回复父帖上下文遗漏，明确截止时间换算为北京时间，在APP、悬浮窗和小组件醒目显示；原文与时区说明可追溯。\n- 确认到账后显示24小时倒计时，新预告立即替代；修复刷新时钟和桌面单色对比度。\n- 保留设置、历史和可回退旧版，改善原有自动启动服务升级恢复。真实悬浮窗与桌面雷达的自动刷新已验证。\n\n最终完整回归：486项执行通过、8项可选画面测试跳过、0失败；另有本版本220张界面渲染记录及10项安装器测试。详细范围见验证附件。\n\n下载DMG和SHA-256文件，在镜像中运行“安装或更新（保留设置）.command”。主应用macOS 13+，小组件macOS 14+；ad-hoc签名、未公证。模型分析需要本机Codex/ChatGPT CLI的既有登录及GPT-6 Astra权限。系统小组件可能稍晚刷新；预告不是实际到账确认。\n\nWindows公开安装包仍见[v2.12.2](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.2)。历史日历数据来源及许可见RESET_HISTORY_SOURCES附件。\n",
-  "html_url": "https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.25",
-  "published_at": "2026-10-22T13:36:46Z",
+  "tag_name": "v2.12.26",
+  "name": "Codex 脉动 2.12.26 · 实际重置到账与24小时倒计时",
+  "body": "Codex 脉动 **2.12.26 / Build 2153**（macOS Apple Silicon）。\n\n修复本账号已经重置，悬浮框和桌面小组件仍停留在预告状态的问题。\n\n- 根据本账号官方额度恢复和周周期重新开始的记录，自动切换为醒目的“已完成重置”与24小时倒计时；主界面、悬浮框、雷达和概览小组件一致显示。\n- 从首次检测到账时刻计时，刷新、重启和稍后的公开确认不延长展示；新预告立即优先替代，到期等待下一轮。\n- 已确认到账不会因后续公开源或模型暂时失败而消失，刷新状态仍独立如实显示；普通百分比修正或自然周期到期不冒充确认。\n- 本账号确认只代表当前账号；保留GPT-6 Astra / High对Tibo发帖及回复的十分钟分析与七天动态保留规则。\n\n完整回归501项通过，0跳过、0失败；包含220张界面检查画面。已实际验证主界面、悬浮框、桌面小组件和重启后倒计时继续递减，保留原有设置与记录。详细范围见验证附件。\n\n下载DMG与SHA-256文件，运行镜像内“安装或更新（保留设置）.command”。主应用macOS 13+，小组件macOS 14+；ad-hoc签名、未公证。公开动态模型分析需要本机Codex/ChatGPT CLI既有登录及GPT-6 Astra权限，系统小组件刷新受macOS调度影响。\n\nWindows公开安装包仍见[v2.12.2](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.2)。历史日历来源与许可见RESET_HISTORY_SOURCES附件。\n",
+  "html_url": "https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.26",
+  "published_at": "2026-10-22T17:36:15Z",
   "draft": false,
   "prerelease": false,
   "schemaVersion": 1,
   "assets": [
     {
-      "name": "Codex-Pulse-v2.12.25-build2152-20261022-arm64.dmg",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.25/Codex-Pulse-v2.12.25-build2152-20261022-arm64.dmg",
-      "size": 7684372,
+      "name": "Codex-Pulse-v2.12.26-build2153-20261023-arm64.dmg",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.26/Codex-Pulse-v2.12.26-build2153-20261023-arm64.dmg",
+      "size": 7123573,
       "state": "uploaded"
     },
     {
-      "name": "Codex-Pulse-v2.12.25-build2152-20261022-arm64.dmg.sha256",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.25/Codex-Pulse-v2.12.25-build2152-20261022-arm64.dmg.sha256",
+      "name": "Codex-Pulse-v2.12.26-build2153-20261023-arm64.dmg.sha256",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.26/Codex-Pulse-v2.12.26-build2153-20261023-arm64.dmg.sha256",
       "size": 116,
       "state": "uploaded"
     },
     {
-      "name": "INSTALL_UPGRADE_2.12.25.md",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.25/INSTALL_UPGRADE_2.12.25.md",
-      "size": 1468,
+      "name": "INSTALL_UPGRADE_2.12.26.md",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.26/INSTALL_UPGRADE_2.12.26.md",
+      "size": 1709,
       "state": "uploaded"
     },
     {
-      "name": "RELEASE_NOTES_2.12.25.md",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.25/RELEASE_NOTES_2.12.25.md",
-      "size": 1746,
+      "name": "RELEASE_NOTES_2.12.26.md",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.26/RELEASE_NOTES_2.12.26.md",
+      "size": 1324,
       "state": "uploaded"
     },
     {
       "name": "RESET_HISTORY_SOURCES.md",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.25/RESET_HISTORY_SOURCES.md",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.26/RESET_HISTORY_SOURCES.md",
       "size": 11449,
       "state": "uploaded"
     },
     {
-      "name": "SHA256SUMS-2.12.25.txt",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.25/SHA256SUMS-2.12.25.txt",
+      "name": "SHA256SUMS-2.12.26.txt",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.26/SHA256SUMS-2.12.26.txt",
       "size": 602,
       "state": "uploaded"
     },
     {
-      "name": "VALIDATION_2.12.25.md",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.25/VALIDATION_2.12.25.md",
-      "size": 2849,
+      "name": "VALIDATION_2.12.26.md",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.26/VALIDATION_2.12.26.md",
+      "size": 2289,
       "state": "uploaded"
     }
   ]
