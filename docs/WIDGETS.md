@@ -55,3 +55,8 @@
 - Widget 构建目标：`xcode/CodexPulseWidgets.xcodeproj`（原生 App Extension 生命周期）
 - 扩展位置：`Codex 脉动.app/Contents/PlugIns/CodexSuanliWidgets.appex`
 - 扩展标识：`dev.codex.balance-dashboard.codex.widgets`
+
+
+## 2.12.26 本账号实际重置确认
+
+官方额度历史同时出现额度恢复与周周期重新开始时，APP、悬浮框、雷达及概览小组件统一切换为“已完成重置”，以首次检测到账时刻为固定起点展示24小时倒计时。稍后的刷新、重启或公开完成确认不会重新计时。新预告优先覆盖，到期等待下一轮。公开动态或模型失败时，保留已确认的到账事实，同时如实显示刷新状态。此确认仅代表当前账号。

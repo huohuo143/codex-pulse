@@ -154,7 +154,7 @@ private struct RadarAttentionCard: View {
           .lineLimit(1).minimumScaleFactor(0.65)
       }
       if let until = entry.snapshot.radarCompletionUntil, entry.date < until {
-        Text("展示剩余 · 新预告优先").font(.system(size: 9, weight: .bold))
+        Text("24小时展示剩余 · 新预告优先").font(.system(size: 9, weight: .bold))
         Text(timerInterval: entry.date...until, countsDown: true)
           .font(.system(size: compact ? 20 : 25, weight: .heavy, design: .rounded))
           .monospacedDigit()

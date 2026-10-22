@@ -14,6 +14,30 @@ public struct QuotaSnapshot: Codable, Equatable, Sendable {
   }
 }
 
+public enum CodexQuotaResetDetection {
+  /// A full refill plus a newly started weekly window proves a reset for this
+  /// account. A normal scheduled rollover or a percentage correction does not.
+  public static func latestConfirmedAt(in snapshots: [QuotaSnapshot], now: Date) -> Date? {
+    let rows = snapshots.filter {
+      $0.recordedAt.timeIntervalSince1970.isFinite && $0.resetsAt.timeIntervalSince1970.isFinite
+        && $0.recordedAt >= now.addingTimeInterval(-7 * 86400) && $0.recordedAt <= now
+        && $0.windowMinutes == 10080 && (0...100).contains($0.remainingPercent)
+        && $0.resetsAt > $0.recordedAt
+    }.sorted { $0.recordedAt < $1.recordedAt }
+    return zip(rows, rows.dropFirst()).compactMap { previous, current -> Date? in
+      let gap = current.recordedAt.timeIntervalSince(previous.recordedAt)
+      guard gap > 0, gap <= 30 * 60,
+            current.remainingPercent >= 90,
+            current.remainingPercent - previous.remainingPercent >= 1,
+            previous.resetsAt > current.recordedAt.addingTimeInterval(5 * 60),
+            current.resetsAt.timeIntervalSince(previous.resetsAt) > 5 * 60,
+            abs(current.resetsAt.addingTimeInterval(-10080 * 60).timeIntervalSince(current.recordedAt)) <= 10 * 60
+      else { return nil }
+      return current.recordedAt
+    }.max()
+  }
+}
+
 public enum QuotaRiskLevel: String, Codable, CaseIterable, Sendable {
   case healthy
   case caution

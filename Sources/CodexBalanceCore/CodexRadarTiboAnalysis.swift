@@ -33,19 +33,42 @@ public extension CodexRadarSnapshot {
   var tiboStatusTitle: String { tiboStatusTitle(at: Date()) }
   var tiboStatusSummary: String { tiboStatusSummary(at: Date()) }
 
+  func resetCompletion(at now: Date) -> (date: Date, isLocal: Bool)? {
+    let local = quotaResetConfirmedAt.flatMap { $0 <= now ? $0 : nil }
+    let official = tiboAnalysis?.state == .completed
+      ? tiboAnalysis?.completedAt.flatMap { $0 <= now ? $0 : nil } : nil
+    // Prefer the account's first observed arrival over a later public statement.
+    // This keeps the 24-hour display from restarting when Tibo confirms later.
+    let preferOfficial = local.flatMap { local in official.map { $0 > local.addingTimeInterval(86400) } } == true
+    guard let completed = (preferOfficial ? official : local ?? official) else { return nil }
+    if tiboAnalysis?.state == .announced,
+       let newest = tiboFeed?.posts.filter({ tiboAnalysis?.evidenceIDs.contains($0.id) == true })
+        .compactMap(\.publishedAt).filter({ $0 <= now }).max(), newest > completed { return nil }
+    return (completed, local != nil && !preferOfficial)
+  }
+
   func tiboStatusTitle(at now: Date) -> String {
+    if let completed = resetCompletion(at: now) {
+      return now < completed.date.addingTimeInterval(86400)
+        ? (!completed.isLocal && tiboAnalysis?.kind == .reset_card ? "重置卡已到账" : "已完成重置") : "等待新预告"
+    }
     guard syncState?.lastSuccessAt != nil else { return "等待动态" }
     guard tiboSourceIsCurrent(at: now) else { return "动态已过期" }
     if (syncState?.consecutiveFailures ?? 0) > 0 { return "动态未更新" }
     if tiboAnalysisFailure != nil { return "分析未成功" }
     guard tiboRefreshIsHealthy(at: now) else { return "等待分析" }
-    if tiboAnalysis?.state == .completed, let completed = tiboAnalysis?.completedAt {
-      return now < completed.addingTimeInterval(86400)
-        ? (tiboAnalysis?.kind == .reset_card ? "重置卡已到账" : "重置到账") : "等待新预告"
-    }
     return tiboAnalysis?.title ?? "等待分析"
   }
   func tiboStatusSummary(at now: Date) -> String {
+    if let completed = resetCompletion(at: now) {
+      if now >= completed.date.addingTimeInterval(86400) {
+        return "上一轮到账确认已展示 24 小时，继续每 10 分钟检查新的重置预告。"
+      }
+      if completed.isLocal {
+        return "本账号官方额度已恢复，周额度周期已重新开始。首次检测到账：北京时间 \(BalanceFormatters.beijingDeadline(completed.date))；从此时展示 24 小时，新预告优先。"
+      }
+      return tiboAnalysis?.summaryZh ?? "已有重置完成确认。"
+    }
     guard syncState?.lastSuccessAt != nil else { return "尚未成功读取 Tibo 公开动态，等待下一次检查。" }
     guard tiboSourceIsCurrent(at: now) else { return "公开动态未及时更新，暂不把旧分析作为当前状态。" }
     if (syncState?.consecutiveFailures ?? 0) > 0 { return syncState?.failureMessage ?? "本次未能更新公开动态，下一轮再试。" }
@@ -53,20 +76,15 @@ public extension CodexRadarSnapshot {
     guard tiboRefreshIsHealthy(at: now) else {
       return "等待 GPT-6 Astra · High 完成本轮发帖与回复分析，暂不采用上轮结论。"
     }
-    if tiboAnalysis?.state == .completed, let completed = tiboAnalysis?.completedAt,
-       now >= completed.addingTimeInterval(86400) {
-      return "上一轮到账确认已展示 24 小时，继续每 10 分钟检查新的重置预告。"
-    }
     return tiboAnalysis?.summaryZh ?? "等待 GPT-6 Astra · High 分析。"
   }
   func tiboCompletionUntil(at now: Date) -> Date? {
-    guard tiboRefreshIsHealthy(at: now), tiboAnalysis?.state == .completed,
-          let completed = tiboAnalysis?.completedAt, completed <= now,
+    guard let completed = resetCompletion(at: now)?.date,
           now < completed.addingTimeInterval(86400) else { return nil }
     return completed.addingTimeInterval(86400)
   }
   func tiboHasAnnouncement(at now: Date) -> Bool {
-    tiboRefreshIsHealthy(at: now) && tiboAnalysis?.state == .announced
+    resetCompletion(at: now) == nil && tiboRefreshIsHealthy(at: now) && tiboAnalysis?.state == .announced
   }
   func tiboRefreshIsHealthy(at now: Date) -> Bool {
     guard tiboSourceIsCurrent(at: now), let sync = syncState, sync.consecutiveFailures == 0,

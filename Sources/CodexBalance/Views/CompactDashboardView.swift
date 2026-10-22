@@ -730,7 +730,7 @@ private struct CompactDashboardContent: View {
         .lineLimit(1).minimumScaleFactor(0.75)
       if let until = radarCompletionUntil {
         HStack(spacing: 5) {
-          Text("展示剩余").font(.system(size: 11, weight: .bold))
+          Text("24小时展示剩余").font(.system(size: 11, weight: .bold))
           Text(timerInterval: now...until, countsDown: true)
             .font(.system(size: mini ? 19 : 22, weight: .heavy, design: .rounded))
             .monospacedDigit().fixedSize()

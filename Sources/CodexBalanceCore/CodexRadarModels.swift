@@ -23,6 +23,8 @@ public struct CodexRadarSnapshot: Equatable, Decodable, Sendable {
   public var tiboAnalysis: CodexRadarTiboAnalysis? = nil
   public var tiboAnalysisAttemptAt: Date? = nil
   public var tiboAnalysisFailure: String? = nil
+  /// First authoritative observation for this account; independent of the public feed.
+  public var quotaResetConfirmedAt: Date? = nil
 
   public var probability24hPercent: Int? {
     if syncState?.isStale == true { return nil }

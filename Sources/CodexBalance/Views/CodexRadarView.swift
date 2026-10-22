@@ -61,7 +61,7 @@ struct CodexRadarView: View {
           }
           if let until = snapshot.tiboCompletionUntil(at: now) {
             HStack {
-              Label("到账提示展示剩余", systemImage: "checkmark.seal.fill")
+              Label("24小时完成提示 · 剩余", systemImage: "checkmark.seal.fill")
               Spacer()
               Text(timerInterval: now...until, countsDown: true).monospacedDigit().fixedSize()
             }
@@ -78,7 +78,7 @@ struct CodexRadarView: View {
             .fixedSize(horizontal: false, vertical: true)
           if snapshot.tiboRefreshIsHealthy(at: now),
              let analysis = snapshot.tiboAnalysis {
-            if !analysis.timingZh.isEmpty {
+            if snapshot.tiboHasAnnouncement(at: now), !analysis.timingZh.isEmpty {
               Text(analysis.timingZh)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(DashboardColors.subtleText)

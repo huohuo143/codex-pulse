@@ -48,7 +48,7 @@ struct WidgetVisualAcceptanceTests {
       var snapshot = CodexWidgetSnapshot.preview
       snapshot.radarAnnouncementActive = ["announced", "deadline"].contains(mode)
       if mode == "deadline" { snapshot.radarDeadlineAt = now.addingTimeInterval(3600) }
-      if mode == "completed" { snapshot.radarLevel = "重置到账"; snapshot.radarCompletionUntil = now.addingTimeInterval(23 * 3600) }
+      if mode == "completed" { snapshot.radarLevel = "已完成重置"; snapshot.radarCompletionUntil = now.addingTimeInterval(23 * 3600) }
       if mode == "new-cycle" { snapshot.radarLevel = "等待新预告" }
       let entry = CodexWidgetEntry(date: now, snapshot: snapshot, hasLiveData: true)
       for scheme in [ColorScheme.light, .dark] {

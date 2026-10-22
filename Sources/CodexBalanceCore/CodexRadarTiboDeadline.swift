@@ -69,7 +69,7 @@ public struct CodexRadarTiboDeadline: Codable, Equatable, Sendable {
 
 public extension CodexRadarSnapshot {
   func tiboDeadline(at now: Date) -> CodexRadarTiboDeadline? {
-    guard tiboRefreshIsHealthy(at: now), tiboAnalysis?.state == .announced,
+    guard tiboHasAnnouncement(at: now),
           let deadline = tiboAnalysis?.deadline, deadline.date != nil else { return nil }
     return deadline
   }

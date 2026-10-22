@@ -48,6 +48,7 @@ extension DashboardStore {
       quotaHistory = result.history
       quotaForecast = result.forecast
       quotaHistoryStorageMessage = result.storageMessage
+      updateRadarQuotaConfirmation(now: now)
       evaluateQuotaAlerts(now: now)
     }
   }
@@ -146,6 +147,7 @@ extension DashboardStore {
     quotaAlertAccountScope = account
     quotaAlertLedger = quotaAlertLedgerStore.load(account: account)
     quotaHistory = []
+    updateRadarQuotaConfirmation()
     quotaHistoryStorageMessage = nil
     quotaForecast = nil
     lastForecastEvent = nil

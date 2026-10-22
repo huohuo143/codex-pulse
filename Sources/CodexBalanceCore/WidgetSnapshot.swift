@@ -191,12 +191,16 @@ public struct CodexWidgetSnapshot: Codable, Equatable, Sendable {
     }
     if schemaVersion < 4 || radarIsStale == true || radarLastSuccessAt.map({ now.timeIntervalSince($0) > 90 * 60 }) != false || radarValidUntil.map({ $0 <= now }) == true {
       result.resetProbability24h = nil
-      result.radarLevel = radarLastSuccessAt == nil && (radarConsecutiveFailures ?? 0) > 0
-        ? "等待数据" : "动态已过期"
-      result.radarSummary = "公开动态未及时更新，等待下一次检查与分析。"
-      result.radarDeadlineAt = nil
-      result.radarCompletionUntil = nil
-      result.radarAnnouncementActive = false
+      // A confirmed arrival is a durable fact, independent of feed freshness.
+      // Keep its original display boundary even when a later check fails.
+      if schemaVersion < 4 || radarCompletionUntil == nil {
+        result.radarLevel = radarLastSuccessAt == nil && (radarConsecutiveFailures ?? 0) > 0
+          ? "等待数据" : "动态已过期"
+        result.radarSummary = "公开动态未及时更新，等待下一次检查与分析。"
+        result.radarDeadlineAt = nil
+        result.radarCompletionUntil = nil
+        result.radarAnnouncementActive = false
+      }
       if radarLastSuccessAt != nil { result.radarSyncStatus = "等待刷新" }
       result.radarIsStale = true
     }

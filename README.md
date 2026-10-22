@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-2.12.25-8b7cff">
+  <img alt="Version" src="https://img.shields.io/badge/version-2.12.26-8b7cff">
   <img alt="macOS" src="https://img.shields.io/badge/macOS-14%2B-111827?logo=apple">
   <img alt="Mac architectures" src="https://img.shields.io/badge/Mac-arm64%20%7C%20x86__64-111827">
   <img alt="Swift" src="https://img.shields.io/badge/Swift-6.0-f05138?logo=swift&logoColor=white">
@@ -18,7 +18,13 @@
 
 `Codex 脉动` 将 Codex 的额度、Token 消耗、重置节奏和 Full reset 权益集中到一套原生 macOS 界面中。它既可以作为常驻悬浮框，也可以完全隐藏悬浮框，仅使用主窗口或 7 款桌面小组件。
 
-> 最新 macOS 发布版本：`2.12.25` build 2152，提供 Apple Silicon（arm64）安装包。主应用兼容 macOS 13；桌面小组件要求 macOS 14 或更高版本；安装包为 ad-hoc 签名、未公证版本。Windows 公开安装包仍见 v2.12.2 发布页。
+> 最新 macOS 发布版本：`2.12.26` build 2153，提供 Apple Silicon（arm64）安装包。主应用兼容 macOS 13；桌面小组件要求 macOS 14 或更高版本；安装包为 ad-hoc 签名、未公证版本。Windows 公开安装包仍见 v2.12.2 发布页。
+
+## 2.12.26 实际重置到账与24小时倒计时
+
+修复本账号官方额度已恢复并开始新周周期，悬浮框和桌面小组件却仍停留在预告的问题。主界面、悬浮框、雷达和概览小组件统一显示“已完成重置”，从历史中的首次检测到账时刻展示24小时倒计时。刷新、重启和稍后的公开完成确认均不延长展示；新预告优先，到期等待下一轮。已确认到账不受后续公开源或模型暂时失败影响，刷新状态仍独立如实显示。
+
+本账号确认只代表当前账号，不推断全部用户已到账；普通百分比修正、自然周期到期和长时间缺测不作为本次确认。详见[更新说明](docs/RELEASE_2.12.26.md)、[验证范围](docs/VALIDATION_2.12.26.md)。
 
 ## 2.12.25 Tibo 重置预告与醒目截止时间
 
@@ -26,7 +32,7 @@
 
 确认到账后展示 24 小时倒计时；有新预告时立即替代，结束后等待新一轮预告。只保留最近七天动态，离线历史月历独立保留。修复应用更新后已有自动启动服务的恢复、小组件单色文字对比，以及悬浮窗刷新时钟。
 
-分析需要本机可用的 Codex/ChatGPT CLI、既有登录及 GPT-6 Astra 模型权限；没有访问权限或分析失败时如实显示失败，不使用关键词模拟分析。公开动态来自 Codex Radar，回复线程通过 Jina Reader 读取；不读取 X Cookie 或登录态。桌面小组件受 macOS 调度影响，可能稍晚于主程序更新。详见[更新说明](docs/RELEASE_2.12.25.md)、[安装说明](docs/INSTALL_UPGRADE_2.12.25.md)与[验证范围](docs/VALIDATION_2.12.25.md)。
+分析需要本机可用的 Codex/ChatGPT CLI、既有登录及 GPT-6 Astra 模型权限；没有访问权限或分析失败时如实显示失败，不使用关键词模拟分析。公开动态来自 Codex Radar，回复线程通过 Jina Reader 读取；不读取 X Cookie 或登录态。桌面小组件受 macOS 调度影响，可能稍晚于主程序更新。详见[更新说明](docs/RELEASE_2.12.25.md)、[安装说明](docs/INSTALL_UPGRADE_2.12.26.md)与[验证范围](docs/VALIDATION_2.12.26.md)。
 
 ## 2.12.8 多来源历史补录
 
@@ -219,13 +225,13 @@ flowchart LR
 
 ## 安装
 
-在 [v2.12.25 发布页](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.25) 下载 Apple Silicon Mac 安装包。完整步骤见 [安装与升级](docs/INSTALL_UPGRADE_2.12.25.md)，测试范围见 [验证说明](docs/VALIDATION_2.12.25.md)。本次发布针对 macOS；Windows x64 安装版、免安装版继续从 [v2.12.2 发布页](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.2) 下载。
+在 [v2.12.26 发布页](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.26) 下载 Apple Silicon Mac 安装包。完整步骤见 [安装与升级](docs/INSTALL_UPGRADE_2.12.26.md)，测试范围见 [验证说明](docs/VALIDATION_2.12.26.md)。本次发布针对 macOS；Windows x64 安装版、免安装版继续从 [v2.12.2 发布页](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.2) 下载。
 
 在 [Releases](https://github.com/huohuo143/codex-pulse/releases) 下载：
 
 ```text
-Codex-Pulse-v2.12.25-build2152-20261022-arm64.dmg
-Codex-Pulse-v2.12.25-build2152-20261022-arm64.dmg.sha256
+Codex-Pulse-v2.12.26-build2153-20261023-arm64.dmg
+Codex-Pulse-v2.12.26-build2153-20261023-arm64.dmg.sha256
 ```
 
 1. 打开 DMG。
@@ -237,7 +243,7 @@ Codex-Pulse-v2.12.25-build2152-20261022-arm64.dmg.sha256
 
 ## 与旧版并行
 
-| 项目 | Codex 脉动 2.12.25 | 旧算力码表 0.1.0 |
+| 项目 | Codex 脉动 2.12.26 | 旧算力码表 0.1.0 |
 | --- | --- | --- |
 | App | `Codex 脉动.app` | `算力码表.app` |
 | Bundle ID | `dev.codex.balance-dashboard.codex` | `dev.codex.balance-dashboard` |

@@ -35,7 +35,7 @@ extension DashboardStore {
     let service = codexRadarService
     Task {
       guard let snapshot = await service.reevaluate() else { return }
-      codexRadarSnapshot = snapshot
+      codexRadarSnapshot = radarWithQuotaConfirmation(snapshot)
       recordRuntimeEvent("radar-local-evaluation")
       codexRadarLastSyncAt = DashboardStatusMergePolicy.radarReliabilityTimestamp(
         from: snapshot.syncState
@@ -48,7 +48,7 @@ extension DashboardStore {
   }
 
   func applyCodexRadarSnapshot(_ snapshot: CodexRadarSnapshot) {
-    codexRadarSnapshot = snapshot
+    codexRadarSnapshot = radarWithQuotaConfirmation(snapshot)
     recordRuntimeEvent("radar-result")
     // Reliability must only advance after a real Tibo feed fetch succeeds.
     // A base/current.json response or a cached-feed recomputation is not a
@@ -74,6 +74,18 @@ extension DashboardStore {
         codexRadarRefreshTimer?.fireDate = max(next, Date().addingTimeInterval(1))
       }
     }
+  }
+
+  func radarWithQuotaConfirmation(_ snapshot: CodexRadarSnapshot, now: Date = Date()) -> CodexRadarSnapshot {
+    var result = snapshot
+    result.quotaResetConfirmedAt = CodexQuotaResetDetection.latestConfirmedAt(in: quotaHistory, now: now)
+    return result
+  }
+
+  func updateRadarQuotaConfirmation(now: Date = Date()) {
+    guard let snapshot = codexRadarSnapshot else { return }
+    codexRadarSnapshot = radarWithQuotaConfirmation(snapshot, now: now)
+    if servicesEnabled { writeWidgetSnapshotFile() }
   }
 
   func archiveRadarEvaluation(_ snapshot: CodexRadarSnapshot) {

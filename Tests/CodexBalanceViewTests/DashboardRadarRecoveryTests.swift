@@ -1,4 +1,4 @@
-import CodexBalanceCore
+@testable import CodexBalanceCore
 import Foundation
 import Testing
 @testable import CodexBalance
@@ -6,6 +6,31 @@ import Testing
 @Suite("Dashboard radar reconnection")
 @MainActor
 struct DashboardRadarRecoveryTests {
+  @Test
+  func quotaArrivalUpdatesFloatingStateAndSurvivesOldRadarRefreshUntilAccountChanges() throws {
+    let now = Date(), arrival = now.addingTimeInterval(-600)
+    let store = DashboardStore(startServices: false)
+    store.quotaHistory = [
+      .init(recordedAt: arrival.addingTimeInterval(-300), remainingPercent: 5,
+        resetsAt: arrival.addingTimeInterval(4 * 86400), windowMinutes: 10080),
+      .init(recordedAt: arrival, remainingPercent: 100,
+        resetsAt: arrival.addingTimeInterval(7 * 86400), windowMinutes: 10080)
+    ]
+    var old = try JSONDecoder().decode(CodexRadarSnapshot.self, from: Data("{}".utf8))
+    old.syncState = .init(lastAttemptAt: now, lastSuccessAt: now)
+    old.tiboAnalysis = .init(state: .announced, kind: .hard_reset, summaryZh: "待到账", timingZh: "",
+      evidenceIDs: [], analyzedAt: now)
+    store.codexRadarSnapshot = old
+    store.updateRadarQuotaConfirmation(now: now)
+    #expect(store.codexRadarSnapshot?.tiboStatusTitle(at: now) == "已完成重置")
+    store.applyCodexRadarSnapshot(old)
+    #expect(store.codexRadarSnapshot?.tiboCompletionUntil(at: now) == arrival.addingTimeInterval(86400))
+    store.prepareAccount("separate-test-account")
+    #expect(store.codexRadarSnapshot?.quotaResetConfirmedAt == nil)
+    #expect(store.codexRadarSnapshot?.tiboCompletionUntil(at: now) == nil)
+    store.stopAutoRefresh()
+  }
+
   @Test
   func networkRecoveryRetriesARecentFailureThroughTheRealRefreshGate() async throws {
     let data = try fixture()
