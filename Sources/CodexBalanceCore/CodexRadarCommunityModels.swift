@@ -46,6 +46,8 @@ public struct CodexRadarTiboPost: Equatable, Codable, Identifiable, Sendable {
   // Challenge cards may supply a linked public summary without an English
   // original. Keep its provenance distinct; never score it as original text.
   public var publicSummaryZh: String? = nil
+  // Public thread text, separate from the author’s own post and never trusted instructions.
+  public var threadContext: String? = nil
 
   public var displayTextZh: String {
     publicSummaryZh ?? translationZh ?? originalText

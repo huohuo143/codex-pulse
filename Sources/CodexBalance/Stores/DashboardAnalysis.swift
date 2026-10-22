@@ -41,11 +41,13 @@ extension DashboardStore {
           current = QuotaSnapshot(recordedAt: event.timestamp, remainingPercent: window.remainingPercent,
             resetsAt: reset, windowMinutes: window.windowMinutes)
         }
-        return (history: history, forecast: QuotaForecaster.forecast(snapshots: history, current: current, now: now))
+        return (history: history, forecast: QuotaForecaster.forecast(snapshots: history, current: current, now: now),
+          storageMessage: storage.storageMessage)
       }.value
       guard generation == forecastGeneration else { return }
       quotaHistory = result.history
       quotaForecast = result.forecast
+      quotaHistoryStorageMessage = result.storageMessage
       evaluateQuotaAlerts(now: now)
     }
   }
@@ -144,6 +146,7 @@ extension DashboardStore {
     quotaAlertAccountScope = account
     quotaAlertLedger = quotaAlertLedgerStore.load(account: account)
     quotaHistory = []
+    quotaHistoryStorageMessage = nil
     quotaForecast = nil
     lastForecastEvent = nil
     lastForecastAt = nil

@@ -21,6 +21,8 @@ extension DashboardStore {
 
   func runReliabilityCheck(manual: Bool = false, allowAutomation: Bool = true) {
     let now = Date()
+    resetDailySummaryForNewDay(now: now)
+    refreshReliabilityEvents()
     let next = ReliabilityAuditor.audit(
       inputs: ReliabilityAuditor.Inputs(
         lastQuotaRefresh: status?.quotaRead?.lastSuccessAt,
@@ -30,7 +32,22 @@ extension DashboardStore {
         radarUpdatedAt: codexRadarLastSyncAt,
         launchWatcherEnabled: CodexWatcherManager.isEnabled(),
         quotaHistoryURL: quotaHistoryStore.storageURL,
-        quotaState: quotaState
+        projectBudgetsURL: projectBudgetStore.storageURL,
+        quotaState: quotaState,
+        quotaHistoryStorageMessage: quotaHistoryStorageMessage,
+        projectBudgetStorageMessage: projectBudgetStorageIssue?.localizedDescription,
+        projectBudgetWriteFailed: projectBudgetWriteFailed,
+        creditExpiryStore: creditExpiryStore,
+        creditExpiryStorageIssue: creditExpiryStorageIssue,
+        creditExpiryWriteFailed: creditExpiryWriteFailed,
+        localBackupHealth: localBackupHealth,
+        automaticBackupsEnabled: reliabilityBackupsEnabled,
+        eventStorageIssue: reliabilityEventStorageIssue,
+        eventWriteFailed: reliabilityEventWriteFailed,
+        dailySummaryHealth: dailySummaryHealth,
+        dailySummaryEnabled: reliabilityDailySummaryEnabled,
+        dailySummaryDue: reliabilityDailySummaryEnabled && Calendar.current.component(.hour, from: now) >= reliabilityDailySummaryHour,
+        unreadableSessionFiles: status?.readerDiagnostics?.unreadableFiles ?? 0
       ),
       now: now
     )
@@ -53,44 +70,52 @@ extension DashboardStore {
         detail: "当前状态：\(reliabilityLevelLabel(next.overall))"
       ))
     }
-    lastReliabilityLevel = next.overall
+    lastReliabilityLevel = reliabilitySnapshot.overall
 
     guard allowAutomation else { return }
-    if shouldPerformAutomaticBackup(now: now) {
-      performLocalBackup(manual: false, now: now)
+    if canRunAutomaticBackup {
+      Task { [weak self] in await self?.performLocalBackup(manual: false, now: now) }
     }
-    if reliabilityDailySummaryEnabled,
-       Calendar.current.component(.hour, from: now) >= reliabilityDailySummaryHour,
-       !localAutomationArchive.hasDailySummary(for: now) {
-      archiveDailySummary(now: now)
+    if canRunAutomaticDailySummary(at: now) {
+      Task { [weak self] in
+        guard let self, self.canRunAutomaticDailySummary(at: now) else { return }
+        await self.archiveDailySummary(now: now)
+      }
     }
     if reliabilityHealthChecksEnabled, reliabilityAutoRecoveryEnabled {
       attemptAutomaticRecovery(snapshot: next, now: now)
     }
   }
 
-  func shouldPerformAutomaticBackup(now: Date, archive: LocalAutomationArchive? = nil) -> Bool {
+  var canRunAutomaticBackup: Bool {
     // The first asynchronous quota read selects the account-specific history.
     // Do not let a startup backup of the legacy path consume the day's attempt.
-    guard reliabilityBackupsEnabled, status?.accountScope?.isEmpty == false else { return false }
-    return !(archive ?? localAutomationArchive).hasBackup(
-      for: now, sourceURLs: localBackupSourceURLs
-    )
+    !isBackingUp && reliabilityBackupsEnabled && status?.accountScope?.isEmpty == false
   }
 
   var localBackupSourceURLs: [URL] {
-    [quotaHistoryStore.storageURL, ProjectBudgetStore.defaultURL,
+    [quotaHistoryStore.storageURL, projectBudgetStore.storageURL, projectBudgetStore.previousURL,
       creditExpiryStore.url, creditExpiryStore.legacyURL, creditExpiryStore.previousURL,
       PulsePaths.support.appendingPathComponent("codex-reset-calendar-v1.json")]
   }
 
-  func performLocalBackup(manual: Bool = true, now: Date = Date(), archive: LocalAutomationArchive? = nil) {
+  func performLocalBackup(manual: Bool = true, now: Date = Date(), archive: LocalAutomationArchive? = nil) async {
+    guard !isBackingUp else { return }
+    isBackingUp = true
+    defer {
+      isBackingUp = false
+      runReliabilityCheck(allowAutomation: false)
+    }
+    let storage = archive ?? localAutomationArchive
+    let sources = localBackupSourceURLs
+    let retryFailed = localBackupHealth == .failed
     do {
-      let result = try (archive ?? localAutomationArchive).backup(
-        sourceURLs: localBackupSourceURLs,
-        now: now,
-        retentionDays: 7
-      )
+      let result = try await Task.detached(priority: .utility) { () -> LocalAutomationResult? in
+        if !manual && !retryFailed && storage.hasBackup(for: now, sourceURLs: sources) { return nil }
+        return try storage.backup(sourceURLs: sources, now: now, retentionDays: 7)
+      }.value
+      guard let result else { localBackupHealth = .verified; return }
+      localBackupHealth = result.itemCount > 0 ? .verified : .noData
       reliabilityMessage = result.itemCount > 0
         ? "已备份 \(result.itemCount) 个关键数据文件"
         : "当前没有可备份的关键数据文件"
@@ -103,13 +128,17 @@ extension DashboardStore {
         ))
       }
     } catch {
+      localBackupHealth = .failed
       reliabilityMessage = "备份失败：\(error.localizedDescription)"
       appendReliabilityEvent(.init(timestamp: now, kind: .failure, title: "关键数据备份失败", detail: "本地归档未完成"))
     }
   }
 
   func exportDiagnosticReport() {
+    guard !isExporting else { return }
     runReliabilityCheck(allowAutomation: false)
+    let snapshot = reliabilitySnapshot
+    let events = reliabilityEvents
     let panel = NSSavePanel()
     panel.title = "导出脱敏诊断报告"
     panel.prompt = "导出"
@@ -119,16 +148,11 @@ extension DashboardStore {
     formatter.dateFormat = "yyyyMMdd-HHmm"
     panel.nameFieldStringValue = "codex-pulse-diagnostics-\(formatter.string(from: Date())).md"
     guard panel.runModal() == .OK, let url = panel.url else { return }
-    let markdown = ReliabilityReportBuilder.diagnosticMarkdown(
-      appVersion: AppInfo.version,
-      snapshot: reliabilitySnapshot,
-      recentEvents: reliabilityEvents
-    )
-    do {
-      try markdown.write(to: url, atomically: true, encoding: .utf8)
-      reliabilityMessage = "诊断报告已导出：\(url.lastPathComponent)"
-    } catch {
-      reliabilityMessage = "诊断报告导出失败：\(error.localizedDescription)"
+    Task {
+      await writeExport({
+        ReliabilityReportBuilder.diagnosticMarkdown(appVersion: AppInfo.version, snapshot: snapshot, recentEvents: events)
+      }, to: url, title: "脱敏诊断报告", successMessage: "诊断报告已导出：\(url.lastPathComponent)",
+        failurePrefix: "诊断报告导出失败")
     }
   }
 
@@ -188,32 +212,125 @@ extension DashboardStore {
     reliabilityMessage = "已触发受控自动恢复"
   }
 
-  func archiveDailySummary(now: Date) {
-    let markdown = ReliabilityReportBuilder.dailySummaryMarkdown(
-      remainingPercent: weekly?.remainingPercent,
-      rolling24hTokens: tokenStats.rolling24HoursTokens,
-      monthTokens: tokenStats.monthTokens,
-      projectedMonthTokens: usageAnalysis.projectedMonthTokens,
-      quotaRisk: quotaForecast?.risk.rawValue ?? "insufficientData",
-      health: reliabilitySnapshot.overall,
-      generatedAt: now
-    )
+  func canRunAutomaticDailySummary(at now: Date) -> Bool {
+    !isArchivingDailySummary && reliabilityDailySummaryEnabled
+      && Calendar.current.component(.hour, from: now) >= reliabilityDailySummaryHour
+      && dailySummaryDataReady
+  }
+
+  var dailySummaryDataReady: Bool {
+    status?.accountScope?.isEmpty == false && weekly != nil && lastFullRefresh != nil
+  }
+
+  func resetDailySummaryForNewDay(now: Date) {
+    guard !isArchivingDailySummary, let previous = lastDailySummaryAttempt,
+      !Calendar.current.isDate(previous, inSameDayAs: now) else { return }
+    dailySummaryHealth = .notChecked
+    dailySummaryMessage = nil
+    lastDailySummaryAttempt = nil
+  }
+
+  func archiveDailySummary(now: Date = Date(), archive: LocalAutomationArchive? = nil) async {
+    guard !isArchivingDailySummary else { return }
+    guard dailySummaryDataReady else {
+      dailySummaryMessage = "等待本次启动的额度和用量读取完成后，再生成摘要。"
+      return
+    }
+    isArchivingDailySummary = true
+    lastDailySummaryAttempt = now
+    defer {
+      isArchivingDailySummary = false
+      runReliabilityCheck(allowAutomation: false)
+    }
+    let storage = archive ?? localAutomationArchive
+    let stats = tokenStats
+    let budgets = projectBudgets
+    let remainingPercent = weekly?.remainingPercent
+    let quotaRisk = quotaForecast?.risk.rawValue ?? "insufficientData"
+    let health = reliabilitySnapshot.overall
     do {
-      _ = try localAutomationArchive.archiveDailySummary(markdown, now: now)
-      appendReliabilityEvent(.init(timestamp: now, kind: .info, title: "每日摘要已归档", detail: "已保存本机聚合指标"))
-      reliabilityMessage = "今日自动摘要已归档"
+      let result = try await Task.detached(priority: .utility) {
+        let analysis = UsageAnalyzer.analyze(stats: stats, budgets: budgets, now: now)
+        let markdown = ReliabilityReportBuilder.dailySummaryMarkdown(
+          remainingPercent: remainingPercent, rolling24hTokens: stats.rolling24HoursTokens,
+          monthTokens: stats.monthTokens, projectedMonthTokens: analysis.projectedMonthTokens,
+          quotaRisk: quotaRisk, health: health, generatedAt: now)
+        return try storage.archiveDailySummary(markdown, now: now)
+      }.value
+      dailySummaryHealth = .verified
+      if result.alreadyPresent {
+        dailySummaryMessage = "今日摘要已存在并通过内容检查，保持原样。"
+      } else if result.preservedOriginalURL != nil {
+        dailySummaryMessage = "已保留不完整摘要原件，并重新生成今日摘要。"
+      } else {
+        dailySummaryMessage = "今日摘要已生成并验证保存。"
+      }
+      if !result.alreadyPresent {
+        appendReliabilityEvent(.init(timestamp: now, kind: .info, title: "每日摘要已归档",
+          detail: result.preservedOriginalURL == nil ? "已验证保存本机聚合指标" : "原摘要已独立保留，新摘要已验证保存"))
+      }
     } catch {
+      dailySummaryHealth = .failed
+      let message = (error as? DailySummaryArchiveError)?.localizedDescription
+        ?? DailySummaryArchiveError.writeFailed.localizedDescription
+      dailySummaryMessage = "每日摘要归档失败：\(message)"
       appendReliabilityEvent(.init(timestamp: now, kind: .failure, title: "每日摘要归档失败", detail: "本地文件未写入"))
-      reliabilityMessage = "每日摘要归档失败：\(error.localizedDescription)"
     }
   }
 
   func appendReliabilityEvent(_ event: ReliabilityEvent) {
     do {
       reliabilityEvents = try reliabilityEventStore.append(event)
+      reliabilityEventStorageIssue = nil
+      reliabilityEventWriteFailed = false
     } catch {
-      dashboardLogger.error("Reliability event write failed: \(error.localizedDescription, privacy: .public)")
+      reliabilityEventStorageIssue = (error as? ReliabilityEventStorageIssue) ?? .writeFailed
+      reliabilityEventWriteFailed = true
+      dashboardLogger.error("Reliability event write failed; existing record retained")
     }
+    updateReliabilityEventHealth()
+  }
+
+  var reliabilityEventStorageMessage: String? {
+    reliabilityEventStorageIssue?.localizedDescription
+      ?? (reliabilityEventWriteFailed ? ReliabilityEventStorageIssue.writeFailed.localizedDescription : nil)
+  }
+
+  func refreshReliabilityEvents() {
+    let result = reliabilityEventStore.loadResult()
+    reliabilityEventStorageIssue = result.issue
+    if result.issue == nil { reliabilityEvents = result.events }
+  }
+
+  func reloadReliabilityEvents() {
+    refreshReliabilityEvents()
+    updateReliabilityEventHealth()
+  }
+
+  func rebuildReliabilityEvents() {
+    do {
+      let preserved = try reliabilityEventStore.rebuildAfterPreservingCorruption()
+      reliabilityEvents = []
+      reliabilityEventStorageIssue = nil
+      reliabilityEventWriteFailed = false
+      appendReliabilityEvent(.init(kind: .recovery, title: "运行事件记录已重建", detail: "损坏原件已独立保留并验证"))
+      reliabilityMessage = "已保留原件并重建记录：\(preserved.lastPathComponent)"
+    } catch {
+      reliabilityEventStorageIssue = (error as? ReliabilityEventStorageIssue) ?? .writeFailed
+      reliabilityEventWriteFailed = true
+      reliabilityMessage = "事件记录未重建：\(reliabilityEventStorageMessage ?? "请重新读取后重试")"
+    }
+    updateReliabilityEventHealth()
+  }
+
+  private func updateReliabilityEventHealth() {
+    let now = Date()
+    let check = ReliabilityAuditor.eventHistoryCheck(issue: reliabilityEventStorageIssue,
+      writeFailed: reliabilityEventWriteFailed, now: now)
+    var checks = reliabilitySnapshot.checks
+    if let index = checks.firstIndex(where: { $0.id == .reliabilityEvents }) { checks[index] = check }
+    else { checks.append(check) }
+    reliabilitySnapshot = .init(generatedAt: now, checks: checks)
   }
 
   func reliabilityLevelLabel(_ level: ReliabilityHealthLevel) -> String {

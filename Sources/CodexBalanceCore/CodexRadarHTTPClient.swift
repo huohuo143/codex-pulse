@@ -8,6 +8,7 @@ enum CodexRadarHTTPClient {
     var retryDelays: [TimeInterval] = [1, 3]
 
     static let primary = Options()
+    static let singleCheck = Options(maximumAttempts: 1)
     static let ancillary = Options(maximumAttempts: 1, maximumDuration: 6, requestTimeout: 6)
   }
 

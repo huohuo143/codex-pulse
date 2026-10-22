@@ -95,17 +95,17 @@ extension DashboardStore {
       cost7DaysUSD: stats.cost7Days.usd,
       costMonthUSD: stats.costMonth.usd,
       cnyRate: exchangeRate?.rate,
-      resetProbability24h: radar?.probability24hPercent,
-      radarLevel: radar?.latestLevelLabel,
-      radarSummary: radar?.latestSummary,
-      radarUpdatedAt: radar?.probabilityUpdate,
+      resetProbability24h: nil,
+      radarLevel: radar?.tiboStatusTitle,
+      radarSummary: radar?.tiboStatusSummary,
+      radarUpdatedAt: radar?.tiboAnalysis?.analyzedAt,
       radarCheckedAt: radar?.syncState?.lastAttemptAt,
       radarLastSuccessAt: radar?.syncState?.lastSuccessAt,
       radarSourceUpdatedAt: radar?.syncState?.feedUpdatedAt,
-      radarEvidenceUpdatedAt: radar?.localResetEstimate?.evidenceUpdatedAt,
-      radarEvaluatedAt: radar?.localResetEstimate?.evaluatedAt,
-      radarValidUntil: radar?.localResetEstimate?.validUntil,
-      radarSyncStatus: radar?.syncState?.statusLabel,
+      radarEvidenceUpdatedAt: radar?.tiboFeed?.posts.filter { radar?.tiboAnalysis?.evidenceIDs.contains($0.id) == true }.compactMap(\.publishedAt).max(),
+      radarEvaluatedAt: radar?.tiboAnalysis?.analyzedAt,
+      radarValidUntil: radar?.tiboStatusValidUntil,
+      radarSyncStatus: radar.map { $0.tiboRefreshIsHealthy(at: Date()) ? "刷新正常" : "等待刷新或分析" },
       radarConsecutiveFailures: radar?.syncState?.consecutiveFailures,
       radarIsUsingCachedFeed: radar?.syncState?.isUsingCachedFeed,
       radarIsStale: radar?.syncState?.isStale,
@@ -138,6 +138,9 @@ extension DashboardStore {
     snapshot.cost7Coverage = stats.cost7Days.coveragePercent
     snapshot.costMonthCoverage = stats.costMonth.coveragePercent
     snapshot.unpricedModels = stats.costMonth.unpricedModels
+    snapshot.radarDeadlineAt = radar?.tiboDeadline(at: Date())?.date
+    snapshot.radarCompletionUntil = radar?.tiboCompletionUntil(at: Date())
+    snapshot.radarAnnouncementActive = radar?.tiboHasAnnouncement(at: Date())
 
     snapshot.usageUpdatedAt = lastFullRefresh
     snapshot.usageValidUntil = status?.usageValidUntil

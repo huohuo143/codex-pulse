@@ -66,17 +66,35 @@ struct ReliabilityAutomationSettingsView: View {
           Text("每日摘要默认关闭；开启后只保存额度、Token、风险和健康状态。")
             .font(.caption)
             .foregroundStyle(DashboardColors.subtleText)
+          Button(store.isArchivingDailySummary ? "正在生成摘要…" : "生成或检查今日摘要", systemImage: "doc.text") {
+            Task { await store.archiveDailySummary() }
+          }
+          .disabled(store.isArchivingDailySummary || !store.dailySummaryDataReady)
+          .help("已有有效摘要保持原样；不完整摘要先保留原件副本，再重新生成。")
+          if !store.dailySummaryDataReady {
+            Text("等待本次启动的额度和用量读取完成后，可生成摘要。")
+              .font(.caption)
+              .foregroundStyle(DashboardColors.subtleText)
+          }
+          if let message = store.dailySummaryMessage {
+            Label(message, systemImage: store.dailySummaryHealth == .failed ? "exclamationmark.triangle" : "info.circle")
+              .font(.caption)
+              .foregroundStyle(store.dailySummaryHealth == .failed ? .orange : DashboardColors.subtleText)
+              .fixedSize(horizontal: false, vertical: true)
+          }
 
           HStack {
             Button("立即自检", systemImage: "stethoscope") {
               store.runReliabilityCheck(manual: true)
             }
-            Button("立即备份", systemImage: "archivebox") {
-              store.performLocalBackup()
+            Button(store.isBackingUp ? "正在备份…" : "立即备份", systemImage: "archivebox") {
+              Task { await store.performLocalBackup() }
             }
+            .disabled(store.isBackingUp)
             Button("导出脱敏诊断", systemImage: "doc.text.magnifyingglass") {
               store.exportDiagnosticReport()
             }
+            .disabled(store.isExporting)
             Button("打开归档目录", systemImage: "folder") {
               store.openAutomationFolder()
             }
@@ -87,7 +105,25 @@ struct ReliabilityAutomationSettingsView: View {
       PanelCard {
         VStack(alignment: .leading, spacing: 11) {
           Text("最近可靠性事件").font(.system(size: 15, weight: .bold))
-          if store.reliabilityEvents.isEmpty {
+          if let message = store.reliabilityEventStorageMessage {
+            Label(message, systemImage: "exclamationmark.triangle")
+              .font(.caption)
+              .foregroundStyle(.orange)
+              .fixedSize(horizontal: false, vertical: true)
+            HStack {
+              Button("重新读取事件", systemImage: "arrow.clockwise") { store.reloadReliabilityEvents() }
+              if store.reliabilityEventStorageIssue == .invalidRecord {
+                Button("保留原件并重建", systemImage: "doc.badge.plus") { store.rebuildReliabilityEvents() }
+                  .help("先保存并验证损坏原件，再从空记录开始记录后续运行事件。")
+              }
+            }
+            if !store.reliabilityEvents.isEmpty {
+              Text("以下为最近成功读取的事件，可能未包含本次运行中的新事件。")
+                .font(.caption)
+                .foregroundStyle(DashboardColors.subtleText)
+            }
+          }
+          if store.reliabilityEvents.isEmpty && store.reliabilityEventStorageMessage == nil {
             Label("暂无恢复或异常事件", systemImage: "checkmark.circle")
               .font(.caption)
               .foregroundStyle(DashboardColors.subtleText)
@@ -141,7 +177,8 @@ struct ReliabilityAutomationSettingsView: View {
         Text(check.detail)
           .font(.system(size: 9, weight: .medium))
           .foregroundStyle(DashboardColors.subtleText)
-          .lineLimit(1)
+          .fixedSize(horizontal: false, vertical: true)
+          .help(check.detail)
       }
       Spacer()
     }

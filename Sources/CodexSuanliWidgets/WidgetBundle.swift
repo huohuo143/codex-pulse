@@ -50,7 +50,7 @@ private struct RadarWidget: Widget {
       RadarWidgetView(entry: entry)
     }
     .configurationDisplayName("Codex 重置雷达")
-    .description("显示公开源的 24 小时重置概率与研判摘要。")
+    .description("显示 GPT-6 Astra 对 Tibo 发帖与回复的重置预告分析及刷新状态。")
     .supportedFamilies([.systemSmall, .systemMedium])
     .contentMarginsDisabled()
   }

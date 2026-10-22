@@ -10,168 +10,147 @@ struct CodexRadarView: View {
   let refresh: () -> Void
   @AppStorage("radarDetailsExpanded") private var detailsExpanded = false
   @AppStorage("radarCommunityExpanded") private var communityExpanded = false
-  @AppStorage("radarScoringExpanded") private var scoringExpanded = false
   @State private var allTiboPostsExpanded = false
 
   var body: some View {
     VStack(spacing: 14) {
-      resetOverviewCard
+      TimelineView(.periodic(from: .now, by: snapshot?.tiboCompletionUntil(at: Date()) == nil ? 30 : 1)) { _ in
+        // A newly published analysis may be newer than the last scheduled tick.
+        resetOverviewCard(at: Date())
+      }
       DisclosureGroup("动态、原帖与翻译", isExpanded: $detailsExpanded) { tiboCard }
       DisclosureGroup("模型效率与社区推荐", isExpanded: $communityExpanded) { CodexRadarCommunityView(snapshot: snapshot) }
     }
   }
 
-  private var resetOverviewCard: some View {
+  private func resetOverviewCard(at now: Date) -> some View {
     PanelCard {
-      VStack(alignment: .leading, spacing: 14) {
-        HStack(alignment: .firstTextBaseline) {
-          Text("重置概览雷达")
+      VStack(alignment: .leading, spacing: 16) {
+        HStack {
+          Text("Tibo 重置预告")
             .font(.system(size: 24, weight: .heavy, design: .rounded))
           Spacer()
-          Text("24H RESET")
-            .font(.system(size: 11, weight: .heavy, design: .rounded))
-            .tracking(2.1)
+          Text("GPT-6 Astra · High")
+            .font(.system(size: 12, weight: .bold))
             .foregroundStyle(palette.weekly)
         }
-
-        if let snapshot = snapshot {
-          HStack(alignment: .center, spacing: 28) {
-            radarGraphic(snapshot)
-              .frame(width: 174, height: 174)
-            codexProbability(snapshot)
-              .frame(maxWidth: .infinity)
+        refreshStatus(at: now)
+        if let snapshot {
+          if let deadline = snapshot.tiboDeadline(at: now), let date = deadline.date {
+            VStack(alignment: .leading, spacing: 7) {
+              Label("最晚到账时间 · 北京时间", systemImage: "clock.badge.exclamationmark")
+                .font(.system(size: 15, weight: .bold))
+              Text(BalanceFormatters.beijingDeadline(date))
+                .font(.system(size: 28, weight: .heavy, design: .rounded))
+                .monospacedDigit()
+              Text(date <= now ? "预告时限已过，实际到账仍待确认" : "Tibo 明确预告的期限，实际到账仍待确认")
+                .font(.system(size: 12, weight: .semibold))
+              if let clarification = deadline.timeZoneClarification {
+                Text(clarification).font(.system(size: 11, weight: .semibold))
+              }
+              Text("原文（\(deadline.sourceTimeZone)）：\(deadline.sourceQuote)")
+                .font(.system(size: 11)).textSelection(.enabled)
+              if let url = snapshot.tiboFeed?.posts.first(where: { $0.id == deadline.evidenceID })?.url {
+                Link("查看期限原帖", destination: url).font(.system(size: 11, weight: .semibold))
+              }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .foregroundStyle(Color.black)
+            .background(Color.orange, in: RoundedRectangle(cornerRadius: 12))
+          }
+          if let until = snapshot.tiboCompletionUntil(at: now) {
+            HStack {
+              Label("到账提示展示剩余", systemImage: "checkmark.seal.fill")
+              Spacer()
+              Text(timerInterval: now...until, countsDown: true).monospacedDigit().fixedSize()
+            }
+            .font(.system(size: 24, weight: .heavy, design: .rounded))
+            .padding(14).foregroundStyle(.black)
+            .background(Color.green, in: RoundedRectangle(cornerRadius: 12))
+          }
+          Text(snapshot.tiboStatusTitle(at: now))
+            .font(.system(size: 30, weight: .heavy, design: .rounded))
+            .foregroundStyle(palette.weekly)
+          Text(snapshot.tiboStatusSummary(at: now))
+            .font(.system(size: 13, weight: .medium))
+            .lineSpacing(3)
+            .fixedSize(horizontal: false, vertical: true)
+          if snapshot.tiboRefreshIsHealthy(at: now),
+             let analysis = snapshot.tiboAnalysis {
+            if !analysis.timingZh.isEmpty {
+              Text(analysis.timingZh)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(DashboardColors.subtleText)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+            ForEach((snapshot.tiboFeed?.posts ?? []).filter { analysis.evidenceIDs.contains($0.id) }) { post in
+              VStack(alignment: .leading, spacing: 5) {
+                Text(post.originalText)
+                  .font(.system(size: 12, weight: .semibold))
+                  .textSelection(.enabled)
+                HStack {
+                  if let date = post.publishedAt { Text("原帖 · \(radarUpdateTime(date))") }
+                  if let url = post.url { Link("查看 Tibo 原帖", destination: url) }
+                }
+                .font(.system(size: 11, weight: .medium))
+              }
+              .padding(10)
+              .background(DashboardColors.faintFill, in: RoundedRectangle(cornerRadius: 10))
+            }
+            if let date = analysis.analyzedAt {
+              Text("分析完成 · \(radarUpdateTime(date)) · 每 10 分钟检查新动态")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(DashboardColors.subtleText)
+            }
           }
         } else {
-          HStack(alignment: .center, spacing: 28) {
-            radarGraphic(nil)
-              .frame(width: 174, height: 174)
-            unavailableOverview
-              .frame(maxWidth: .infinity, alignment: .leading)
-          }
+          unavailableOverview
         }
-
         Divider().overlay(DashboardColors.separator)
-        HStack(spacing: 10) {
-          Link(CodexRadarService.attributionText, destination: CodexRadarService.siteURL)
-          Spacer()
-          if isLoading {
-            ProgressView().controlSize(.small)
-          }
-          Label("每 30 分钟自动同步", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90")
-          if let nextSync = nextSyncAt {
-            Text("下次 \(shortTime(nextSync))")
-              .monospacedDigit()
-          }
-        }
-        .font(.system(size: 9, weight: .medium))
-        .foregroundStyle(DashboardColors.subtleText)
+        Text("每 10 分钟检查一次发帖与回复 · 仅保留最近 7 天 · 不预测概率")
+          .font(.system(size: 12, weight: .semibold))
+          .foregroundStyle(DashboardColors.subtleText)
+        Link(CodexRadarService.attributionText, destination: CodexRadarService.siteURL)
+          .font(.system(size: 10, weight: .medium))
       }
     }
   }
 
-  private func codexProbability(_ snapshot: CodexRadarSnapshot) -> some View {
-    VStack(alignment: .leading, spacing: 12) {
-      HStack(alignment: .center, spacing: 16) {
-        VStack(alignment: .leading, spacing: 3) {
-          Text("Codex")
-            .font(.system(size: 27, weight: .heavy, design: .rounded))
-          Text(snapshot.latestLevelLabel)
-            .font(.system(size: 15, weight: .medium))
-            .foregroundStyle(DashboardColors.subtleText)
-        }
+  private func refreshStatus(at now: Date) -> some View {
+    let healthy = snapshot?.tiboRefreshIsHealthy(at: now) == true
+    let hasFailure = snapshot?.tiboAnalysisFailure != nil || (snapshot?.syncState?.consecutiveFailures ?? 0) > 0
+    let title = isLoading ? "正在检查与分析" : (healthy ? "刷新正常" : (hasFailure ? "刷新或分析未成功" : "等待刷新与分析"))
+    let color: Color = isLoading ? palette.weekly : (healthy ? .green : .orange)
+    return VStack(alignment: .leading, spacing: 10) {
+      HStack(spacing: 9) {
+        if isLoading { ProgressView().controlSize(.small) }
+        else { Image(systemName: healthy ? "checkmark.circle.fill" : "exclamationmark.circle.fill") }
+        Text(title)
         Spacer()
-        VStack(alignment: .trailing, spacing: 2) {
-          probabilityText(
-            snapshot.probability24hPercent,
-            tint: probabilityTint(snapshot.localResetEstimate?.level ?? snapshot.prediction?.level)
-          )
-          if let probabilityUpdate = snapshot.probabilityUpdate {
-            Text("重置雷达 · \(radarUpdateTime(probabilityUpdate))")
-              .font(.system(size: 8, weight: .semibold, design: .rounded))
-              .foregroundStyle(DashboardColors.subtleText)
-          }
-        }
       }
-
-      Divider().overlay(DashboardColors.separator)
-
-      if let summary = snapshot.latestSummary, summary.isEmpty == false {
-        Text(summary)
-          .font(.system(size: 11, weight: .medium))
-          .foregroundStyle(DashboardColors.text.opacity(0.88))
-          .lineSpacing(2)
-          .lineLimit(3)
+      .font(.system(size: 18, weight: .bold))
+      .foregroundStyle(color)
+      HStack(alignment: .top, spacing: 25) {
+        VStack(alignment: .leading, spacing: 4) {
+          Text("动态成功刷新").font(.system(size: 12, weight: .semibold))
+          Text(snapshot?.syncState?.lastSuccessAt.map { radarUpdateTime($0) } ?? "尚未成功")
+            .font(.system(size: 22, weight: .heavy, design: .rounded)).monospacedDigit()
+        }
+        VStack(alignment: .leading, spacing: 4) {
+          Text("下次检查").font(.system(size: 12, weight: .semibold))
+          Text(nextSyncAt.map { radarUpdateTime($0) } ?? "等待安排")
+            .font(.system(size: 22, weight: .heavy, design: .rounded)).monospacedDigit()
+        }
+        Spacer(minLength: 0)
       }
-
-      if let estimate = snapshot.localResetEstimate {
-        VStack(alignment: .leading, spacing: 5) {
-          Label("App 本地估算 · 24h 全局硬重置 · 非官方", systemImage: "function")
-            .font(.system(size: 10, weight: .bold))
-            .foregroundStyle(palette.weekly)
-          DisclosureGroup("详细评分依据", isExpanded: $scoringExpanded) {
-          ForEach(estimate.signals, id: \.self) { signal in
-            Text("• \(signal)")
-              .font(.system(size: 9, weight: .medium))
-              .foregroundStyle(DashboardColors.subtleText)
-          }
-          }
-        }
+      if let failure = snapshot?.syncState?.failureMessage {
+        Text(failure).font(.system(size: 12, weight: .medium)).foregroundStyle(.orange)
       }
-
-      if let sync = snapshot.syncState {
-        VStack(alignment: .leading, spacing: 3) {
-          HStack(spacing: 10) {
-            Label(sync.statusLabel, systemImage: sync.isStale ? "exclamationmark.triangle.fill" : "network")
-              .foregroundStyle(sync.isStale ? .orange : DashboardColors.subtleText)
-            if let checked = sync.lastAttemptAt {
-              Text("本次检查 \(radarUpdateTime(checked))")
-            }
-            if let source = sync.feedUpdatedAt {
-              Text("Tibo 源 \(radarUpdateTime(source))")
-            }
-          }
-          HStack(spacing: 10) {
-            if let evaluated = snapshot.localResetEstimate?.evaluatedAt {
-              Text("概率评估 \(radarUpdateTime(evaluated))")
-            }
-            if let evidence = snapshot.localResetEstimate?.evidenceUpdatedAt {
-              Text("有效证据 \(radarUpdateTime(evidence))")
-            } else {
-              Text("当前无有效硬重置证据")
-            }
-          }
-          if let failure = sync.failureMessage {
-            Text(failure)
-              .foregroundStyle(.orange)
-              .fixedSize(horizontal: false, vertical: true)
-          }
-        }
-        .font(.system(size: 9, weight: .medium, design: .rounded))
-        .foregroundStyle(DashboardColors.subtleText)
-      }
-
-      HStack(spacing: 12) {
-        if snapshot.localResetEstimate == nil,
-           let probability48h = snapshot.prediction?.probability48h {
-          Text("48h  \(Int((min(1, max(0, probability48h)) * 100).rounded()))%")
-        }
-        if snapshot.windowOpen == true || snapshot.window?.open == true {
-          Label("窗口已开", systemImage: "bolt.fill")
-            .foregroundStyle(.green)
-        }
-        Spacer()
-        if let judgement = snapshot.publicJudgement,
-           snapshot.publicJudgementIsNewer {
-          Label("最新研判", systemImage: "sparkles")
-            .foregroundStyle(.green)
-          Text(judgement.updatedAt.formatted(.dateTime.month().day().hour().minute()))
-        } else if let updated = snapshot.probabilityUpdate ?? snapshot.latestUpdate {
-          Text("最新更新 \(radarUpdateTime(updated))")
-        }
-      }
-      .font(.system(size: 10, weight: .semibold, design: .rounded))
-      .foregroundStyle(DashboardColors.subtleText)
     }
+    .padding(13)
+    .background(color.opacity(0.10), in: RoundedRectangle(cornerRadius: 12))
+    .accessibilityElement(children: .combine)
   }
 
   private var unavailableOverview: some View {
@@ -279,14 +258,11 @@ struct CodexRadarView: View {
       ForEach(displayPosts(from: posts)) { post in
         VStack(alignment: .leading, spacing: 5) {
           HStack(spacing: 7) {
-            Text(post.kindLabel)
+            Text(post.isReply ? "回复" : "动态")
               .font(.system(size: 9, weight: .bold, design: .rounded))
               .padding(.horizontal, 7)
               .padding(.vertical, 3)
               .background(palette.weekly.opacity(0.12), in: Capsule())
-            Text(post.relevanceLabel)
-              .font(.system(size: 9, weight: .bold))
-              .foregroundStyle(relevanceTint(post.relevance))
             Spacer()
             if let date = post.publishedAt {
               Text(radarUpdateTime(date))
@@ -309,13 +285,7 @@ struct CodexRadarView: View {
               .foregroundStyle(DashboardColors.subtleText)
               .textSelection(.enabled)
           }
-          if let analysis = post.analysisZh, analysis.isEmpty == false {
-            Text(analysis)
-              .font(.system(size: 9, weight: .medium))
-              .foregroundStyle(DashboardColors.subtleText)
-              .lineSpacing(2)
-              .lineLimit(2)
-          }
+
         }
         .padding(10)
         .background(DashboardColors.faintFill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -350,11 +320,10 @@ struct CodexRadarView: View {
     presence: CodexRadarTiboPresence?
   ) -> some View {
     let latest = snapshot?.tiboFeed?.posts.first
-    let activity = latest?.displayTextZh ?? presence?.latestActivityZh
+    let activity = latest?.displayTextZh
     let usesPublicJudgement = activity == nil
-    let fallback = snapshot?.publicJudgement?.summary ?? snapshot?.latestSummary
-    let activityDate = latest?.publishedAt ?? presence?.latestActivityAt
-      ?? snapshot?.publicJudgement?.updatedAt
+    let fallback = snapshot?.tiboStatusSummary
+    let activityDate = latest?.publishedAt
     VStack(alignment: .leading, spacing: 7) {
       HStack {
         Text(usesPublicJudgement || activity == nil ? "最新研判" : "最新动态")
@@ -372,69 +341,6 @@ struct CodexRadarView: View {
         .foregroundStyle(DashboardColors.text.opacity(0.90))
         .lineSpacing(3)
         .lineLimit(3)
-    }
-  }
-
-  private func radarGraphic(_ snapshot: CodexRadarSnapshot?) -> some View {
-    let rawProbability = snapshot?.displayProbability24h
-    let probability = min(1, max(0, rawProbability ?? 0))
-    let tint = probabilityTint(snapshot?.localResetEstimate?.level ?? snapshot?.prediction?.level)
-    return ZStack {
-      ForEach([0.28, 0.52, 0.76, 1.0], id: \.self) { scale in
-        Circle()
-          .stroke(tint.opacity(0.28), lineWidth: 1)
-          .scaleEffect(scale)
-      }
-      Rectangle().fill(tint.opacity(0.22)).frame(width: 1)
-      Rectangle().fill(tint.opacity(0.22)).frame(height: 1)
-      if rawProbability != nil {
-        Circle()
-          .trim(from: 0, to: probability)
-          .stroke(tint.opacity(0.48), style: StrokeStyle(lineWidth: 22, lineCap: .butt))
-          .rotationEffect(.degrees(-90))
-          .scaleEffect(0.78)
-        Circle()
-          .fill(tint)
-          .frame(width: 8, height: 8)
-          .offset(y: -64)
-          .rotationEffect(.degrees(probability * 360))
-          .shadow(color: tint.opacity(0.70), radius: 5)
-      }
-      VStack(spacing: 1) {
-        Text(rawProbability == nil ? "--" : "\(Int((probability * 100).rounded()))%")
-          .font(.system(size: 25, weight: .heavy, design: .rounded))
-          .monospacedDigit()
-        Text("24H")
-          .font(.system(size: 9, weight: .bold, design: .rounded))
-          .foregroundStyle(DashboardColors.subtleText)
-      }
-      .foregroundStyle(tint)
-    }
-    .accessibilityElement(children: .ignore)
-    .accessibilityLabel("Codex 24 小时全局硬重置概率")
-    .accessibilityValue(rawProbability == nil ? "等待数据" : "\(Int((probability * 100).rounded()))%")
-  }
-
-  private func probabilityText(_ percent: Int?, tint: Color) -> some View {
-    HStack(alignment: .lastTextBaseline, spacing: 2) {
-      Text(percent.map(String.init) ?? "--")
-        .font(.system(size: 45, weight: .heavy, design: .rounded))
-      if percent != nil {
-        Text("%")
-          .font(.system(size: 20, weight: .heavy, design: .rounded))
-      }
-    }
-    .foregroundStyle(tint)
-    .monospacedDigit()
-  }
-
-  private func probabilityTint(_ level: String?) -> Color {
-    switch level?.lowercased() {
-    case "very_high", "high": palette.weekly
-    case "medium_high", "medium": .orange
-    case "medium_low": .yellow
-    case "low", "very_low": palette.usage24h
-    default: palette.weekly
     }
   }
 
@@ -491,7 +397,7 @@ private struct TiboClockView: View {
         Text(weekdayFormatter.string(from: context.date))
           .font(.system(size: 13, weight: .bold))
           .foregroundStyle(DashboardColors.subtleText)
-        Text(hasRadarData ? period(context.date) : "等待雷达数据")
+        Text("当地时间 · 非在线状态")
           .font(.system(size: 12, weight: .bold))
           .foregroundStyle(tint)
           .padding(.horizontal, 8)
@@ -502,13 +408,5 @@ private struct TiboClockView: View {
     }
   }
 
-  private func period(_ date: Date) -> String {
-    switch calendar.component(.hour, from: date) {
-    case 0..<7: "可能睡眠"
-    case 7..<9: "清晨"
-    case 9..<18: "工作时段"
-    case 18..<23: "晚间"
-    default: "可能休息"
-    }
-  }
+
 }

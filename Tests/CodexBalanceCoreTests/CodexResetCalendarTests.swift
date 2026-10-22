@@ -136,7 +136,7 @@ struct CodexResetCalendarTests {
     let service = CodexRadarService(fetcher: { radar }, publicPageFetcher: { page }, now: { self.now },
       historyURL: folder.appendingPathComponent("old-history.json"))
     let snapshot = try await service.current(force: true)
-    #expect(snapshot.tiboFeed?.posts.isEmpty == false)
+    #expect(snapshot.tiboFeed?.posts.isEmpty == true) // October 7 statuses are outside seven-day retention.
     #expect(snapshot.syncState?.lastSuccessAt != nil)
     #expect(snapshot.resetCalendar?.failureMessage != nil)
   }

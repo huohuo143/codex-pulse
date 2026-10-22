@@ -195,7 +195,9 @@ enum CodexRadarResetScorer {
     let hasContextualResetTiming = contextualFactor > 0
     let hasDeferredNextCycleSignal = deferredFactor > 0
     let hasExplicitReset = explicitFactor > 0
-    let hasBankedReset = semantics.contains(where: \.hasBankedReset)
+    let hasBankedReset = semantics.contains {
+      $0.hasBankedReset && rollingLifetime(for: $0.post, now: now).factor > 0
+    }
     let hasStandaloneSignal = resetSupportingSemantics.contains {
       $0.strongestActiveFactor > 0 && $0.post.isReply == false
     }
@@ -276,7 +278,7 @@ enum CodexRadarResetScorer {
     if hasCombinationSignal {
       statusText = "上次重置后，Tibo 状态形成“发布预告 + 低成本/高供给”的组合强信号，但仍未明确承诺额度重置。"
     } else if hasExplicitReset {
-      statusText = "上次重置后出现明确的额度重置措辞，建议打开原帖核对官方语境。"
+      statusText = "上次重置后出现明确的重置预告或额度重置措辞；实际完成待确认，请查看原帖语境。"
     } else if hasDeferredNextCycleSignal {
       statusText = "Tibo 确认本轮按钮已按下，同时将另一场庆祝延期至明天，构成跨重置周期的下一轮强信号，但仍未明确承诺再次全局重置。"
     } else if hasContextualResetTiming {
@@ -285,8 +287,10 @@ enum CodexRadarResetScorer {
       statusText = "上次重置后的动态涉及发布或用量语境，但未出现新的重置承诺。"
     } else if hasBankedReset {
       statusText = "Tibo 已明确宣布发放 BANKED reset，但这是可储存权益，不等于全局硬重置；当前没有新的硬重置信号。"
+    } else if percent == 0 {
+      statusText = "当前未识别到有效时间窗内的重置信号；0% 是规则计分，不代表不会发生重置。"
     } else {
-      statusText = "上次重置后尚未出现新的重置信号。"
+      statusText = "当前评分来自公开重置窗口状态；Tibo 动态未提供额外有效信号，实际完成待确认。"
     }
     let summary = "\(page.judgement.summary) \(statusText)"
 
@@ -331,6 +335,7 @@ enum CodexRadarResetScorer {
       || text.contains("更多容量")
       || text.contains("高供给")
     let hasBankedReset = text.contains("banked reset")
+      || text.contains("banked usage reset")
       || text.contains("banked my friend")
       || text.contains("可储存的重置")
       || text.contains("可存起来的重置")
@@ -354,7 +359,8 @@ enum CodexRadarResetScorer {
       && hasResetButtonMetaphor
       && hasDeferredNextCycleSignal == false
     let hasExplicitReset = hasBankedReset == false && (
-      text.contains("usage reset")
+      isResetDayAnnouncement(post.originalText)
+        || text.contains("usage reset")
         || text.contains("reset usage")
         || text.contains("reset the limit")
         || text.contains("hard reset")
@@ -385,6 +391,19 @@ enum CodexRadarResetScorer {
       deferredLifetime: hasDeferredNextCycleSignal ? timingLifetime : inactiveLifetime,
       explicitLifetime: hasExplicitReset ? timingLifetime : inactiveLifetime
     )
+  }
+
+  // Match an affirmative announcement, not a question, a wish, or an
+  // editorial translation. A timing-only reply needs verified thread context
+  // and must not acquire reset meaning merely by appearing next to a post.
+  private static func isResetDayAnnouncement(_ original: String) -> Bool {
+    let text = original.lowercased().replacingOccurrences(of: "’", with: "'")
+    let affirmative = #"\b(?:it's|it is|today is)\s+(?:a\s+)?reset day\b"#
+    let negated = #"\b(?:not|never|isn't|won't|don't)\b[^.!?]{0,60}\breset day\b"#
+    let question = #"\breset day\b[^.!?]*\?"#
+    return text.range(of: affirmative, options: .regularExpression) != nil
+      && text.range(of: negated, options: .regularExpression) == nil
+      && text.range(of: question, options: .regularExpression) == nil
   }
 
   private static let inactiveLifetime = Lifetime(factor: 0, validUntil: nil)

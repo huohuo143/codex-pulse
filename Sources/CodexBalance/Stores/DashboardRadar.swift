@@ -12,7 +12,7 @@ extension DashboardStore {
     guard codexRadarRefreshGate.request(force: force) else { return }
     recordRuntimeEvent("radar-request")
     codexRadarIsLoading = true
-    codexRadarStatusMessage = "正在同步 Tibo 动态、站长推荐与智力效率…"
+    codexRadarStatusMessage = "正在检查 Tibo 发帖与回复，并由 GPT-6 Astra · High 分析…"
     let service = codexRadarService
     Task {
       do {
@@ -42,7 +42,6 @@ extension DashboardStore {
       )
       updateCodexRadarStatusMessage(snapshot)
       if servicesEnabled {
-        archiveRadarEvaluation(snapshot)
         writeWidgetSnapshotFile()
       }
     }
@@ -59,7 +58,6 @@ extension DashboardStore {
     )
     updateCodexRadarStatusMessage(snapshot)
     if servicesEnabled {
-      archiveRadarEvaluation(snapshot)
       writeWidgetSnapshotFile()
     }
 
@@ -70,7 +68,11 @@ extension DashboardStore {
     } else {
       codexRadarRetryTask?.cancel()
       codexRadarRetryTask = nil
-      codexRadarNextSyncAt = codexRadarRefreshTimer?.fireDate ?? Date().addingTimeInterval(CodexRadarService.refreshInterval)
+      codexRadarNextSyncAt = snapshot.syncState?.lastAttemptAt?.addingTimeInterval(CodexRadarService.refreshInterval)
+        ?? Date().addingTimeInterval(CodexRadarService.refreshInterval)
+      if let next = codexRadarNextSyncAt {
+        codexRadarRefreshTimer?.fireDate = max(next, Date().addingTimeInterval(1))
+      }
     }
   }
 

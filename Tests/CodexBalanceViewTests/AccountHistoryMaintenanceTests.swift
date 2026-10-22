@@ -5,7 +5,7 @@ import CodexBalanceCore
 
 @Suite("Account history maintenance")
 struct AccountHistoryMaintenanceTests {
-  @MainActor @Test func healthAndBackupFollowCurrentAccountHistory() throws {
+  @MainActor @Test func healthAndBackupFollowCurrentAccountHistory() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
     let historyURL = root.appendingPathComponent("quota-history-qa-account.json")
@@ -17,10 +17,10 @@ struct AccountHistoryMaintenanceTests {
     store.quotaHistoryStore = history
     let backupRoot = root.appendingPathComponent("archive")
     let archive = LocalAutomationArchive(root: backupRoot)
-    #expect(!store.shouldPerformAutomaticBackup(now: now, archive: archive))
+    #expect(!store.canRunAutomaticBackup)
     store.runReliabilityCheck(allowAutomation: false)
     #expect(store.reliabilitySnapshot.checks.first { $0.id == .quotaHistory }?.level == .healthy)
-    store.performLocalBackup(manual: false, now: now, archive: archive)
+    await store.performLocalBackup(manual: false, now: now, archive: archive)
     let enumerator = try #require(FileManager.default.enumerator(at: backupRoot, includingPropertiesForKeys: nil))
     let copied = try #require(enumerator.allObjects.compactMap { $0 as? URL }.first { $0.lastPathComponent == historyURL.lastPathComponent })
     #expect(try Data(contentsOf: copied) == Data(contentsOf: historyURL))

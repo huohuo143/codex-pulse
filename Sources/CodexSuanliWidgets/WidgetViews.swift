@@ -5,6 +5,7 @@ import SwiftUI
 import WidgetKit
 
 struct CodexOverviewWidgetView: View {
+  @Environment(\.widgetRenderingMode) private var renderingMode
   let entry: CodexWidgetEntry
   @Environment(\.widgetFamily) private var systemFamily
   @Environment(\.codexWidgetFamilyOverride) private var familyOverride
@@ -22,16 +23,28 @@ struct CodexOverviewWidgetView: View {
             tint: CodexWidgetTheme.usage
           )
           KeyValueRow(
-            title: "重置概率",
-            value: entry.snapshot.resetProbability24h.map { "\($0)%" } ?? "--",
-            tint: radarTint(entry.snapshot.resetProbability24h)
+            title: "重置预告",
+            value: announcementTitle(entry.snapshot),
+            tint: (entry.snapshot.radarAnnouncementActive == true || entry.snapshot.radarCompletionUntil != nil) ? (renderingMode == .fullColor ? .black : .primary) : radarTint(entry.snapshot.resetProbability24h)
           )
+          .padding(5)
+          .background(renderingMode != .fullColor ? Color.clear : (entry.snapshot.radarAnnouncementActive == true ? Color.orange : (entry.snapshot.radarCompletionUntil != nil ? Color.green : Color.clear)), in: RoundedRectangle(cornerRadius: 6))
+          if let until = entry.snapshot.radarCompletionUntil, entry.date < until {
+            HStack {
+              Text("展示剩余")
+              Text(timerInterval: entry.date...until, countsDown: true).monospacedDigit()
+            }.font(.system(size: 12, weight: .heavy))
+          }
           KeyValueRow(
             title: "Full reset",
             value: entry.snapshot.resetCreditsAvailable.map { "\($0) 次" } ?? "--",
             tint: CodexWidgetTheme.credit
           )
-          ResetText(snapshot: entry.snapshot)
+          if entry.snapshot.radarDeadlineAt != nil {
+            RadarDeadline(entry: entry)
+          } else {
+            ResetText(snapshot: entry.snapshot)
+          }
         }
       }
       if family == .systemLarge {
@@ -101,56 +114,85 @@ struct RadarWidgetView: View {
   @Environment(\.codexWidgetFamilyOverride) private var familyOverride
   private var family: WidgetFamily { familyOverride ?? systemFamily }
 
-  private var probabilityText: String {
-    entry.snapshot.resetProbability24h.map { "\($0)%" } ?? "--"
-  }
-
   var body: some View {
-    Group {
+    VStack(alignment: .leading, spacing: 6) {
+      WidgetHeader(title: "Tibo 重置预告", symbol: "scope", tint: CodexWidgetTheme.radar)
       if family == .systemSmall {
-        VStack(alignment: .leading, spacing: 8) {
-          WidgetHeader(title: "重置雷达", symbol: "scope", tint: CodexWidgetTheme.radar)
-          Spacer(minLength: 0)
-          Text(probabilityText)
-            .font(.system(size: 42, weight: .heavy, design: .rounded))
-            .foregroundStyle(radarTint(entry.snapshot.resetProbability24h))
-            .monospacedDigit()
-          Text(entry.snapshot.radarLevel ?? "等待公开研判")
-            .font(.system(size: 11, weight: .bold))
-            .foregroundStyle(CodexWidgetTheme.text)
-            .lineLimit(1)
-          RadarAttribution(snapshot: entry.snapshot)
-        }
+        RadarAttentionCard(entry: entry, compact: true)
+        RadarAttribution(snapshot: entry.snapshot)
       } else {
-        HStack(spacing: 16) {
-          ZStack {
-            Circle().stroke(CodexWidgetTheme.track, lineWidth: 10)
-            Circle()
-              .trim(from: 0, to: max(0.01, CGFloat(entry.snapshot.resetProbability24h ?? 0) / 100))
-              .stroke(radarTint(entry.snapshot.resetProbability24h), style: StrokeStyle(lineWidth: 10, lineCap: .round))
-              .rotationEffect(.degrees(-90))
-            Text(probabilityText)
-              .font(.system(size: 28, weight: .heavy, design: .rounded))
-              .foregroundStyle(radarTint(entry.snapshot.resetProbability24h))
-              .monospacedDigit()
-          }
-          .frame(width: 96, height: 96)
-          VStack(alignment: .leading, spacing: 7) {
-            WidgetHeader(title: "Codex 24h 重置雷达", symbol: "scope", tint: CodexWidgetTheme.radar)
-            Text(entry.snapshot.radarLevel ?? "等待公开研判")
-              .font(.system(size: 13, weight: .heavy))
-              .foregroundStyle(CodexWidgetTheme.text)
-            Text(entry.snapshot.radarSummary ?? "打开 Codex 脉动同步公开雷达数据。")
-              .font(.system(size: 10.5, weight: .medium))
-              .foregroundStyle(CodexWidgetTheme.subtle)
-              .lineLimit(3)
+        HStack(spacing: 12) {
+          RadarAttentionCard(entry: entry, compact: false)
+          VStack(alignment: .leading, spacing: 8) {
             RadarAttribution(snapshot: entry.snapshot)
+            Text("每 10 分钟检查")
+              .font(.system(size: 10, weight: .bold))
+              .foregroundStyle(CodexWidgetTheme.subtle)
           }
         }
       }
     }
-    .padding(14)
+    .padding(12)
     .codexWidgetBackground()
+  }
+}
+
+private struct RadarAttentionCard: View {
+  @Environment(\.widgetRenderingMode) private var renderingMode
+  let entry: CodexWidgetEntry
+  let compact: Bool
+  private var announced: Bool { entry.snapshot.radarAnnouncementActive == true }
+  private var completed: Bool { entry.snapshot.radarCompletionUntil.map { entry.date < $0 } == true }
+  var body: some View {
+    let active = announced || completed
+    VStack(alignment: .leading, spacing: 3) {
+      HStack(spacing: 4) {
+        Image(systemName: announced ? "megaphone.fill" : (completed ? "checkmark.seal.fill" : "scope"))
+          .font(.system(size: compact ? 12 : 15, weight: .heavy))
+        Text(announcementTitle(entry.snapshot))
+          .font(.system(size: compact ? 20 : 24, weight: .black, design: .rounded))
+          .lineLimit(1).minimumScaleFactor(0.65)
+      }
+      if let until = entry.snapshot.radarCompletionUntil, entry.date < until {
+        Text("展示剩余 · 新预告优先").font(.system(size: 9, weight: .bold))
+        Text(timerInterval: entry.date...until, countsDown: true)
+          .font(.system(size: compact ? 20 : 25, weight: .heavy, design: .rounded))
+          .monospacedDigit()
+      } else if let deadline = entry.snapshot.radarDeadlineAt {
+        Text(deadline <= entry.date ? "期限已过 · 到账待确认" : "最晚到账 · 北京时间")
+          .font(.system(size: 9, weight: .bold))
+        Text(BalanceFormatters.beijingDeadline(deadline, compact: true))
+          .font(.system(size: compact ? 22 : 27, weight: .heavy, design: .rounded)).monospacedDigit()
+          .lineLimit(1).minimumScaleFactor(0.75)
+      } else {
+        Text(announced ? "待到账 · 尚无明确期限" : "等待新一轮动态")
+          .font(.system(size: 10, weight: .bold)).lineLimit(1).minimumScaleFactor(0.8)
+      }
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(8)
+    .foregroundStyle(renderingMode != .fullColor ? Color.primary : (active ? Color.black : CodexWidgetTheme.text))
+    .background(renderingMode != .fullColor ? Color.clear : (active ? (announced ? Color.orange : Color.green) : CodexWidgetTheme.track),
+      in: RoundedRectangle(cornerRadius: 10))
+  }
+}
+
+private struct RadarDeadline: View {
+  let entry: CodexWidgetEntry
+  var body: some View {
+    if let deadline = entry.snapshot.radarDeadlineAt {
+      VStack(alignment: .leading, spacing: 2) {
+        Text(deadline <= entry.date ? "期限已过 · 到账待确认" : "最晚到账 · 北京时间")
+          .font(.system(size: 9, weight: .bold))
+        Text(BalanceFormatters.beijingDeadline(deadline, compact: true))
+          .font(.system(size: 21, weight: .heavy, design: .rounded))
+          .monospacedDigit()
+      }
+      .foregroundStyle(deadline <= entry.date ? Color.orange : CodexWidgetTheme.radar)
+      .lineLimit(1).minimumScaleFactor(0.8)
+      .accessibilityElement(children: .combine)
+      .accessibilityLabel("最晚到账北京时间 \(BalanceFormatters.beijingDeadline(deadline))，实际到账待确认")
+    }
   }
 }
 
@@ -240,6 +282,7 @@ struct TokenTrendWidgetView: View {
         Spacer()
         Text((entry.snapshot.usageState(at: entry.date).canDisplayValue ? BalanceFormatters.compactNumber(entry.snapshot.rolling24HoursTokens) : "--"))
           .font(.system(size: 17, weight: .heavy, design: .rounded))
+              .lineLimit(2).multilineTextAlignment(.center).padding(8)
           .foregroundStyle(CodexWidgetTheme.usage)
       }
       UsageBars(points: entry.snapshot.hourly24, tint: CodexWidgetTheme.usage, labelStride: 4)
@@ -476,30 +519,21 @@ private struct RadarAttribution: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 2) {
       HStack(spacing: 4) {
-        Image(systemName: snapshot.radarIsStale == true
-          ? "exclamationmark.triangle.fill"
-          : "dot.radiowaves.left.and.right")
-        Text(snapshot.radarSyncStatus ?? "公开源")
+        Image(systemName: snapshot.radarSyncStatus == "刷新正常" && snapshot.radarIsStale != true
+          ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+          .foregroundStyle(snapshot.radarSyncStatus == "刷新正常" && snapshot.radarIsStale != true ? Color.green : Color.orange)
+        Text(snapshot.radarSyncStatus ?? "等待刷新")
       }
-      .font(.system(size: 8.5, weight: .semibold))
-
+      .font(.system(size: 10, weight: .semibold))
       HStack(spacing: 3) {
-        if let checkedAt = snapshot.radarCheckedAt {
-          Text("检")
+        Text("刷新")
+        if let checkedAt = snapshot.radarLastSuccessAt {
           Text(checkedAt, format: .dateTime.hour().minute())
-        }
-        if let sourceAt = snapshot.radarSourceUpdatedAt {
-          Text("· 源")
-          Text(sourceAt, format: .dateTime.hour().minute())
-        }
-        if let evaluatedAt = snapshot.radarEvaluatedAt ?? snapshot.radarUpdatedAt {
-          Text("· 评")
-          Text(evaluatedAt, format: .dateTime.hour().minute())
-        }
+        } else { Text("--:--") }
       }
-      .font(.system(size: 7.5, weight: .medium))
+      .font(.system(size: 13, weight: .bold))
       .monospacedDigit()
-      .minimumScaleFactor(0.65)
+      .minimumScaleFactor(0.8)
     }
     .foregroundStyle(snapshot.radarIsStale == true ? Color.orange : CodexWidgetTheme.subtle)
     .lineLimit(1)
@@ -650,4 +684,9 @@ private func currencyText(_ usd: Double, cnyRate: Double?, coverage: Double? = n
   let usdText = String(format: "$%.2f", usd) + (includeCoverage && coverage < 100 ? " · 计价\(Int(coverage.rounded()))%" : "")
   guard let cnyRate else { return usdText }
   return "\(usdText) · ¥\(String(format: "%.0f", usd * cnyRate))"
+}
+
+private func announcementTitle(_ snapshot: CodexWidgetSnapshot) -> String {
+  guard snapshot.resetProbability24h == nil else { return "等待分析" }
+  return snapshot.radarLevel ?? "等待动态"
 }

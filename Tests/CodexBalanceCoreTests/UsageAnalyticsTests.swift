@@ -69,7 +69,7 @@ struct UsageAnalyticsTests {
   }
 
   @Test
-  func budgetStoreRoundTripsAndQuarantinesCorruption() throws {
+  func budgetStoreRoundTripsAndRetainsCorruption() throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     defer { try? FileManager.default.removeItem(at: root) }
     let url = root.appendingPathComponent("budgets.json")
@@ -86,8 +86,8 @@ struct UsageAnalyticsTests {
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
     try Data("not-json".utf8).write(to: url)
     #expect(store.load().isEmpty)
-    let quarantined = try FileManager.default.contentsOfDirectory(atPath: root.path)
-    #expect(quarantined.contains { $0.contains("corrupt-") })
+    #expect(try Data(contentsOf: url) == Data("not-json".utf8))
+    #expect(store.loadResult().issue == .invalidRecord)
   }
 
   private var utcCalendar: Calendar {

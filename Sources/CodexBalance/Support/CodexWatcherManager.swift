@@ -19,8 +19,17 @@ enum CodexWatcherManager {
       .appendingPathComponent("Library/LaunchAgents/\(label).plist")
   }
 
-  static func isEnabled() -> Bool {
+  private static var isConfigured: Bool {
     FileManager.default.fileExists(atPath: plistURL.path)
+  }
+
+  private static var service: CodexWatcherService {
+    CodexWatcherService(domain: "gui/\(getuid())", label: label,
+      plistPath: plistURL.path, run: runLaunchctl)
+  }
+
+  static func isEnabled() -> Bool {
+    isConfigured && service.isLoaded
   }
 
   static func setEnabled(_ enabled: Bool, appURL: URL) throws {
@@ -32,8 +41,11 @@ enum CodexWatcherManager {
   }
 
   static func refreshIfEnabled(appURL: URL) throws {
-    guard isEnabled(), isInstalledAppLocation(appURL) else { return }
+    // A saved configuration is the user's intent, not proof of registration.
+    // Repair a missing job even when its script already matches this version.
+    guard isConfigured, isInstalledAppLocation(appURL) else { return }
     if isCurrentInstallation(appURL: appURL) {
+      try service.load()
       return
     }
     try install(appURL: appURL)
@@ -68,12 +80,13 @@ enum CodexWatcherManager {
     let plist = launchAgentPlist(scriptPath: scriptURL.path)
     try plist.write(to: plistURL, atomically: true, encoding: .utf8)
 
-    _ = runLaunchctl(arguments: ["bootout", "gui/\(getuid())", plistURL.path])
-    _ = runLaunchctl(arguments: ["bootstrap", "gui/\(getuid())", plistURL.path])
+    try service.unload()
+    try service.load()
   }
 
   private static func uninstall() throws {
-    _ = runLaunchctl(arguments: ["bootout", "gui/\(getuid())", plistURL.path])
+    // Keep the configuration if the service could not actually be stopped.
+    try service.unload()
     let fileManager = FileManager.default
     if fileManager.fileExists(atPath: plistURL.path) {
       try fileManager.removeItem(at: plistURL)
@@ -178,19 +191,26 @@ enum CodexWatcherManager {
     """
   }
 
-  private static func runLaunchctl(arguments: [String]) -> Int32 {
+  private static func runLaunchctl(arguments: [String]) -> CodexWatcherService.CommandResult {
     let process = Process()
     process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
     process.arguments = arguments
-    process.standardOutput = Pipe()
-    process.standardError = Pipe()
+    let output = Pipe()
+    process.standardOutput = output
+    process.standardError = FileHandle.nullDevice
 
     do {
       try process.run()
+      // Drain before waiting; keep only the bounded prefix that includes the
+      // service state, even if an inherited environment makes print very large.
+      var prefix = Data()
+      while let chunk = try output.fileHandleForReading.read(upToCount: 8192), !chunk.isEmpty {
+        if prefix.count < 65536 { prefix.append(chunk.prefix(65536 - prefix.count)) }
+      }
       process.waitUntilExit()
-      return process.terminationStatus
+      return .init(status: process.terminationStatus, output: String(decoding: prefix, as: UTF8.self))
     } catch {
-      return -1
+      return .init(status: -1)
     }
   }
 
@@ -223,5 +243,80 @@ enum CodexWatcherManager {
       .replacingOccurrences(of: "\"", with: "&quot;")
       .replacingOccurrences(of: "<", with: "&lt;")
       .replacingOccurrences(of: ">", with: "&gt;")
+  }
+}
+
+/// The launchd registration lifecycle, separated from file installation so its
+/// failure paths can be exercised without touching the user's real service.
+struct CodexWatcherService {
+  let domain: String
+  let label: String
+  let plistPath: String
+  let run: ([String]) -> CommandResult
+  var pause: (TimeInterval) -> Void = { Thread.sleep(forTimeInterval: $0) }
+
+  private var target: String { "\(domain)/\(label)" }
+  var isLoaded: Bool { run(["print", target]).isRegistered }
+
+  func load() throws {
+    var lastFailure: Int32 = -1
+    var attempts = 0
+    for poll in 0..<21 {
+      let inspection = run(["print", target])
+      if inspection.isRegistered { return }
+      if !inspection.isStopping {
+        guard attempts < 3 else { break }
+        let bootstrap = run(["bootstrap", domain, plistPath])
+        attempts += 1
+        let after = run(["print", target])
+        if after.isRegistered { return }
+        lastFailure = bootstrap.status == 0 ? after.status : bootstrap.status
+        if attempts == 3, !after.isStopping { break }
+      }
+      if poll < 20 { pause(0.5) }
+    }
+    throw RegistrationError(action: "开启", status: lastFailure)
+  }
+
+  func unload() throws {
+    let initial = run(["print", target])
+    // launchctl print returns 113 for an unknown service. An execution or
+    // permission failure must not authorize deleting a live configuration.
+    if initial.status == 113 { return }
+    guard initial.status == 0 else {
+      throw RegistrationError(action: "关闭", status: initial.status)
+    }
+    let bootoutStatus = initial.isStopping ? 0 : run(["bootout", target]).status
+    for attempt in 0..<21 {
+      let registrationStatus = run(["print", target])
+      if registrationStatus.status == 113 { return }
+      guard registrationStatus.status == 0 else {
+        throw RegistrationError(action: "关闭", status: registrationStatus.status)
+      }
+      if attempt < 20 { pause(0.5) }
+    }
+    throw RegistrationError(action: "关闭", status: bootoutStatus)
+  }
+
+  struct CommandResult {
+    var status: Int32
+    var output: String = ""
+
+    var isStopping: Bool {
+      output.split(separator: "\n").contains { line in
+        let state = line.trimmingCharacters(in: .whitespaces)
+        return state == "state = SIGTERMed" || state == "state = SIGKILLed" || state == "state = exiting"
+      }
+    }
+    var isRegistered: Bool { status == 0 && !isStopping }
+  }
+
+  struct RegistrationError: LocalizedError, Equatable {
+    let action: String
+    let status: Int32
+
+    var errorDescription: String? {
+      "自动启动服务未能\(action)，请稍后重试。"
+    }
   }
 }

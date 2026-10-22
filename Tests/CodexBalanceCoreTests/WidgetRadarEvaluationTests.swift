@@ -18,7 +18,7 @@ struct WidgetRadarEvaluationTests {
     #expect(waiting.radarLevel == "等待数据")
     #expect(waiting.radarSyncStatus == "等待数据·自动重连中")
     value.radarLastSuccessAt = now.addingTimeInterval(-91 * 60)
-    #expect(value.effective(at: now).radarLevel == "数据过期")
+    #expect(value.effective(at: now).radarLevel == "动态已过期")
   }
 
   @Test func contentChangesOnlyReloadRelatedKinds() {

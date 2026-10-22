@@ -2,8 +2,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VERSION="${VERSION:-2.12.5}"
-BUILD_NUMBER="${BUILD_NUMBER:-2131}"
+VERSION="${VERSION:-2.12.25}"
+BUILD_NUMBER="${BUILD_NUMBER:-2152}"
 ARCH="${ARCH:-$(uname -m)}"
 BUNDLE_ID="${CODEX_PULSE_BUNDLE_ID:-dev.codex.balance-dashboard.codex}"
 APP_BUNDLE="${1:-$ROOT_DIR/dist/build-v$VERSION-build$BUILD_NUMBER-$ARCH/Codex 脉动.app}"
@@ -37,6 +37,11 @@ require_file "$WIDGET_BINARY"
 require_file "$WIDGET_SOURCE"
 require_file "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
 require_file "$WIDGET_BUNDLE/Contents/Resources/AppIcon.icns"
+for bundle in "$APP_BUNDLE" "$WIDGET_BUNDLE"; do
+  require_file "$bundle/Contents/Resources/Zstandard-LICENSE.txt"
+  /usr/bin/cmp -s "$ROOT_DIR/Sources/CodexBalanceCore/Resources/Zstandard-LICENSE.txt" \
+    "$bundle/Contents/Resources/Zstandard-LICENSE.txt" || fail "Zstandard license mismatch"
+done
 
 /usr/bin/plutil -lint "$APP_INFO" "$WIDGET_INFO" >/dev/null
 /usr/bin/codesign --verify --deep --strict "$APP_BUNDLE"

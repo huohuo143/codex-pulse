@@ -3,6 +3,19 @@ import SwiftUI
 
 struct CompactDashboardView: View {
   @EnvironmentObject private var store: DashboardStore
+  var body: some View {
+    TimelineView(.periodic(from: .now, by: store.codexRadarSnapshot?.tiboCompletionUntil(at: Date()) == nil ? 30 : 1)) { context in
+      CompactDashboardContent(refreshTick: context.date)
+    }
+  }
+}
+
+private struct CompactDashboardContent: View {
+  // The tick keeps expiry checks running while idle. EnvironmentObject updates
+  // can redraw this child between ticks, so judge new results against wall time.
+  let refreshTick: Date
+  private var now: Date { Date() }
+  @EnvironmentObject private var store: DashboardStore
   @Environment(\.dashboardAppearance) private var appearance
   @Environment(\.colorScheme) private var colorScheme
 
@@ -24,21 +37,16 @@ struct CompactDashboardView: View {
   private var primaryQuotaMetric: FloatingPanelMetric? { activeQuotaMetrics.first }
   private var secondaryQuotaMetric: FloatingPanelMetric? { activeQuotaMetrics.dropFirst().first }
   private var fiveHourTint: Color { .orange }
-  private var resetProbability: Int? { store.codexRadarSnapshot?.probability24hPercent }
-  private var resetProbabilityText: String { resetProbability.map { "\($0)%" } ?? "--" }
-  private var resetProbabilityTint: Color {
-    guard let resetProbability else { return DashboardColors.subtleText }
-    switch resetProbability {
-    case 70...: return store.palette.weekly
-    case 40...: return .orange
-    default: return store.palette.usage24h
-    }
-  }
+  private var resetProbabilityText: String { store.codexRadarSnapshot?.tiboStatusTitle(at: now) ?? "等待动态" }
+  private var resetProbabilityTint: Color { store.palette.weekly }
 
   var body: some View {
     ZStack(alignment: .topTrailing) {
-      compactContent
-        .allowsHitTesting(false)
+      VStack(spacing: 6) {
+        compactContent
+        if shows(.resetRadar) { radarAttentionBanner }
+      }
+      .allowsHitTesting(false)
 
       WindowDragSurface(help: "拖动 Codex 脉动窗口")
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -269,6 +277,7 @@ struct CompactDashboardView: View {
         }
         if shows(.resetRadar) {
           circleMetric("重置", resetProbabilityText, tint: resetProbabilityTint)
+          radarRefreshLabel(condensed: true)
         }
         if shows(.resetCredits) {
           circleMetric("Full reset", resetCreditsCountText, tint: store.palette.weekly)
@@ -307,13 +316,16 @@ struct CompactDashboardView: View {
         .font(.system(size: mini ? 8.5 : 10, weight: .bold, design: .rounded))
       }
       if shows(.resetRadar) {
+        VStack(alignment: .leading, spacing: 3) {
         HStack(spacing: 4) {
           Image(systemName: "scope")
-          Text("24h重置")
+          Text("重置预告")
           Spacer(minLength: 2)
-          Text(resetProbabilityText)
+          Text(resetProbabilityText).lineLimit(1).minimumScaleFactor(0.55)
             .foregroundStyle(resetProbabilityTint)
             .monospacedDigit()
+        }
+        radarRefreshLabel()
         }
         .font(.system(size: mini ? 8.5 : 10, weight: .bold, design: .rounded))
       }
@@ -419,7 +431,10 @@ struct CompactDashboardView: View {
         tint: store.palette.usage24h
       )
     case .resetRadar:
-      pillValue(title: "重置概率", value: resetProbabilityText, tint: resetProbabilityTint)
+      VStack(alignment: .leading, spacing: 3) {
+        pillValue(title: "重置预告", value: resetProbabilityText, tint: resetProbabilityTint)
+        radarRefreshLabel(condensed: true)
+      }
     case .resetCredits:
       pillValue(title: "Full reset", value: resetCreditsCountText, tint: store.palette.weekly)
     }
@@ -574,14 +589,17 @@ struct CompactDashboardView: View {
         .font(.system(size: mini ? 9 : 11, weight: .semibold))
       }
       if shows(.resetRadar) {
+        VStack(alignment: .leading, spacing: 3) {
         HStack {
-          Label("24h 重置概率", systemImage: "scope")
+          Label("重置预告", systemImage: "scope")
           Spacer()
-          Text(resetProbabilityText)
+          Text(resetProbabilityText).lineLimit(1).minimumScaleFactor(0.55)
             .foregroundStyle(resetProbabilityTint)
             .monospacedDigit()
         }
         .font(.system(size: mini ? 9 : 11, weight: .bold, design: .rounded))
+        radarRefreshLabel()
+        }
       }
       if shows(.resetCredits) {
         HStack {
@@ -630,8 +648,11 @@ struct CompactDashboardView: View {
       Text("24h \(BalanceFormatters.compactNumber(store.hasUsageData ? stats.rolling24HoursTokens : nil))")
         .foregroundStyle(store.palette.usage24h)
     case .resetRadar:
-      Text("重置 \(resetProbabilityText)")
-        .foregroundStyle(resetProbabilityTint)
+      VStack(alignment: .leading, spacing: 2) {
+        Text("重置 \(resetProbabilityText)")
+          .foregroundStyle(resetProbabilityTint)
+        radarRefreshLabel(condensed: true)
+      }
     case .resetCredits:
       Text("Reset \(resetCreditsCountText)")
         .foregroundStyle(store.palette.weekly)
@@ -694,24 +715,66 @@ struct CompactDashboardView: View {
     quotaWindow(metric).map { "\(Int($0.remainingPercent.rounded()))%" } ?? "--"
   }
 
+  private var radarCompletionUntil: Date? {
+    store.codexRadarSnapshot?.tiboCompletionUntil(at: now)
+  }
+  private var radarAnnounced: Bool {
+    store.codexRadarSnapshot?.tiboHasAnnouncement(at: now) == true
+  }
+  private var radarAttentionBanner: some View {
+    let active = radarAnnounced || radarCompletionUntil != nil
+    let tint: Color = radarAnnounced ? .orange : .green
+    return VStack(spacing: 3) {
+      Label(resetProbabilityText, systemImage: radarAnnounced ? "megaphone.fill" : (radarCompletionUntil != nil ? "checkmark.seal.fill" : "scope"))
+        .font(.system(size: mini ? 21 : 25, weight: .black, design: .rounded))
+        .lineLimit(1).minimumScaleFactor(0.75)
+      if let until = radarCompletionUntil {
+        HStack(spacing: 5) {
+          Text("展示剩余").font(.system(size: 11, weight: .bold))
+          Text(timerInterval: now...until, countsDown: true)
+            .font(.system(size: mini ? 19 : 22, weight: .heavy, design: .rounded))
+            .monospacedDigit().fixedSize()
+        }
+      } else if let deadline = radarDeadline {
+        Text("\(deadline <= now ? "期限已过" : "最晚到账") · 北京时间")
+          .font(.system(size: 10, weight: .bold))
+        Text(BalanceFormatters.beijingDeadline(deadline, compact: true))
+          .font(.system(size: mini ? 22 : 26, weight: .heavy, design: .rounded)).monospacedDigit()
+      } else {
+        Text(radarAnnounced ? "等待到账确认 · 尚无明确期限" : "每 10 分钟检查新预告")
+          .font(.system(size: mini ? 10 : 11, weight: .bold))
+      }
+    }
+    .frame(maxWidth: .infinity)
+    .frame(height: 76)
+    .foregroundStyle(active ? Color.black : DashboardColors.text)
+    .background(active ? tint : Color(nsColor: .windowBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
+    .overlay(RoundedRectangle(cornerRadius: 12).stroke(active ? tint.opacity(0.9) : Color.gray.opacity(0.3), lineWidth: 2))
+    .shadow(color: active ? tint.opacity(0.45) : .clear, radius: 7)
+    .accessibilityElement(children: .combine)
+  }
+
   private var resetRadarRow: some View {
+    VStack(alignment: .leading, spacing: 3) {
     HStack(spacing: mini ? 5 : 7) {
       Image(systemName: "scope")
-      Text("24h 重置概率")
+      Text("重置预告")
       Spacer(minLength: 4)
       if store.codexRadarIsLoading {
         ProgressView().controlSize(.mini)
       }
-      Text(resetProbabilityText)
+      Text(resetProbabilityText).lineLimit(1).minimumScaleFactor(0.55)
         .font(.system(size: mini ? 11 : 13, weight: .heavy, design: .rounded))
         .foregroundStyle(resetProbabilityTint)
         .monospacedDigit()
         .contentTransition(.numericText())
     }
+    radarRefreshLabel()
+    }
     .font(.system(size: mini ? 9 : 10.5, weight: .bold, design: .rounded))
     .foregroundStyle(DashboardColors.subtleText)
     .padding(.horizontal, mini ? 8 : 10)
-    .frame(height: mini ? 24 : 28)
+    .frame(height: mini ? 44 : 50)
     .background(
       RoundedRectangle(cornerRadius: mini ? 8 : 9, style: .continuous)
         .fill(resetProbabilityTint.opacity(0.10))
@@ -721,7 +784,50 @@ struct CompactDashboardView: View {
         )
     )
     .accessibilityElement(children: .combine)
-    .accessibilityLabel("Codex 24 小时重置概率 \(resetProbabilityText)")
+    .accessibilityLabel("Codex 重置预告状态 \(resetProbabilityText)，\(radarRefreshAccessibilityLabel)")
+  }
+
+  private var radarRefreshIsHealthy: Bool {
+    !store.codexRadarIsLoading && (store.codexRadarSnapshot?.tiboRefreshIsHealthy(at: now) ?? false)
+  }
+
+  private var radarRefreshStatus: String {
+    if store.codexRadarIsLoading { return "检查中" }
+    return radarRefreshIsHealthy ? "刷新正常" : "等待刷新"
+  }
+
+  private var radarRefreshAccessibilityLabel: String {
+    let time = store.codexRadarSnapshot?.syncState?.lastSuccessAt?.formatted(date: .abbreviated, time: .standard) ?? "尚无成功记录"
+    let deadline = radarDeadline.map { "，最晚到账北京时间 \(BalanceFormatters.beijingDeadline($0))，实际到账待确认" } ?? ""
+    return "\(radarRefreshStatus)，上次动态成功刷新 \(time)\(deadline)"
+  }
+
+  private var radarDeadline: Date? {
+    store.codexRadarSnapshot?.tiboDeadline(at: now)?.date
+  }
+
+  private func radarRefreshLabel(condensed: Bool = false) -> some View {
+    let time = store.codexRadarSnapshot?.syncState?.lastSuccessAt?.formatted(date: .omitted, time: .shortened) ?? "--:--"
+    let icon = store.codexRadarIsLoading ? "arrow.triangle.2.circlepath" : (radarRefreshIsHealthy ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+    return HStack(spacing: 4) {
+      Image(systemName: icon)
+        .foregroundStyle(radarRefreshIsHealthy ? Color.green : Color.orange)
+      Text(condensed || radarDeadline != nil ? time : "\(radarRefreshStatus) · \(time)")
+        .foregroundStyle(DashboardColors.text)
+        .monospacedDigit()
+      if !condensed, let deadline = radarDeadline {
+        Spacer(minLength: 2)
+        Text("\(deadline <= now ? "期限已过" : "最晚") \(BalanceFormatters.beijingDeadline(deadline, compact: true)) 北京")
+          .foregroundStyle(deadline <= now ? Color.orange : store.palette.weekly)
+          .font(.system(size: mini ? 9 : 10, weight: .heavy, design: .rounded))
+          .minimumScaleFactor(0.75)
+      }
+    }
+    .font(.system(size: condensed ? (mini ? 9 : 10) : (mini ? 11 : 12), weight: .bold, design: .rounded))
+    .lineLimit(1)
+    .help(radarRefreshAccessibilityLabel)
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel(radarRefreshAccessibilityLabel)
   }
 
   private var radarMicroLabel: some View {
@@ -734,7 +840,7 @@ struct CompactDashboardView: View {
     .foregroundStyle(resetProbabilityTint)
     .lineLimit(1)
     .accessibilityElement(children: .ignore)
-    .accessibilityLabel("24 小时重置概率 \(resetProbabilityText)")
+    .accessibilityLabel("重置预告状态 \(resetProbabilityText)")
   }
 
   private var costText: String {

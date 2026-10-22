@@ -22,15 +22,19 @@ final class DashboardStore: ObservableObject {
   @Published var isFullRefreshing = false
   @Published var lastFullRefresh: Date?
   @Published var operationFeedback: DashboardOperationFeedback?
+  @Published var exportProgressTitle: String?
+  var isExporting: Bool { exportProgressTitle != nil }
   @Published var radarEvaluation = RadarEvaluationSummary()
   @Published var radarEvaluationMessage: String?
   @Published var creditExpiry = CreditExpiryLedger()
   @Published var expiryMessage: String?
   @Published var isSavingCreditExpiry = false
   @Published var creditExpiryStorageIssue: CreditExpiryStorageError?
+  @Published var creditExpiryWriteFailed = false
   @Published var creditExpiryRecovery: CreditExpiryRecovery?
   @Published var pricingMessage = ModelPricingStore.shared.snapshot().description
   @Published var launchWithCodexEnabled = CodexWatcherManager.isEnabled()
+  @Published var launchWatcherIsUpdating = false
   @Published var settingsMessage: String?
   @Published var clamshellActive = false
   @Published var codexRadarSnapshot: CodexRadarSnapshot?
@@ -40,12 +44,24 @@ final class DashboardStore: ObservableObject {
   @Published var codexRadarNextSyncAt: Date?
   @Published var quotaForecast: QuotaForecast?
   @Published var quotaHistory: [QuotaSnapshot] = []
+  @Published var quotaHistoryStorageMessage: String?
   @Published var usageAnalysis = UsageAnalysis()
   @Published var projectBudgets: [ProjectBudget] = []
   @Published var budgetMessage: String?
+  @Published var projectBudgetStorageIssue: ProjectBudgetStorageIssue?
+  @Published var projectBudgetRecovery: ProjectBudgetRecovery?
+  @Published var projectBudgetWriteFailed = false
   @Published var reliabilitySnapshot = ReliabilitySnapshot()
   @Published var reliabilityEvents: [ReliabilityEvent] = []
+  @Published var reliabilityEventStorageIssue: ReliabilityEventStorageIssue?
+  @Published var reliabilityEventWriteFailed = false
   @Published var reliabilityMessage: String?
+  @Published var isBackingUp = false
+  @Published var localBackupHealth: LocalBackupHealthState = .notChecked
+  @Published var isArchivingDailySummary = false
+  @Published var dailySummaryHealth: DailySummaryHealthState = .notChecked
+  @Published var dailySummaryMessage: String?
+  var lastDailySummaryAttempt: Date?
   @Published var latestAppRelease: AppRelease?
   @Published var appUpdateAvailability: AppUpdateAvailability?
   @Published var appUpdateIsChecking = false
@@ -233,8 +249,8 @@ final class DashboardStore: ObservableObject {
   var previousAutomaticTick: Date?
   let snapshotPublisher = WidgetSnapshotPublisher()
   var pendingSnapshotTask: Task<Void, Never>?
-  let projectBudgetStore = ProjectBudgetStore()
-  let reliabilityEventStore = ReliabilityEventStore()
+  let projectBudgetStore: ProjectBudgetStore
+  let reliabilityEventStore: ReliabilityEventStore
   let localAutomationArchive = LocalAutomationArchive()
   let appUpdateService = GitHubReleaseUpdateService(retryState: AppUpdateRetryState(data: PulsePreferences.shared.data(forKey: "appUpdateRetryState")))
   lazy var quotaNotificationService: any QuotaNotificationServing = QuotaNotificationService.shared
@@ -273,9 +289,13 @@ final class DashboardStore: ObservableObject {
 
   init(startServices: Bool = true, radarService: CodexRadarService = CodexRadarService(),
        alertLedgerStore: QuotaAlertLedgerStore = QuotaAlertLedgerStore(),
-       expiryStore: CreditExpiryLedgerStore = CreditExpiryLedgerStore()) {
+       expiryStore: CreditExpiryLedgerStore = CreditExpiryLedgerStore(),
+       budgetStore: ProjectBudgetStore = ProjectBudgetStore(),
+       eventStore: ReliabilityEventStore = ReliabilityEventStore()) {
     codexRadarService = radarService
     creditExpiryStore = expiryStore
+    projectBudgetStore = budgetStore
+    reliabilityEventStore = eventStore
     servicesEnabled = startServices
     quotaAlertLedgerStore = alertLedgerStore
     let defaults = PulsePreferences.shared
@@ -336,8 +356,13 @@ final class DashboardStore: ObservableObject {
     creditExpiry = expiryRead.ledger
     creditExpiryStorageIssue = expiryRead.issue
     creditExpiryRecovery = expiryRead.recovery
-    projectBudgets = projectBudgetStore.load()
-    reliabilityEvents = reliabilityEventStore.load()
+    let budgetRead = projectBudgetStore.loadResult()
+    projectBudgets = budgetRead.budgets
+    projectBudgetStorageIssue = budgetRead.issue
+    projectBudgetRecovery = budgetRead.recovery
+    let eventRead = reliabilityEventStore.loadResult()
+    reliabilityEvents = eventRead.events
+    reliabilityEventStorageIssue = eventRead.issue
     restoreCachedAppUpdate(defaults: defaults)
     guard startServices else { return }
     updateUsageAnalysis()
@@ -640,47 +665,90 @@ final class DashboardStore: ObservableObject {
 
   @discardableResult
   func setProjectBudget(project: TokenProjectBucket, monthlyTokenLimit: Int,
+    originalBudget: ProjectBudget? = nil,
     storage: ProjectBudgetStore? = nil) -> Result<Void, Error> {
+    defer { runReliabilityCheck(allowAutomation: false) }
     guard monthlyTokenLimit > 0 else {
       budgetMessage = "预算必须大于 0 Token"
       return .failure(ProjectBudgetInputError.nonPositive)
     }
+    let original = originalBudget.flatMap {
+      $0.id == ProjectBudget.identifier(projectName: project.projectName, projectPath: project.projectPath) ? $0 : nil
+    }
     let budget = ProjectBudget(
       projectName: project.projectName,
       projectPath: project.projectPath,
-      monthlyTokenLimit: monthlyTokenLimit
+      monthlyTokenLimit: monthlyTokenLimit,
+      createdAt: original?.createdAt ?? Date()
     )
     do {
       projectBudgets = try (storage ?? projectBudgetStore).upsert(budget)
+      projectBudgetWriteFailed = false
+      projectBudgetStorageIssue = nil
+      projectBudgetRecovery = nil
       budgetMessage = "已保存 \(project.projectName) 的月度预算"
       lastAnalysisStats = nil
       updateUsageAnalysis()
       return .success(())
     } catch {
+      updateProjectBudgetReadIssue(storage: storage)
+      recordProjectBudgetWriteFailure(error)
       budgetMessage = "预算保存失败：\(error.localizedDescription)"
       return .failure(error)
     }
   }
 
-  func removeProjectBudget(id: String) {
+  @discardableResult
+  func removeProjectBudget(id: String, storage: ProjectBudgetStore? = nil) -> Result<Void, Error> {
+    defer { runReliabilityCheck(allowAutomation: false) }
     do {
-      projectBudgets = try projectBudgetStore.remove(id: id)
+      let containedBudget = projectBudgets.contains { $0.id == id }
+      projectBudgets = try (storage ?? projectBudgetStore).remove(id: id)
+      if containedBudget { projectBudgetWriteFailed = false }
+      projectBudgetStorageIssue = nil
+      projectBudgetRecovery = nil
       budgetMessage = "已移除项目预算"
       lastAnalysisStats = nil
       updateUsageAnalysis()
+      return .success(())
     } catch {
+      updateProjectBudgetReadIssue(storage: storage)
+      recordProjectBudgetWriteFailure(error)
       budgetMessage = "预算移除失败：\(error.localizedDescription)"
+      return .failure(error)
     }
   }
 
   func setLaunchWithCodexEnabled(_ enabled: Bool) {
-    do {
-      try CodexWatcherManager.setEnabled(enabled, appURL: Bundle.main.bundleURL)
-      launchWithCodexEnabled = CodexWatcherManager.isEnabled()
-      settingsMessage = enabled ? "已开启：打开 Codex 时自动启动 Codex 脉动" : "已关闭自动启动"
-    } catch {
-      launchWithCodexEnabled = CodexWatcherManager.isEnabled()
-      settingsMessage = "设置失败：\(error.localizedDescription)"
+    let appURL = Bundle.main.bundleURL
+    performWatcherOperation(
+      successMessage: enabled ? "已开启：打开 Codex 时自动启动 Codex 脉动" : "已关闭自动启动",
+      failurePrefix: "设置失败"
+    ) {
+      try CodexWatcherManager.setEnabled(enabled, appURL: appURL)
+      return CodexWatcherManager.isEnabled()
+    }
+  }
+
+  func performWatcherOperation(
+    successMessage: String?, failurePrefix: String,
+    operation: @escaping @Sendable () throws -> Bool
+  ) {
+    guard !launchWatcherIsUpdating else { return }
+    launchWatcherIsUpdating = true
+    Task { [weak self] in
+      let result = await Task.detached(priority: .utility) {
+        Result { try operation() }
+      }.value
+      guard let self else { return }
+      self.launchWatcherIsUpdating = false
+      switch result {
+      case .success(let enabled):
+        self.launchWithCodexEnabled = enabled
+        self.settingsMessage = successMessage
+      case .failure(let error):
+        self.settingsMessage = "\(failurePrefix)：\(error.localizedDescription)"
+      }
     }
   }
 
@@ -798,13 +866,13 @@ final class DashboardStore: ObservableObject {
 
   func repairLaunchWatcherIfNeeded(showMessage: Bool) {
     guard !PulsePreferences.isIsolated else { return }
-    do {
-      try CodexWatcherManager.refreshIfEnabled(appURL: Bundle.main.bundleURL)
-      launchWithCodexEnabled = CodexWatcherManager.isEnabled()
-      if showMessage, launchWithCodexEnabled { settingsMessage = "自动启动已指向当前 Codex 脉动" }
-    } catch {
-      launchWithCodexEnabled = CodexWatcherManager.isEnabled()
-      settingsMessage = "自动启动修复失败：\(error.localizedDescription)"
+    let appURL = Bundle.main.bundleURL
+    performWatcherOperation(
+      successMessage: showMessage ? "自动启动已指向当前 Codex 脉动" : nil,
+      failurePrefix: "自动启动修复失败"
+    ) {
+      try CodexWatcherManager.refreshIfEnabled(appURL: appURL)
+      return CodexWatcherManager.isEnabled()
     }
   }
 

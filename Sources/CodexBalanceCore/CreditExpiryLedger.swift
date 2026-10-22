@@ -108,9 +108,13 @@ public enum CreditExpiryStorageError: Error, LocalizedError, Equatable, Sendable
   case invalidRecord
   case invalidLegacyRecord
   case unsupportedVersion(Int)
+  case unsupportedBackupVersion(Int)
   case missingRecord
   case noValidBackup
   case alreadyValid
+  case unreadableBackup
+  case changedOnDisk
+  case recordTooLarge
 
   public var errorDescription: String? {
     switch self {
@@ -118,9 +122,13 @@ public enum CreditExpiryStorageError: Error, LocalizedError, Equatable, Sendable
     case .invalidRecord: "到期记录内容不完整或格式无效，已停止保存，原文件未改动。"
     case .invalidLegacyRecord: "历史到期记录无法读取，已停止保存，原文件未改动。"
     case let .unsupportedVersion(version): "到期记录使用暂不支持的版本（\(version)），请使用支持该版本的 App。原文件未改动。"
+    case let .unsupportedBackupVersion(version): "到期记录备份使用暂不支持的版本（\(version)），已停止保存以保护备份。请使用支持该版本的 App。"
     case .missingRecord: "当前到期记录文件缺失，可恢复上次有效记录。"
     case .noValidBackup: "没有可恢复的有效记录备份，原文件未改动。"
     case .alreadyValid: "当前文件已是有效记录，请重新读取后继续。"
+    case .unreadableBackup: "无法安全读取到期记录备份，已停止保存。请检查备份文件是否可访问，现有记录未改动。"
+    case .changedOnDisk: "到期记录在操作期间发生变化，已停止写入。请重新读取后继续。"
+    case .recordTooLarge: "到期记录超过 8 MB，未保存。请缩短过长的来源或说明后重试，原文件未改动。"
     }
   }
 }
@@ -134,6 +142,7 @@ public struct CreditExpiryReadResult: Sendable {
   public var ledger = CreditExpiryLedger()
   public var issue: CreditExpiryStorageError?
   public var recovery: CreditExpiryRecovery?
+  public var backupIssue: CreditExpiryStorageError?
 }
 
 public struct CreditExpiryRecoveryResult: Sendable {
@@ -144,6 +153,9 @@ public struct CreditExpiryRecoveryResult: Sendable {
 public struct CreditExpiryLedgerStore: Sendable {
   public var url: URL
   public var legacyURL: URL
+  private var prepareDirectory: @Sendable (URL) throws -> Void = {
+    try FileManager.default.createDirectory(at: $0, withIntermediateDirectories: true)
+  }
   public var previousURL: URL { url.deletingPathExtension().appendingPathExtension("previous.json") }
 
   public init(url: URL = PulsePaths.support.appendingPathComponent("credit-expiry-v2.json"),
@@ -151,82 +163,137 @@ public struct CreditExpiryLedgerStore: Sendable {
     self.url = url; self.legacyURL = legacyURL
   }
 
+  init(url: URL, legacyURL: URL, prepareDirectory: @escaping @Sendable (URL) throws -> Void) {
+    self.init(url: url, legacyURL: legacyURL)
+    self.prepareDirectory = prepareDirectory
+  }
+
   public func load() -> CreditExpiryLedger { loadResult().ledger }
 
   public func loadResult() -> CreditExpiryReadResult {
-    if FileManager.default.fileExists(atPath: url.path) {
-      guard let data = try? Data(contentsOf: url) else {
-        return .init(issue: .unreadableRecord)
+    do {
+      let current = try readCurrent()
+      let backup: Data?
+      do { backup = try read(previousURL, issue: .unreadableBackup) }
+      catch { return .init(ledger: current.ledger, issue: .unreadableBackup) }
+      let issue = backupIssue(backup)
+      if case let .unsupportedVersion(version) = issue {
+        return .init(ledger: current.ledger, issue: .unsupportedBackupVersion(version))
       }
-      do { return .init(ledger: try Self.decode(data)) }
-      catch let issue as CreditExpiryStorageError {
-        return .init(issue: issue, recovery: issue == .invalidRecord ? recoverySummary() : nil)
-      } catch { return .init(issue: .invalidRecord, recovery: recoverySummary()) }
-    }
-    if FileManager.default.fileExists(atPath: previousURL.path) {
-      if let recovery = recoverySummary() { return .init(issue: .missingRecord, recovery: recovery) }
-      // A missing primary must not authorize overwriting the only remaining
-      // backup, even if this version cannot read it.
-      return .init(issue: .noValidBackup)
-    }
-    guard FileManager.default.fileExists(atPath: legacyURL.path) else { return .init() }
-    guard let data = try? Data(contentsOf: legacyURL),
-      let record = try? JSONDecoder().decode(CreditExpiryRecord.self, from: data),
-      record.expiresAt.timeIntervalSinceReferenceDate.isFinite else {
-      return .init(issue: .invalidLegacyRecord)
-    }
-    let batch = CreditExpiryBatch(id: "legacy-single-date-v1", title: "历史到期记录",
-      expiryDate: CreditExpiryBatch.dateString(record.expiresAt), basis: .legacy,
-      note: "旧版本的单笔记录；保留原有核实状态。", record: record)
-    return .init(ledger: CreditExpiryLedger(batches: [batch]))
+      return .init(ledger: current.ledger, backupIssue: issue)
+    } catch let issue as CreditExpiryStorageError {
+      return .init(issue: issue, recovery: [.invalidRecord, .missingRecord].contains(issue) ? recoverySummary() : nil)
+    } catch { return .init(issue: .unreadableRecord) }
   }
 
   public func save(_ ledger: CreditExpiryLedger) throws {
     try Self.validate(ledger)
     // Never replace a corrupt or newer-format document with an empty fallback.
     // Recheck at write time as the file may have changed after the UI loaded it.
-    let state = loadResult()
-    if let issue = state.issue { throw issue }
+    let current = try readCurrent()
+    let oldBackup = try read(previousURL, issue: .unreadableBackup)
+    if case let .unsupportedVersion(version) = backupIssue(oldBackup) {
+      throw CreditExpiryStorageError.unsupportedBackupVersion(version)
+    }
+    if current.data == nil, oldBackup != nil { throw CreditExpiryStorageError.changedOnDisk }
     let data = try JSONEncoder().encode(ledger)
-    let previous = FileManager.default.fileExists(atPath: url.path) ? try Data(contentsOf: url) : data
-    _ = try Self.decode(previous)
-    try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+    // Never write a document that the bounded reader would reject on restart.
+    guard data.count <= LocalRecordFile.maximumSize else { throw CreditExpiryStorageError.recordTooLarge }
+    let previous = current.data ?? data
+    try prepareDirectory(url.deletingLastPathComponent())
+    try requireUnchanged(current)
+    try requireUnchanged(previousURL, expected: oldBackup, issue: .unreadableBackup)
     // A failed backup must leave the current document untouched.
     try previous.write(to: previousURL, options: .atomic)
-    guard try Data(contentsOf: previousURL) == previous else { throw CocoaError(.fileWriteUnknown) }
+    guard try read(previousURL, issue: .unreadableBackup) == previous else { throw CocoaError(.fileWriteUnknown) }
+    try requireUnchanged(current)
     try data.write(to: url, options: .atomic)
   }
 
   public func restorePrevious() throws -> CreditExpiryRecoveryResult {
-    var original: Data?
-    if FileManager.default.fileExists(atPath: url.path) {
-      guard let data = try? Data(contentsOf: url) else { throw CreditExpiryStorageError.unreadableRecord }
+    let original = try read(url)
+    if let data = original {
       do {
         _ = try Self.decode(data)
         throw CreditExpiryStorageError.alreadyValid
       } catch CreditExpiryStorageError.invalidRecord {
-        original = data
+        // Keep these original bytes until a separate copy has been verified.
       }
       // Unsupported versions and valid documents must never be downgraded.
     }
-    guard let backup = try? Data(contentsOf: previousURL),
+    guard let backup = try? LocalRecordFile.read(at: previousURL),
       let ledger = try? Self.decode(backup) else { throw CreditExpiryStorageError.noValidBackup }
-    try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try prepareDirectory(url.deletingLastPathComponent())
+    try requireUnchanged(url, expected: original)
+    try requireUnchanged(previousURL, expected: backup, issue: .noValidBackup)
     var preserved: URL?
     if let original {
       let destination = url.deletingPathExtension().appendingPathExtension("damaged-\(UUID().uuidString).json")
       try original.write(to: destination, options: .withoutOverwriting)
-      guard try Data(contentsOf: destination) == original else { throw CocoaError(.fileWriteUnknown) }
+      guard try read(destination) == original else { throw CocoaError(.fileWriteUnknown) }
       preserved = destination
     }
+    try requireUnchanged(url, expected: original)
+    try requireUnchanged(previousURL, expected: backup, issue: .noValidBackup)
     try backup.write(to: url, options: .atomic)
     return CreditExpiryRecoveryResult(ledger: ledger, preservedOriginalURL: preserved)
   }
 
   private func recoverySummary() -> CreditExpiryRecovery? {
-    guard let data = try? Data(contentsOf: previousURL), let ledger = try? Self.decode(data) else { return nil }
+    guard let data = try? LocalRecordFile.read(at: previousURL), let ledger = try? Self.decode(data) else { return nil }
     let modified = try? previousURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
     return CreditExpiryRecovery(batchCount: ledger.batches.count, backedUpAt: modified)
+  }
+
+  private func backupIssue(_ data: Data?) -> CreditExpiryStorageError? {
+    guard let data else { return nil }
+    do { _ = try Self.decode(data); return nil }
+    catch let issue as CreditExpiryStorageError { return issue }
+    catch { return .invalidRecord }
+  }
+
+  private struct CurrentRecord {
+    var data: Data?
+    var legacy: Data?
+    var ledger: CreditExpiryLedger
+  }
+
+  private func readCurrent() throws -> CurrentRecord {
+    if let data = try read(url) { return .init(data: data, ledger: try Self.decode(data)) }
+    // Links (including dangling links), pipes and oversized files are not absent files.
+    // Preserve the sole remaining backup even when it cannot be decoded.
+    if let backup = try read(previousURL, issue: .noValidBackup) {
+      guard (try? Self.decode(backup)) != nil else { throw CreditExpiryStorageError.noValidBackup }
+      throw CreditExpiryStorageError.missingRecord
+    }
+    guard let data = try read(legacyURL, issue: .invalidLegacyRecord) else {
+      return .init(ledger: CreditExpiryLedger())
+    }
+    guard let record = try? JSONDecoder().decode(CreditExpiryRecord.self, from: data),
+      record.expiresAt.timeIntervalSinceReferenceDate.isFinite else {
+      throw CreditExpiryStorageError.invalidLegacyRecord
+    }
+    let batch = CreditExpiryBatch(id: "legacy-single-date-v1", title: "历史到期记录",
+      expiryDate: CreditExpiryBatch.dateString(record.expiresAt), basis: .legacy,
+      note: "旧版本的单笔记录；保留原有核实状态。", record: record)
+    return .init(legacy: data, ledger: CreditExpiryLedger(batches: [batch]))
+  }
+
+  private func read(_ location: URL, issue: CreditExpiryStorageError = .unreadableRecord) throws -> Data? {
+    do { return try LocalRecordFile.read(at: location) }
+    catch { throw issue }
+  }
+
+  private func requireUnchanged(_ location: URL, expected: Data?,
+    issue: CreditExpiryStorageError = .unreadableRecord) throws {
+    guard try read(location, issue: issue) == expected else { throw CreditExpiryStorageError.changedOnDisk }
+  }
+
+  private func requireUnchanged(_ current: CurrentRecord) throws {
+    try requireUnchanged(url, expected: current.data)
+    if current.data == nil {
+      try requireUnchanged(legacyURL, expected: current.legacy, issue: .invalidLegacyRecord)
+    }
   }
 
   private static func decode(_ data: Data) throws -> CreditExpiryLedger {

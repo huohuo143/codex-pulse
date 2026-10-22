@@ -20,6 +20,9 @@ public struct CodexRadarSnapshot: Equatable, Decodable, Sendable {
   public var efficiency: CodexRadarEfficiencySnapshot?
   public var syncState: CodexRadarSyncState? = nil
   public var resetCalendar: CodexResetCalendarSnapshot? = nil
+  public var tiboAnalysis: CodexRadarTiboAnalysis? = nil
+  public var tiboAnalysisAttemptAt: Date? = nil
+  public var tiboAnalysisFailure: String? = nil
 
   public var probability24hPercent: Int? {
     if syncState?.isStale == true { return nil }

@@ -49,6 +49,8 @@ public final class CodexStatusReader: @unchecked Sendable {
   var deviceSnapshots: [CodexDeviceTokenUsage] = []
   var cachedLogEvents: [RateLimitEvent] = []
   var lastIndexRevision = -1
+  var failedSessionPaths = Set<String>()
+  var nextSessionRetry: Date?
   public internal(set) var diagnostics = SessionReadDiagnostics()
   public var lastSessionActivity: Date? { fileIndex.lastActivityAt }
   let liveRateLimitSource: CodexAppServerRateLimitSource?
@@ -90,11 +92,11 @@ public final class CodexStatusReader: @unchecked Sendable {
       self.sessionRoots = [sessionsRoot]
     } else if codexHome != nil || environmentHome != nil {
       self.codexHome = resolvedHome
-      self.sessionRoots = [resolvedHome.appendingPathComponent("sessions")]
+      self.sessionRoots = SessionLogLocation.roots(in: resolvedHome)
     } else {
       self.codexHome = resolvedHome
       let discoveredRoots = Self.discoverSessionRoots(fileManager: fileManager)
-      self.sessionRoots = discoveredRoots.isEmpty ? [resolvedHome.appendingPathComponent("sessions")] : discoveredRoots
+      self.sessionRoots = discoveredRoots
     }
     // Retained initializer argument for source compatibility; complete statistics never truncate.
     self.injectedFileIndex = fileIndex
@@ -132,12 +134,17 @@ public final class CodexStatusReader: @unchecked Sendable {
     }
     let entries = fileIndex.read(at: now)
     let files = entries.map(\.url)
-    if lastIndexRevision != fileIndex.revision {
+    if lastIndexRevision != fileIndex.revision || nextSessionRetry.map({ now >= $0 }) == true {
       let activePaths = Set(files.map(\.path))
+      failedSessionPaths.formIntersection(activePaths)
       let filteredCache = eventCache.filter { activePaths.contains($0.key) }
       if filteredCache.count != eventCache.count { eventCache = filteredCache; persistentEventCacheDirty = true }
-      cachedLogEvents = entries.flatMap { parseEvents(in: $0.url, entry: $0, now: now) }.sorted { $0.timestamp < $1.timestamp }
+      cachedLogEvents = entries.sorted { $0.url.path < $1.url.path }
+        .flatMap { parseEvents(in: $0.url, entry: $0, now: now) }
+        .sorted { $0.timestamp < $1.timestamp }
       lastIndexRevision = fileIndex.revision
+      diagnostics.unreadableFiles = failedSessionPaths.count
+      nextSessionRetry = failedSessionPaths.isEmpty ? nil : now.addingTimeInterval(60)
       tokenStatsCache = nil
       persistEventCacheIfNeeded()
     }
@@ -361,13 +368,14 @@ public final class CodexStatusReader: @unchecked Sendable {
   static func discoverSessionRoots(fileManager: FileManager) -> [URL] {
     let home = fileManager.homeDirectoryForCurrentUser
     let candidates = [
-      home.appendingPathComponent(".codex/sessions"),
-      home.appendingPathComponent(".codex/browser/sessions"),
-      home.appendingPathComponent("Library/Application Support/Codex/sessions"),
-      home.appendingPathComponent("Library/Application Support/com.openai.codex/sessions")
+      home.appendingPathComponent(".codex"),
+      home.appendingPathComponent(".codex/browser"),
+      home.appendingPathComponent("Library/Application Support/Codex"),
+      home.appendingPathComponent("Library/Application Support/com.openai.codex")
     ]
 
-    return candidates.filter { fileManager.fileExists(atPath: $0.path) }
+    // Include missing roots: an archive folder can be created after startup.
+    return candidates.flatMap(SessionLogLocation.roots)
   }
 
   static func containsJSONL(in root: URL, fileManager: FileManager) -> Bool {
@@ -381,7 +389,7 @@ public final class CodexStatusReader: @unchecked Sendable {
       return false
     }
 
-    for case let url as URL in enumerator where url.pathExtension == "jsonl" {
+    for case let url as URL in enumerator where SessionLogLocation.isSupported(url) {
       guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey]),
             values.isRegularFile == true
       else {
@@ -404,11 +412,12 @@ public final class CodexStatusReader: @unchecked Sendable {
         cached.prefix = readPrefix(in: file, length: min(4096, entry.size))
         eventCache[cacheKey] = cached; persistentEventCacheDirty = true
       }
+      failedSessionPaths.remove(cacheKey)
       return cached.events
     }
     let old = eventCache[cacheKey]
     let canAppend: Bool
-    if let old, old.identity == entry.identity, entry.size > old.fileSize, let prefix = old.prefix {
+    if !SessionLogLocation.isCompressed(file), let old, old.identity == entry.identity, entry.size > old.fileSize, let prefix = old.prefix {
       canAppend = readPrefix(in: file, length: prefix.count) == prefix
     } else { canAppend = false }
     var cache = canAppend ? old! : ParsedFileCache(modified: entry.modified, identity: entry.identity,
@@ -433,8 +442,12 @@ public final class CodexStatusReader: @unchecked Sendable {
       cache.modified = entry.modified; cache.identity = entry.identity
       cache.prefix = readPrefix(in: file, length: min(4096, cache.fileSize))
       eventCache[cacheKey] = cache; persistentEventCacheDirty = true
+      failedSessionPaths.remove(cacheKey)
       return cache.events
-    } catch { return old?.events ?? [] }
+    } catch {
+      failedSessionPaths.insert(cacheKey)
+      return old?.events ?? []
+    }
   }
 
   /// Keep an in-progress final JSONL record and resume from the previous byte offset.

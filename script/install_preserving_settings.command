@@ -14,6 +14,44 @@ BACKUP_DIR="${CODEX_PULSE_BACKUP_DIR:-$SUPPORT_DIR/version-backups/$STAMP}"
 LABEL="dev.codex.balance-dashboard.codex.watch-codex"
 WATCH_PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+
+# BEGIN WATCHER_RECOVERY
+# Keep this self-contained: the same functions are embedded in the rollback.
+watcher_launchctl() { /bin/launchctl "$@"; }
+watcher_retry_delay() { /bin/sleep "$1"; }
+stop_watcher() {
+  local target="$1" attempt code
+  watcher_launchctl bootout "$target" || true
+  # bootout returns before a foreground sleep/trap has finished. Do not let a
+  # still-registered, SIGTERMed job count as a restored service below.
+  for attempt in {1..21}; do
+    if watcher_launchctl print "$target" >/dev/null 2>&1; then
+      code=0
+    else
+      code=$?
+    fi
+    if [[ "$code" == 113 ]]; then return 0; fi
+    if [[ "$code" != 0 ]]; then break; fi
+    if (( attempt < 21 )); then watcher_retry_delay 0.5; fi
+  done
+  print -u2 "自动启动服务仍未退出，本次操作已停止，请稍后重试。"
+  return 1
+}
+restore_watcher() {
+  local domain="$1" label="$2" plist="$3" attempt
+  if watcher_launchctl print "$domain/$label" >/dev/null 2>&1; then return 0; fi
+  for attempt in 1 2 3; do
+    # bootstrap can report error 5 while the previous job finishes bootout.
+    # Its exit status alone is not proof that the service is registered.
+    watcher_launchctl bootstrap "$domain" "$plist" || true
+    if watcher_launchctl print "$domain/$label" >/dev/null 2>&1; then return 0; fi
+    if (( attempt < 3 )); then watcher_retry_delay 1; fi
+  done
+  print -u2 "自动启动服务尚未恢复，已尝试 3 次。可在应用设置中重新开启自动启动。"
+  return 1
+}
+# END WATCHER_RECOVERY
+
 [[ -d "$SOURCE_APP" ]] || { print -u2 "找不到安装源：$SOURCE_APP"; exit 1; }
 [[ "${SOURCE_APP:A}" != "${DEST_APP:A}" ]] || { print -u2 "安装源与目标不能相同"; exit 1; }
 [[ ! -e "$BACKUP_DIR" ]] || { print -u2 "备份目录已存在，请使用新的目录"; exit 1; }
@@ -32,7 +70,7 @@ fi
 [[ $# == 0 ]] || { print -u2 "支持的参数：--check（仅检查）"; exit 2; }
 mkdir -p "$DEST_DIR" "$BACKUP_DIR/config"
 /usr/bin/defaults export "$BUNDLE_ID" "$BACKUP_DIR/preferences.plist" >/dev/null 2>&1 || true
-for item in "$SUPPORT_DIR"/quota-history*.json "$SUPPORT_DIR"/project-budgets-v1.json \
+for item in "$SUPPORT_DIR"/quota-history*.json "$SUPPORT_DIR"/project-budgets-v1*.json \
   "$SUPPORT_DIR"/credit-expiry-v1.json "$SUPPORT_DIR"/credit-expiry-v2.json \
   "$SUPPORT_DIR"/credit-expiry-v2.previous.json "$SUPPORT_DIR"/credit-expiry-v2.damaged-*.json "$SUPPORT_DIR"/model-prices*.json \
   "$SUPPORT_DIR"/radar-evaluation-v1 "$SUPPORT_DIR"/codex-radar-tibo-history.json "$SUPPORT_DIR"/codex-reset-calendar-v1.json \
@@ -42,10 +80,13 @@ for item in "$SUPPORT_DIR"/quota-history*.json "$SUPPORT_DIR"/project-budgets-v1
   [[ -e "$item" ]] && /usr/bin/ditto "$item" "$BACKUP_DIR/config/${item:t}"
 done
 [[ -f "$WATCH_PLIST" ]] && /usr/bin/ditto "$WATCH_PLIST" "$BACKUP_DIR/watch-agent.plist"
-cat > "$BACKUP_DIR/恢复上一版.command" <<'ROLLBACK'
+cat > "$BACKUP_DIR/恢复上一版.command" <<'ROLLBACK_HEADER'
 #!/bin/zsh
 set -euo pipefail
 setopt NULL_GLOB
+ROLLBACK_HEADER
+typeset -f watcher_launchctl watcher_retry_delay stop_watcher restore_watcher >> "$BACKUP_DIR/恢复上一版.command"
+cat >> "$BACKUP_DIR/恢复上一版.command" <<'ROLLBACK'
 BACKUP_DIR="${0:A:h}"
 DEST_APP="$HOME/Applications/Codex 脉动.app"
 SUPPORT_DIR="$HOME/Library/Application Support/CodexSuanliMeter"
@@ -57,7 +98,7 @@ LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchS
 WATCHER_WAS_LOADED=0
 if /bin/launchctl print "gui/$(/usr/bin/id -u)/$LABEL" >/dev/null 2>&1; then
   WATCHER_WAS_LOADED=1
-  /bin/launchctl bootout "gui/$(/usr/bin/id -u)/$LABEL" >/dev/null 2>&1 || true
+  stop_watcher "gui/$(/usr/bin/id -u)/$LABEL" || exit 1
 fi
 for pid in $(/usr/bin/pgrep -x CodexSuanliMeter || true) $(/usr/bin/pgrep -x CodexSuanliWidgets || true); do
   executable="$(/bin/ps -p "$pid" -o comm= 2>/dev/null || true)"
@@ -71,8 +112,15 @@ for item in "$BACKUP_DIR/config/"*; do /usr/bin/ditto "$item" "$SUPPORT_DIR/${it
 [[ -f "$BACKUP_DIR/preferences.plist" ]] && /usr/bin/defaults import dev.codex.balance-dashboard.codex "$BACKUP_DIR/preferences.plist"
 "$LSREGISTER" -f "$DEST_APP" >/dev/null 2>&1 || true
 /usr/bin/pluginkit -a "$DEST_APP/Contents/PlugIns/CodexSuanliWidgets.appex" >/dev/null 2>&1 || true
-if [[ "$WATCHER_WAS_LOADED" == 1 && -f "$WATCH_PLIST" ]]; then /bin/launchctl bootstrap "gui/$(/usr/bin/id -u)" "$WATCH_PLIST"; fi
+WATCHER_RESTORE_FAILED=0
+if [[ "$WATCHER_WAS_LOADED" == 1 ]]; then
+  restore_watcher "gui/$(/usr/bin/id -u)" "$LABEL" "$WATCH_PLIST" || WATCHER_RESTORE_FAILED=1
+fi
 /usr/bin/open -n "$DEST_APP"
+if [[ "$WATCHER_RESTORE_FAILED" == 1 ]]; then
+  print -u2 "上一版应用已恢复并启动，但自动启动服务需要重试。备份仍在 $BACKUP_DIR"
+  exit 1
+fi
 print "已恢复上一版；回滚前的新版本也已保留在 $BACKUP_DIR"
 ROLLBACK
 chmod +x "$BACKUP_DIR/恢复上一版.command"
@@ -82,7 +130,7 @@ STAGED_APP="$DEST_DIR/.Codex-pulse-install-$STAMP.app"
 WATCHER_WAS_LOADED=0
 if /bin/launchctl print "gui/$(/usr/bin/id -u)/$LABEL" >/dev/null 2>&1; then
   WATCHER_WAS_LOADED=1
-  /bin/launchctl bootout "gui/$(/usr/bin/id -u)/$LABEL" >/dev/null 2>&1 || true
+  stop_watcher "gui/$(/usr/bin/id -u)/$LABEL" || exit 1
 fi
 # Stop only processes whose executable belongs to the installed target.
 for pid in $(/usr/bin/pgrep -x CodexSuanliMeter || true) $(/usr/bin/pgrep -x CodexSuanliWidgets || true); do
@@ -98,10 +146,17 @@ fi
 /bin/mv "$STAGED_APP" "$DEST_APP"
 "$LSREGISTER" -f "$DEST_APP" >/dev/null 2>&1 || true
 /usr/bin/pluginkit -a "$DEST_APP/Contents/PlugIns/CodexSuanliWidgets.appex" >/dev/null 2>&1 || true
-if [[ "$WATCHER_WAS_LOADED" == 1 && -f "$WATCH_PLIST" ]]; then
-  /bin/launchctl bootstrap "gui/$(/usr/bin/id -u)" "$WATCH_PLIST"
+# BEGIN WATCHER_RESTORE_AND_OPEN
+WATCHER_RESTORE_FAILED=0
+if [[ "$WATCHER_WAS_LOADED" == 1 ]]; then
+  restore_watcher "gui/$(/usr/bin/id -u)" "$LABEL" "$WATCH_PLIST" || WATCHER_RESTORE_FAILED=1
 fi
 
 /usr/bin/open -n "$DEST_APP"
+if [[ "$WATCHER_RESTORE_FAILED" == 1 ]]; then
+  print -u2 "应用已更新并启动，但自动启动服务需要重试。原应用、配置与回滚入口：$BACKUP_DIR"
+  exit 1
+fi
 print "安装完成：$DEST_APP"
 print "原应用、配置与回滚入口：$BACKUP_DIR"
+# END WATCHER_RESTORE_AND_OPEN

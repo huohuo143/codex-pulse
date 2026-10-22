@@ -36,7 +36,10 @@ extension DashboardStore {
     let updatedLedger = ledger
     isSavingCreditExpiry = true
     expiryMessage = "正在保存这一笔记录…"
-    defer { isSavingCreditExpiry = false }
+    defer {
+      isSavingCreditExpiry = false
+      runReliabilityCheck(allowAutomation: false)
+    }
     do {
       if let persist {
         try await persist(updatedLedger)
@@ -45,6 +48,7 @@ extension DashboardStore {
         try await Task.detached(priority: .utility) { try storage.save(updatedLedger) }.value
       }
       creditExpiry = updatedLedger
+      creditExpiryWriteFailed = false
       expiryMessage = confirmed && status?.accountScope != account
         ? "已保存到提交时的账户；当前账户已变化，请重新核对"
         : (confirmed ? "已保存当前账户的这一笔记录" : "已保存这一笔，等待核实")
@@ -52,6 +56,7 @@ extension DashboardStore {
       return true
     } catch {
       await updateCreditExpiryReadIssue()
+      recordCreditExpiryWriteFailure(error)
       expiryMessage = "记录保存失败：\(error.localizedDescription)"
       return false
     }
@@ -61,7 +66,10 @@ extension DashboardStore {
     guard !isSavingCreditExpiry else { return nil }
     isSavingCreditExpiry = true
     expiryMessage = "正在重新读取到期记录…"
-    defer { isSavingCreditExpiry = false }
+    defer {
+      isSavingCreditExpiry = false
+      runReliabilityCheck(allowAutomation: false)
+    }
     let storage = creditExpiryStore
     let read = await Task.detached(priority: .utility) { storage.loadResult() }.value
     creditExpiryStorageIssue = read.issue
@@ -77,19 +85,24 @@ extension DashboardStore {
     guard !isSavingCreditExpiry else { return nil }
     isSavingCreditExpiry = true
     expiryMessage = "正在恢复上次有效记录…"
-    defer { isSavingCreditExpiry = false }
+    defer {
+      isSavingCreditExpiry = false
+      runReliabilityCheck(allowAutomation: false)
+    }
     let storage = creditExpiryStore
     do {
       let result = try await Task.detached(priority: .utility) { try storage.restorePrevious() }.value
       creditExpiry = result.ledger
       creditExpiryStorageIssue = nil
       creditExpiryRecovery = nil
+      creditExpiryWriteFailed = false
       expiryMessage = "已恢复备份中的 \(result.ledger.batches.count) 笔记录"
         + (result.preservedOriginalURL == nil ? "" : "；原文件已单独保留")
       writeWidgetSnapshotFile()
       return result.ledger
     } catch {
       await updateCreditExpiryReadIssue()
+      recordCreditExpiryWriteFailure(error)
       expiryMessage = "恢复未完成：\(error.localizedDescription)"
       return nil
     }
@@ -100,6 +113,15 @@ extension DashboardStore {
     let read = await Task.detached(priority: .utility) { storage.loadResult() }.value
     creditExpiryStorageIssue = read.issue
     creditExpiryRecovery = read.recovery
+  }
+
+  private func recordCreditExpiryWriteFailure(_ error: any Error) {
+    guard creditExpiryStorageIssue == nil else { return }
+    if let issue = error as? CreditExpiryStorageError,
+      [.invalidRecord, .recordTooLarge, .alreadyValid].contains(issue) { return }
+    // Reading a valid old document does not prove the failed write succeeded.
+    // Keep this warning until a save or explicit recovery actually completes.
+    creditExpiryWriteFailed = true
   }
 
   func openCreditExpiryFolder() {
@@ -148,11 +170,11 @@ extension DashboardStore {
     if let top = stats.categoryBreakdown.max(by: { $0.totalTokens < $1.totalTokens }), top.totalTokens > 0 {
       lines.append("主要工作类型：\(top.category.label)（\(BalanceFormatters.compactNumber(top.totalTokens)) Token）")
     }
-    if let probability = codexRadarSnapshot?.probability24hPercent {
-      let level = codexRadarSnapshot?.latestLevelLabel ?? "研判中"
-      lines.append("Codex 24h 重置概率：\(probability)%（\(level)）")
+    if let radar = codexRadarSnapshot {
+      lines.append("Tibo 重置状态：\(radar.tiboStatusTitle)")
       lines.append(CodexRadarService.attributionText)
     }
+
     if let forecast = quotaForecast {
       if let rate = forecast.ratePerDay {
         lines.append("额度节奏：\(String(format: "%.1f", rate)) 个百分点/天")
@@ -173,7 +195,11 @@ extension DashboardStore {
   }
 
   func exportUsageCSV() {
+    guard !isExporting else { return }
     guard hasUsageData else { operationFeedback = .init(.information, "用量首次统计中，请稍后导出"); return }
+    let stats = tokenStats
+    let rate = exchangeRate?.rate
+    let generatedAt = Date()
     let panel = NSSavePanel()
     panel.title = "导出 Codex 用量"
     panel.prompt = "导出"
@@ -184,23 +210,10 @@ extension DashboardStore {
     panel.nameFieldStringValue = "codex-usage-\(formatter.string(from: Date())).csv"
     guard panel.runModal() == .OK, let url = panel.url else { return }
 
-    let csv = CodexUsageCSVExporter.makeCSV(
-      stats: tokenStats,
-      cnyRate: exchangeRate?.rate,
-      generatedAt: Date()
-    )
-    writeExport(csv, to: url, successMessage: "已导出：\(url.lastPathComponent)")
-  }
-
-  @discardableResult
-  func writeExport(_ content: String, to url: URL, successMessage: String, failurePrefix: String = "导出失败") -> Bool {
-    do {
-      try content.write(to: url, atomically: true, encoding: .utf8)
-      operationFeedback = .init(.success, successMessage)
-      return true
-    } catch {
-      operationFeedback = .init(.failure, "\(failurePrefix)：\(error.localizedDescription)")
-      return false
+    Task {
+      await writeExport({
+        CodexUsageCSVExporter.makeCSV(stats: stats, cnyRate: rate, generatedAt: generatedAt)
+      }, to: url, title: "用量 CSV", successMessage: "已导出：\(url.lastPathComponent)")
     }
   }
 }

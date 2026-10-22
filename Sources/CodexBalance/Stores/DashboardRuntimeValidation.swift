@@ -7,6 +7,7 @@ extension DashboardStore {
     let metrics: [String: Double] = [
       "mainTimerLagSeconds": lag,
       "parsedFiles": Double(status?.readerDiagnostics?.parsedFiles ?? 0),
+      "unreadableSessionFiles": Double(status?.readerDiagnostics?.unreadableFiles ?? 0),
       "logBytesRead": Double(status?.readerDiagnostics?.bytesRead ?? 0),
       "aggregations": Double(status?.readerDiagnostics?.aggregations ?? 0),
       "analysisGeneration": Double(analysisGeneration),

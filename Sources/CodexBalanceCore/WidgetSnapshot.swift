@@ -64,6 +64,9 @@ public struct CodexWidgetSnapshot: Codable, Equatable, Sendable {
   public var resetProbability24h: Int?
   public var radarLevel: String?
   public var radarSummary: String?
+  public var radarDeadlineAt: Date? = nil
+  public var radarCompletionUntil: Date? = nil
+  public var radarAnnouncementActive: Bool? = nil
   public var radarUpdatedAt: Date?
   public var radarCheckedAt: Date?
   public var radarLastSuccessAt: Date?
@@ -189,7 +192,18 @@ public struct CodexWidgetSnapshot: Codable, Equatable, Sendable {
     if schemaVersion < 4 || radarIsStale == true || radarLastSuccessAt.map({ now.timeIntervalSince($0) > 90 * 60 }) != false || radarValidUntil.map({ $0 <= now }) == true {
       result.resetProbability24h = nil
       result.radarLevel = radarLastSuccessAt == nil && (radarConsecutiveFailures ?? 0) > 0
-        ? "等待数据" : "数据过期"
+        ? "等待数据" : "动态已过期"
+      result.radarSummary = "公开动态未及时更新，等待下一次检查与分析。"
+      result.radarDeadlineAt = nil
+      result.radarCompletionUntil = nil
+      result.radarAnnouncementActive = false
+      if radarLastSuccessAt != nil { result.radarSyncStatus = "等待刷新" }
+      result.radarIsStale = true
+    }
+    if let until = result.radarCompletionUntil, until <= now {
+      result.radarCompletionUntil = nil
+      result.radarLevel = "等待新预告"
+      result.radarSummary = "上一轮到账确认已展示 24 小时，继续每 10 分钟检查新预告。"
     }
     if !usageState(at: now).canDisplayValue {
       result.hourly24 = []; result.daily14 = []; result.topProjects = []; result.topCategories = []
@@ -209,7 +223,7 @@ public struct CodexWidgetSnapshot: Codable, Equatable, Sendable {
       [metadata.lastSuccessAt?.addingTimeInterval(301), metadata.lastSuccessAt?.addingTimeInterval(1801)].compactMap { $0 }
     }
     let boundaries = [resetsAt, displaysFiveHourQuota ? fiveHourResetsAt : nil, confirmedCreditExpiry,
-      radarValidUntil, radarLastSuccessAt?.addingTimeInterval(5401), usageValidUntil,
+      radarValidUntil, radarDeadlineAt, radarCompletionUntil, radarLastSuccessAt?.addingTimeInterval(5401), usageValidUntil,
       usageUpdatedAt?.addingTimeInterval(301), usageUpdatedAt?.addingTimeInterval(1801)].compactMap { $0 }
       + resetCredits.compactMap(\.expiresAt) + sourceDates
     return [now] + Set(boundaries.filter { $0 > now && $0 <= now.addingTimeInterval(86400) }).sorted()
@@ -242,9 +256,9 @@ public struct CodexWidgetSnapshot: Codable, Equatable, Sendable {
       cost7DaysUSD: 98.52,
       costMonthUSD: 326.47,
       cnyRate: 7.18,
-      resetProbability24h: 72,
-      radarLevel: "高概率",
-      radarSummary: "公开信号升温，建议关注官方更新与重置窗口。",
+      resetProbability24h: nil,
+      radarLevel: "重置已预告",
+      radarSummary: "Tibo 已明确预告重置，实际完成待确认。",
       radarUpdatedAt: now.addingTimeInterval(-18 * 60),
       resetCreditsAvailable: 2,
       resetCredits: [
@@ -433,7 +447,7 @@ public extension CodexWidgetSnapshot {
       kinds.formUnion([.overview, .tokenSummary, .tokenTrend, .workload])
     }
     if remainingPercent != previous.remainingPercent || usedPercent != previous.usedPercent || resetsAt != previous.resetsAt || fiveHourRemainingPercent != previous.fiveHourRemainingPercent || fiveHourUsedPercent != previous.fiveHourUsedPercent || fiveHourResetsAt != previous.fiveHourResetsAt || showsFiveHourQuota != previous.showsFiveHourQuota || quotaRead != previous.quotaRead { kinds.formUnion([.quota, .overview]) }
-    if resetProbability24h != previous.resetProbability24h || radarLevel != previous.radarLevel || radarSummary != previous.radarSummary || radarLastSuccessAt != previous.radarLastSuccessAt || radarEvidenceUpdatedAt != previous.radarEvidenceUpdatedAt || radarEvaluatedAt != previous.radarEvaluatedAt || radarValidUntil != previous.radarValidUntil || radarSyncStatus != previous.radarSyncStatus || radarConsecutiveFailures != previous.radarConsecutiveFailures || radarIsStale != previous.radarIsStale || radarIsUsingCachedFeed != previous.radarIsUsingCachedFeed { kinds.formUnion([.radar, .overview]) }
+    if radarCompletionUntil != previous.radarCompletionUntil || radarAnnouncementActive != previous.radarAnnouncementActive || radarDeadlineAt != previous.radarDeadlineAt || resetProbability24h != previous.resetProbability24h || radarLevel != previous.radarLevel || radarSummary != previous.radarSummary || radarLastSuccessAt != previous.radarLastSuccessAt || radarEvidenceUpdatedAt != previous.radarEvidenceUpdatedAt || radarEvaluatedAt != previous.radarEvaluatedAt || radarValidUntil != previous.radarValidUntil || radarSyncStatus != previous.radarSyncStatus || radarConsecutiveFailures != previous.radarConsecutiveFailures || radarIsStale != previous.radarIsStale || radarIsUsingCachedFeed != previous.radarIsUsingCachedFeed { kinds.formUnion([.radar, .overview]) }
     if resetCreditsAvailable != previous.resetCreditsAvailable || resetCredits != previous.resetCredits || resetCreditsRead != previous.resetCreditsRead || confirmedCreditExpiry != previous.confirmedCreditExpiry { kinds.formUnion([.resetCredits, .overview]) }
     if rolling24HoursTokens != previous.rolling24HoursTokens || todayTokens != previous.todayTokens || last7DaysTokens != previous.last7DaysTokens || monthTokens != previous.monthTokens || cost24HoursUSD != previous.cost24HoursUSD || cost7DaysUSD != previous.cost7DaysUSD || costMonthUSD != previous.costMonthUSD || cost24Coverage != previous.cost24Coverage || cost7Coverage != previous.cost7Coverage || costMonthCoverage != previous.costMonthCoverage || unpricedModels != previous.unpricedModels || cnyRate != previous.cnyRate { kinds.formUnion([.tokenSummary, .overview]) }
     if hourly24 != previous.hourly24 || daily14 != previous.daily14 { kinds.formUnion([.tokenTrend, .overview]) }

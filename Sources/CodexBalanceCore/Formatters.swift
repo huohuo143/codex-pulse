@@ -13,6 +13,15 @@ public struct CompactNumberParts: Equatable, Sendable {
 }
 
 public enum BalanceFormatters {
+  public static func beijingDeadline(_ date: Date, compact: Bool = false) -> String {
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: "zh_CN")
+    formatter.calendar = Calendar(identifier: .gregorian)
+    formatter.timeZone = TimeZone(secondsFromGMT: 8 * 3600)
+    formatter.dateFormat = compact ? "MM/dd HH:mm" : "yyyy年M月d日 HH:mm"
+    return formatter.string(from: date)
+  }
+
   public static func percent(_ value: Double?) -> String {
     guard let value, value.isFinite else { return "--" }
     return "\(Int(value.rounded()))%"

@@ -30,7 +30,8 @@ let package = Package(
     .executable(name: "CodexSuanliWidgets", targets: ["CodexSuanliWidgets"])
   ],
   targets: [
-    .target(name: "CodexBalanceCore", resources: [.process("Resources")]),
+    .target(name: "CZstd"),
+    .target(name: "CodexBalanceCore", dependencies: ["CZstd"], resources: [.process("Resources")]),
     .executableTarget(
       name: "CodexBalance",
       dependencies: ["CodexBalanceCore"]

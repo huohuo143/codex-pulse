@@ -95,7 +95,7 @@ struct DashboardSettingsView: View {
         Picker("本地额度刷新间隔", selection: $store.refreshIntervalOption) {
           ForEach(RefreshIntervalOption.allCases) { Text($0.title).tag($0) }
         }
-        Text("额度独立刷新，会话用量随新活动更新。窗口隐藏且连续 5 分钟无会话活动时，额度检查自动降至 120 秒；恢复活动或手动刷新后立即检查。雷达每 30 分钟独立同步。")
+        Text("额度独立刷新，会话用量随新活动更新。窗口隐藏且连续 5 分钟无会话活动时，额度检查自动降至 120 秒；恢复活动或手动刷新后立即检查。Tibo 动态每 10 分钟检查一次，由 GPT-6 Astra · High 分析。")
           .font(.caption)
           .foregroundStyle(DashboardColors.subtleText)
         HStack {
@@ -105,6 +105,12 @@ struct DashboardSettingsView: View {
       }
 
       settingsSection("额度预测与提醒") {
+        if let message = store.quotaHistoryStorageMessage {
+          Label(message, systemImage: "exclamationmark.triangle")
+            .font(.caption)
+            .foregroundStyle(.orange)
+            .fixedSize(horizontal: false, vertical: true)
+        }
         Toggle(isOn: Binding(
           get: { store.quotaAlertsEnabled },
           set: { store.setQuotaAlertsEnabled($0) }
@@ -170,7 +176,7 @@ struct DashboardSettingsView: View {
       }
 
       settingsSection("Codex 重置雷达") {
-        Text("读取 Codex Radar 首页收录的 Tibo 公开 Posts / Replies，由 App 本地规则估算 Codex 24 小时全局硬重置概率。BANKED reset 是可储存权益，与全局硬重置分开判定；过期的远程百分比不再展示。不需要 API Key 或 X Cookie。")
+        Text("每 10 分钟读取公开源收录的 Tibo 发帖与回复，使用本机已登录的 Codex，以 GPT-6 Astra · High 判断是否有明确重置预告，不预测概率。只保留最近 7 天动态；区分重置预告、完成确认和重置卡。不读取 X 登录态或 Cookie。")
           .font(.caption)
           .foregroundStyle(DashboardColors.subtleText)
         HStack {
@@ -196,7 +202,12 @@ struct DashboardSettingsView: View {
         )) {
           Text("打开 Codex 时自动启动")
         }
-        if let message = store.settingsMessage {
+        .disabled(store.launchWatcherIsUpdating)
+        if store.launchWatcherIsUpdating {
+          Text("正在更新自动启动…")
+            .font(.caption)
+            .foregroundStyle(DashboardColors.subtleText)
+        } else if let message = store.settingsMessage {
           Text(message)
             .font(.caption)
             .foregroundStyle(DashboardColors.subtleText)

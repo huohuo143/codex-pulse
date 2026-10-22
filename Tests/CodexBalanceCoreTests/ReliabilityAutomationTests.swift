@@ -12,8 +12,8 @@ struct ReliabilityAutomationTests {
     let history = root.appendingPathComponent("history.json")
     let budgets = root.appendingPathComponent("budgets.json")
     let widget = root.appendingPathComponent("widget.json")
-    try Data("{\"schemaVersion\":1}".utf8).write(to: history)
-    try Data("{\"schemaVersion\":1}".utf8).write(to: budgets)
+    try Data("{\"schemaVersion\":1,\"snapshots\":[]}".utf8).write(to: history)
+    try Data("{\"schemaVersion\":1,\"budgets\":[]}".utf8).write(to: budgets)
     let now = Date()
     try CodexWidgetSnapshotStore.save(CodexWidgetSnapshot(updatedAt: now), to: widget)
 
@@ -27,13 +27,15 @@ struct ReliabilityAutomationTests {
         launchWatcherEnabled: true,
         quotaHistoryURL: history,
         projectBudgetsURL: budgets,
-        widgetSnapshotURL: widget
+        widgetSnapshotURL: widget,
+        creditExpiryStore: .init(url: root.appendingPathComponent("credits-v2.json"),
+          legacyURL: root.appendingPathComponent("credits-v1.json"))
       ),
       now: now
     )
 
     #expect(result.overall == .healthy)
-    #expect(result.checks.count == 7)
+    #expect(result.checks.count == 10)
     #expect(result.criticalCount == 0)
   }
 
@@ -201,8 +203,12 @@ struct ReliabilityAutomationTests {
 
     try Data("not-json".utf8).write(to: url)
     #expect(store.load().isEmpty)
-    let files = try FileManager.default.contentsOfDirectory(atPath: root.path)
-    #expect(files.contains { $0.contains("corrupt-") })
+    #expect(store.loadResult().issue == .invalidRecord)
+    #expect(try Data(contentsOf: url) == Data("not-json".utf8))
+    let preserved = try store.rebuildAfterPreservingCorruption()
+    #expect(try Data(contentsOf: preserved) == Data("not-json".utf8))
+    #expect(store.loadResult().issue == nil)
+    #expect(store.load().isEmpty)
   }
 
   @Test

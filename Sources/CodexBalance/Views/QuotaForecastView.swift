@@ -5,6 +5,7 @@ import SwiftUI
 struct QuotaForecastCard: View {
   let forecast: QuotaForecast?
   let tint: Color
+  var storageMessage: String? = nil
 
   var body: some View {
     PanelCard {
@@ -19,6 +20,13 @@ struct QuotaForecastCard: View {
           }
           Spacer()
           statusBadge
+        }
+
+        if let storageMessage {
+          Label(storageMessage, systemImage: "exclamationmark.triangle")
+            .font(.caption)
+            .foregroundStyle(.orange)
+            .fixedSize(horizontal: false, vertical: true)
         }
 
         Text(forecast?.sustainabilitySummary ?? "暂时无法判断能否撑到重置")

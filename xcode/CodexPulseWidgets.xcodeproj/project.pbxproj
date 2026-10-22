@@ -35,7 +35,7 @@
 /* Begin PBXFrameworksBuildPhase section */
 		C10000000000000000000001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
+			buildActionMask = 2149483647;
 			files = (
 				A10000000000000000000008 /* SwiftUI.framework in Frameworks */,
 				A10000000000000000000009 /* WidgetKit.framework in Frameworks */,
@@ -129,13 +129,13 @@
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		C10000000000000000000003 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		C10000000000000000000003 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2149483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		C10000000000000000000002 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
+			buildActionMask = 2149483647;
 			files = (
 				A10000000000000000000001 /* WidgetBundle.swift in Sources */,
 				A10000000000000000000002 /* WidgetProvider.swift in Sources */,
@@ -160,13 +160,13 @@
 				ARCHS = "$(ARCHS_STANDARD)";
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGN_ENTITLEMENTS = ../config/CodexSuanliWidgets.entitlements;
-				CURRENT_PROJECT_VERSION = 2131;
+				CURRENT_PROJECT_VERSION = 2152;
 				DEFINES_MODULE = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ../config/CodexSuanliWidgets-Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/../Frameworks", "@executable_path/../../../../Frameworks");
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.12.5;
+				MARKETING_VERSION = 2.12.25;
 				OTHER_SWIFT_FLAGS = "$(inherited) -package-name CodexSuanliMeter";
 				PRODUCT_BUNDLE_IDENTIFIER = dev.codex.balance-dashboard.codex.widgets;
 				PRODUCT_NAME = CodexSuanliWidgets;
@@ -183,13 +183,13 @@
 				ARCHS = "$(ARCHS_STANDARD)";
 				CODE_SIGNING_ALLOWED = NO;
 				CODE_SIGN_ENTITLEMENTS = ../config/CodexSuanliWidgets.entitlements;
-				CURRENT_PROJECT_VERSION = 2131;
+				CURRENT_PROJECT_VERSION = 2152;
 				DEFINES_MODULE = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = ../config/CodexSuanliWidgets-Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/../Frameworks", "@executable_path/../../../../Frameworks");
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.12.5;
+				MARKETING_VERSION = 2.12.25;
 				OTHER_SWIFT_FLAGS = "$(inherited) -package-name CodexSuanliMeter";
 				PRODUCT_BUNDLE_IDENTIFIER = dev.codex.balance-dashboard.codex.widgets;
 				PRODUCT_NAME = CodexSuanliWidgets;

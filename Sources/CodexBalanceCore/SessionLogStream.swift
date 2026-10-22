@@ -11,9 +11,6 @@ enum SessionLogStream {
 
   static func read(file: URL, offset: Int, endOffset: Int, pending: Data,
                    consume: (String) -> Void) throws -> Result {
-    let handle = try FileHandle(forReadingFrom: file)
-    defer { try? handle.close() }
-    try handle.seek(toOffset: UInt64(max(0, offset)))
     var line = pending
     var batch = Data()
     var position = offset
@@ -30,8 +27,7 @@ enum SessionLogStream {
         line = Data(line.prefix(contextPrefixBytes))
       }
     }
-    while position < endOffset, let chunk = try handle.read(upToCount: min(256 * 1024, endOffset - position)), !chunk.isEmpty {
-      position += chunk.count
+    func consumeChunk(_ chunk: Data) {
       var start = chunk.startIndex
       while let newline = chunk[start...].firstIndex(of: 10) {
         append(chunk[start..<newline])
@@ -42,6 +38,19 @@ enum SessionLogStream {
         }
       }
       append(chunk[start...])
+    }
+    if SessionLogLocation.isCompressed(file) {
+      // Compressed offsets are not decoded offsets. Callers restart a changed
+      // frame and only publish the accumulated events after full validation.
+      position = try ZstdSessionStream.read(file: file, endOffset: endOffset, consume: consumeChunk)
+    } else {
+      let handle = try FileHandle(forReadingFrom: file)
+      defer { try? handle.close() }
+      try handle.seek(toOffset: UInt64(max(0, offset)))
+      while position < endOffset, let chunk = try handle.read(upToCount: min(256 * 1024, endOffset - position)), !chunk.isEmpty {
+        position += chunk.count
+        consumeChunk(chunk)
+      }
     }
     // A complete final JSON object does not require a newline; partial UTF-8 is
     // retained as bytes, so appends cannot replace or lose a split character.

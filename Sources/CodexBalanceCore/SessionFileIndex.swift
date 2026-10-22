@@ -57,7 +57,7 @@ public final class SessionFileIndex: @unchecked Sendable {
       for path in dirty {
         let url = URL(fileURLWithPath: path).standardizedFileURL
         guard roots.contains(where: { url.path == $0.path || url.path.hasPrefix($0.path + "/") }) else { continue }
-        if url.pathExtension == "jsonl" {
+        if SessionLogLocation.isSupported(url) {
           // File events only invalidate this entry. Filtering the complete
           // index for every append makes a batch of D events cost O(files * D).
           entries.removeValue(forKey: url.path)
@@ -79,7 +79,7 @@ public final class SessionFileIndex: @unchecked Sendable {
     enumerationCount += 1
     guard let enumerator = FileManager.default.enumerator(at: root,
       includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles]) else { return }
-    for case let url as URL in enumerator where url.pathExtension == "jsonl" { register(url) }
+    for case let url as URL in enumerator where SessionLogLocation.isSupported(url) { register(url) }
   }
 
   private func register(_ candidate: URL) {
@@ -114,6 +114,8 @@ public struct SessionReadDiagnostics: Codable, Equatable, Sendable {
   public var parsedFiles = 0
   public var bytesRead = 0
   public var aggregations = 0
+  // Optional for compatibility with previously encoded status snapshots.
+  public var unreadableFiles: Int? = nil
   public init() {}
 }
 

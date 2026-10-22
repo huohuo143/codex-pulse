@@ -83,7 +83,7 @@ struct ProjectBudgetEditorTests {
       for state in ["valid", "invalid", "failed"] {
         var form = ProjectBudgetEditorState(limitText: state == "invalid" ? "-100" : "2,000,000")
         if state == "failed" { _ = form.save { _ in .failure(CocoaError(.fileWriteNoPermission)) } }
-        let view = ProjectBudgetEditor(project: project, form: form) { _ in .success(()) }
+        let view = ProjectBudgetEditor(project: project, form: form) { _, _ in .success(()) }
           .environment(\.colorScheme, scheme)
           .preferredColorScheme(scheme)
           .frame(width: 420, height: 320)

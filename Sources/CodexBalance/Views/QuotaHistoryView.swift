@@ -56,7 +56,7 @@ struct QuotaHistoryView: View {
         Button { store.exportQuotaHistoryCSV(period: period) } label: {
           Label("导出样本", systemImage: "square.and.arrow.up")
         }
-        .disabled(points.isEmpty)
+        .disabled(store.isExporting || points.isEmpty)
         .help("导出所选时间范围内的官方额度采样")
       }
       Picker("额度历史时间范围", selection: $period) {

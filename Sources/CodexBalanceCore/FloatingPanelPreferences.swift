@@ -34,7 +34,7 @@ public enum FloatingPanelMetric: String, CaseIterable, Identifiable, Hashable, S
     case .weeklyQuota: "官方 7 天窗口的剩余比例"
     case .fiveHourQuota: "官方 5 小时窗口的剩余比例"
     case .rolling24Tokens: "最近 24 小时 Token 与金额预估"
-    case .resetRadar: "Codex 24 小时重置概率"
+    case .resetRadar: "Tibo 重置预告状态"
     case .resetCredits: "可用次数与最近到期信息"
     }
   }

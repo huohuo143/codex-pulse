@@ -109,6 +109,32 @@ private struct QuotaHistoryEnvelope: Codable {
   var snapshots: [QuotaSnapshot]
 }
 
+public enum QuotaHistoryStorageIssue: Error, LocalizedError, Equatable, Sendable {
+  case unreadableHistory
+  case invalidHistory
+  case unsupportedVersion(Int)
+  case preservationFailed
+  case changedOnDisk
+  case writeFailed
+
+  public var errorDescription: String? {
+    switch self {
+    case .unreadableHistory:
+      "无法读取额度历史，已暂停保存，原文件未改动。请检查文件是否可访问后重新打开 App。"
+    case .invalidHistory:
+      "额度历史内容不完整或格式无效，请检查恢复状态。健康检查未改动原文件。"
+    case let .unsupportedVersion(version):
+      "额度历史来自暂不支持的版本（\(version)），已暂停保存，原文件未改动。请使用支持该记录版本的 App。"
+    case .preservationFailed:
+      "额度历史损坏且未能备份，已暂停保存，原文件未改动。请检查文件夹是否可写后重新打开 App。"
+    case .changedOnDisk:
+      "额度历史文件在读取后发生变化，已暂停保存以保护现有记录。请重新打开 App 后继续。"
+    case .writeFailed:
+      "额度历史暂未保存，本次新样本仅保留在内存中；下次刷新将重试。"
+    }
+  }
+}
+
 public final class QuotaHistoryStore: @unchecked Sendable {
   public static let expectedWindowMinutes = 7.0 * 24.0 * 60.0
   public static let defaultURL = PulsePaths.support.appendingPathComponent("quota-history-v1.json")
@@ -119,6 +145,34 @@ public final class QuotaHistoryStore: @unchecked Sendable {
   private let lock = NSLock()
   private var loaded = false
   private var cached: [QuotaSnapshot] = []
+  private var lastReadData: Data?
+  private var blocksWrites = false
+  private var hasPendingChanges = false
+  private var issue: QuotaHistoryStorageIssue?
+  private var preservedOriginal: URL?
+
+  public var storageIssue: QuotaHistoryStorageIssue? {
+    lock.lock()
+    defer { lock.unlock() }
+    loadIfNeeded()
+    return issue
+  }
+
+  public var preservedOriginalURL: URL? {
+    lock.lock()
+    defer { lock.unlock() }
+    loadIfNeeded()
+    return preservedOriginal
+  }
+
+  public var storageMessage: String? {
+    lock.lock()
+    defer { lock.unlock() }
+    loadIfNeeded()
+    if let issue { return issue.localizedDescription }
+    if preservedOriginal != nil { return "检测到损坏的额度历史，已在原文件夹保留独立备份。额度趋势将从新样本重新积累。" }
+    return nil
+  }
 
   public init(url: URL = QuotaHistoryStore.defaultURL, fileManager: FileManager = .default) {
     self.url = url
@@ -153,6 +207,9 @@ public final class QuotaHistoryStore: @unchecked Sendable {
     defer { lock.unlock() }
     loadIfNeeded()
 
+    // A transient write failure must also retry when the next sample is unchanged.
+    defer { persistIfNeeded() }
+
     if let latest = cached.max(by: { $0.recordedAt < $1.recordedAt }) {
       if incoming.recordedAt < latest.recordedAt.addingTimeInterval(-60) {
         return cached
@@ -172,24 +229,26 @@ public final class QuotaHistoryStore: @unchecked Sendable {
 
     cached.append(incoming)
     cached = pruned(cached, now: now)
-    persist()
+    hasPendingChanges = true
     return cached
   }
 
   private func loadIfNeeded() {
     guard !loaded else { return }
     loaded = true
-    guard fileManager.fileExists(atPath: url.path) else { return }
     do {
-      let data = try Data(contentsOf: url)
-      let decoder = JSONDecoder()
-      decoder.dateDecodingStrategy = .iso8601
-      let envelope = try decoder.decode(QuotaHistoryEnvelope.self, from: data)
-      guard envelope.schemaVersion == QuotaHistoryEnvelope.currentSchemaVersion else { return }
-      cached = pruned(envelope.snapshots, now: Date())
+      guard let data = try Self.readHistory(at: url) else { return }
+      lastReadData = data
+      do {
+        let envelope = try Self.decodeHistory(data)
+        cached = pruned(envelope.snapshots, now: Date())
+      } catch QuotaHistoryStorageIssue.unsupportedVersion(let version) {
+        blockWrites(.unsupportedVersion(version))
+      } catch {
+        preserveCorruptFile(data)
+      }
     } catch {
-      quarantineCorruptFile()
-      cached = []
+      blockWrites(.unreadableHistory)
     }
   }
 
@@ -203,7 +262,18 @@ public final class QuotaHistoryStore: @unchecked Sendable {
     )
   }
 
-  private func persist() {
+  private func persistIfNeeded() {
+    guard hasPendingChanges, !blocksWrites else { return }
+    do {
+      // A refresh must not overwrite an edit or replacement made since loading.
+      guard try Self.readHistory(at: url) == lastReadData else {
+        blockWrites(.changedOnDisk)
+        return
+      }
+    } catch {
+      blockWrites(.unreadableHistory)
+      return
+    }
     do {
       try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
       let envelope = QuotaHistoryEnvelope(
@@ -213,18 +283,57 @@ public final class QuotaHistoryStore: @unchecked Sendable {
       let encoder = JSONEncoder()
       encoder.dateEncodingStrategy = .iso8601
       encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-      try encoder.encode(envelope).write(to: url, options: [.atomic])
+      let data = try encoder.encode(envelope)
+      try data.write(to: url, options: [.atomic])
+      lastReadData = data
+      hasPendingChanges = false
+      issue = nil
     } catch {
       // History is additive telemetry. A write failure must never block live quota display.
+      issue = .writeFailed
     }
   }
 
-  private func quarantineCorruptFile() {
+  private func blockWrites(_ issue: QuotaHistoryStorageIssue) {
+    self.issue = issue
+    blocksWrites = true
+  }
+
+  private func preserveCorruptFile(_ data: Data) {
     let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: "en_US_POSIX")
     formatter.dateFormat = "yyyyMMdd-HHmmss"
     let target = url.deletingPathExtension()
-      .appendingPathExtension("corrupt-(formatter.string(from: Date())).json")
-    try? fileManager.moveItem(at: url, to: target)
+      .appendingPathExtension("corrupt-\(formatter.string(from: Date()))-\(UUID().uuidString).json")
+    do {
+      // Copy without replacing any older backup. Keep the primary in place
+      // until a new history has actually been written successfully.
+      try fileManager.copyItem(at: url, to: target)
+      guard try Self.readHistory(at: target) == data else { throw CocoaError(.fileWriteUnknown) }
+      preservedOriginal = target
+    } catch {
+      blockWrites(.preservationFailed)
+    }
+  }
+
+  private static func readHistory(at url: URL) throws -> Data? {
+    try LocalRecordFile.read(at: url)
+  }
+
+  static func validateContents(_ data: Data) throws { _ = try decodeHistory(data) }
+
+  private static func decodeHistory(_ data: Data) throws -> QuotaHistoryEnvelope {
+    struct Header: Decodable { let schemaVersion: Int }
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .iso8601
+    guard let header = try? decoder.decode(Header.self, from: data) else { throw QuotaHistoryStorageIssue.invalidHistory }
+    guard header.schemaVersion == QuotaHistoryEnvelope.currentSchemaVersion else {
+      throw QuotaHistoryStorageIssue.unsupportedVersion(header.schemaVersion)
+    }
+    guard let payload = try? decoder.decode(QuotaHistoryEnvelope.self, from: data) else {
+      throw QuotaHistoryStorageIssue.invalidHistory
+    }
+    return payload
   }
 }
 

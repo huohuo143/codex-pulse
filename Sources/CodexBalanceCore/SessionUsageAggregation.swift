@@ -99,11 +99,11 @@ extension CodexStatusReader {
   func buildTokenUsageEvents(from events: [RateLimitEvent]) -> [TokenUsageEvent] {
     var unique: [String: TokenUsageEvent] = [:]
     for event in events where event.usage.lastTotalTokens > 0 && event.usage.totalTokens > 0 {
-      // `totalTokens` is cumulative within one rollout file. Codex can emit
+      // `totalTokens` is cumulative within one rollout session. Codex can emit
       // multiple quota snapshots without advancing that cumulative counter,
       // sometimes with a different `lastTotalTokens` value. Count the first
       // occurrence only so a status-only refresh never becomes new usage.
-      let key = "\(event.sourcePath):\(event.usage.totalTokens)"
+      let key = "\(SessionLogLocation.accountingIdentity(event.sourcePath)):\(event.usage.totalTokens)"
       let displayProjectName = workspaceLabel(for: event.projectPath) ?? event.projectName
       let usageEvent = TokenUsageEvent(
         timestamp: event.timestamp,

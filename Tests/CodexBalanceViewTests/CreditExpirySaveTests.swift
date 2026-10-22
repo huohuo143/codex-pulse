@@ -5,6 +5,43 @@ import CodexBalanceCore
 
 @MainActor @Suite("Credit grant save reliability", .serialized)
 struct CreditExpirySaveTests {
+  @Test func unsafeBackupKeepsVisibleRecordsAndDraftUntilReloadAndRetry() async throws {
+    let fixture = CreditSaveFixture()
+    defer { fixture.clean() }
+    let initial = CreditExpiryLedger(batches: [grant("existing")])
+    try fixture.storage.save(initial)
+    let original = try Data(contentsOf: fixture.storage.url)
+    let store = DashboardStore(startServices: false, expiryStore: fixture.storage)
+    var form = CreditExpiryEditorState()
+    form.select(initial.batches[0], account: nil)
+    form.note = "keep this draft"
+    let draft = try form.makeBatch(existing: initial.batches[0])
+    try FileManager.default.removeItem(at: fixture.storage.previousURL)
+    try FileManager.default.createSymbolicLink(atPath: fixture.storage.previousURL.path, withDestinationPath: "missing-backup.json")
+    let succeeded = await store.saveCreditExpiry(batch: draft, confirmed: false)
+    form.finishSave(draft, succeeded: succeeded)
+    #expect(!succeeded)
+    #expect(store.creditExpiry == initial)
+    #expect(store.creditExpiryStorageIssue == .unreadableBackup)
+    #expect(store.creditExpiryRecovery == nil)
+    #expect(!store.isSavingCreditExpiry)
+    #expect(try Data(contentsOf: fixture.storage.url) == original)
+    #expect(form.note == "keep this draft")
+    #expect(form.hasUnsavedChanges)
+    let reopened = DashboardStore(startServices: false, expiryStore: fixture.storage)
+    #expect(reopened.creditExpiry == initial)
+    #expect(reopened.creditExpiryStorageIssue == .unreadableBackup)
+    try FileManager.default.removeItem(at: fixture.storage.previousURL)
+    try original.write(to: fixture.storage.previousURL)
+    let reloaded = try #require(await store.reloadCreditExpiry())
+    form.receiveReloadedLedger(reloaded)
+    #expect(form.note == "keep this draft")
+    #expect(form.selectedID == "existing")
+    let retry = try form.makeBatch(existing: reloaded.batches[0])
+    #expect(await store.saveCreditExpiry(batch: retry, confirmed: false))
+    #expect(fixture.storage.load().batches[0].note == "keep this draft")
+  }
+
   @Test func overlappingSaveIsRejectedAndRetryRetainsBothGrants() async throws {
     let fixture = CreditSaveFixture()
     defer { fixture.clean() }
@@ -136,7 +173,14 @@ struct CreditExpirySaveTests {
     #expect(form.credits == "1,5")
   }
 
-  @Test func backupIncludesBothGrantFormatsAndDetectsMissingReceipt() throws {
+  @Test func backupIncludesBothGrantFormatsAndDetectsMissingReceipt() async throws {
+    let defaults = PulsePreferences.shared
+    let previousBackupSetting = defaults.object(forKey: "reliabilityBackupsEnabled")
+    defaults.set(true, forKey: "reliabilityBackupsEnabled")
+    defer {
+      if let previousBackupSetting { defaults.set(previousBackupSetting, forKey: "reliabilityBackupsEnabled") }
+      else { defaults.removeObject(forKey: "reliabilityBackupsEnabled") }
+    }
     let fixture = CreditSaveFixture()
     defer { fixture.clean() }
     let batch = grant("current")
@@ -150,9 +194,10 @@ struct CreditExpirySaveTests {
     let archiveRoot = fixture.root.appendingPathComponent("archive")
     let archive = LocalAutomationArchive(root: archiveRoot)
     let now = Date()
-    #expect(store.shouldPerformAutomaticBackup(now: now, archive: archive))
-    store.performLocalBackup(now: now, archive: archive)
-    #expect(!store.shouldPerformAutomaticBackup(now: now, archive: archive))
+    #expect(store.canRunAutomaticBackup)
+    #expect(!archive.hasBackup(for: now, sourceURLs: store.localBackupSourceURLs))
+    await store.performLocalBackup(now: now, archive: archive)
+    #expect(archive.hasBackup(for: now, sourceURLs: store.localBackupSourceURLs))
     let files = try #require(FileManager.default.enumerator(at: archiveRoot, includingPropertiesForKeys: nil))
       .allObjects.compactMap { $0 as? URL }
     for source in [fixture.storage.url, fixture.storage.legacyURL, fixture.storage.previousURL] {
@@ -161,7 +206,7 @@ struct CreditExpirySaveTests {
     }
     let copy = try #require(files.first { $0.lastPathComponent == fixture.storage.url.lastPathComponent })
     try FileManager.default.removeItem(at: copy)
-    #expect(store.shouldPerformAutomaticBackup(now: now, archive: archive))
+    #expect(!archive.hasBackup(for: now, sourceURLs: store.localBackupSourceURLs))
   }
 
   @Test func diskCorruptionAfterLoadingBlocksSaveUntilExplicitRecovery() async throws {

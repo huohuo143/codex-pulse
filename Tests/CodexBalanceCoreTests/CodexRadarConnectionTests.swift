@@ -69,6 +69,12 @@ struct CodexRadarConnectionTests {
       #expect((error as? URLError)?.code == .timedOut)
     }
     #expect(started.duration(to: .now) < .seconds(1))
+    // URLSession reports stopLoading asynchronously after task cancellation.
+    // Keep the transfer-time assertion above; allow only its callback to settle.
+    let cancellationDeadline = ContinuousClock.now.advanced(by: .seconds(2))
+    while scenario.stopCount < 1, ContinuousClock.now < cancellationDeadline {
+      try await Task.sleep(for: .milliseconds(10))
+    }
     #expect(scenario.stopCount >= 1)
   }
 

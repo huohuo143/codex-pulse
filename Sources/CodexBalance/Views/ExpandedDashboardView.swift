@@ -52,6 +52,19 @@ struct ExpandedDashboardView: View {
           .padding(.horizontal, 20)
           .padding(.top, 18)
           .padding(.bottom, 12)
+        if let title = store.exportProgressTitle {
+          HStack(spacing: 8) {
+            ProgressView().controlSize(.small)
+            Text("正在导出\(title)…").font(.system(size: 11, weight: .medium))
+            Spacer()
+            Text("可继续浏览").font(.caption).foregroundStyle(DashboardColors.subtleText)
+          }
+          .padding(10)
+          .background(DashboardColors.separator.opacity(0.2), in: RoundedRectangle(cornerRadius: 8))
+          .padding(.horizontal, 20)
+          .padding(.bottom, 10)
+          .accessibilityElement(children: .combine)
+        }
         if let feedback = store.operationFeedback {
           DashboardOperationBanner(feedback: feedback) { store.operationFeedback = nil }
             .padding(.horizontal, 20)
@@ -94,6 +107,7 @@ struct ExpandedDashboardView: View {
         if store.isLoading || store.isFullRefreshing { ProgressView().controlSize(.small) }
         iconButton("doc.on.doc", help: "复制用量摘要") { store.copyUsageSummary() }
         iconButton("square.and.arrow.up", help: "导出用量 CSV") { store.exportUsageCSV() }
+          .disabled(store.isExporting || !store.hasUsageData)
         iconButton("arrow.clockwise", help: "刷新额度、完整用量与重置雷达") { store.refreshAll() }
         iconButton(
           store.floatingPanelEnabled ? "chevron.up" : "rectangle.on.rectangle.slash",
@@ -150,9 +164,9 @@ struct ExpandedDashboardView: View {
         expiryBatches: store.creditExpiry.confirmedBatches(for: store.status?.accountScope),
         metadata: store.status?.flexibleCreditRead
       )
-      QuotaForecastCard(forecast: store.quotaForecast, tint: store.palette.weekly)
+      QuotaForecastCard(forecast: store.quotaForecast, tint: store.palette.weekly,
+        storageMessage: store.quotaHistoryStorageMessage)
       CodexRadarView(snapshot: store.codexRadarSnapshot, palette: store.palette, isLoading: store.codexRadarIsLoading, nextSyncAt: store.codexRadarNextSyncAt, statusMessage: store.codexRadarStatusMessage, refresh: { store.refreshCodexRadar(force: true) })
-      RadarEvaluationView(summary: store.radarEvaluation, message: store.radarEvaluationMessage, save: store.saveRadarOutcome)
       costCards
       disclaimerPanel
       errorPanel

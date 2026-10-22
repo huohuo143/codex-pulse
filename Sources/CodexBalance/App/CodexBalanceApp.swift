@@ -60,6 +60,7 @@ struct CodexBalanceApp: App {
           store.exportUsageCSV()
         }
         .keyboardShortcut("e", modifiers: [.command, .shift])
+        .disabled(store.isExporting || !store.hasUsageData)
 
         Button("复制用量摘要") {
           store.copyUsageSummary()

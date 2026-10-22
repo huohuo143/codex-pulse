@@ -14,12 +14,16 @@ struct AdvancedInsightsView: View {
       budgetPanel
     }
     .sheet(item: $budgetEditorProject) { project in
+      let existing = store.projectBudgets.first(where: { $0.id == project.id })
       ProjectBudgetEditor(
         project: project,
-        form: ProjectBudgetEditorState(limitText:
-          store.projectBudgets.first(where: { $0.id == project.id }).map { String($0.monthlyTokenLimit) } ?? "")
-      ) { limit in
-        store.setProjectBudget(project: project, monthlyTokenLimit: limit)
+        form: ProjectBudgetEditorState(limitText: existing.map { String($0.monthlyTokenLimit) } ?? "", originalBudget: existing),
+        storageIssue: store.projectBudgetStorageIssue, recovery: store.projectBudgetRecovery,
+        recoveryMessage: store.budgetMessage?.hasPrefix("预算恢复失败：") == true ? store.budgetMessage : nil,
+        reload: store.reloadProjectBudgets, restore: store.restoreProjectBudgetBackup,
+        openFolder: store.openProjectBudgetFolder
+      ) { limit, original in
+        store.setProjectBudget(project: project, monthlyTokenLimit: limit, originalBudget: original)
       }
     }
   }
@@ -119,9 +123,16 @@ struct AdvancedInsightsView: View {
               }
             }
           }
+          .disabled(store.projectBudgetStorageIssue != nil)
         }
 
-        if store.usageAnalysis.projectBudgets.isEmpty {
+        if let issue = store.projectBudgetStorageIssue {
+          ProjectBudgetRecoveryView(issue: issue, recovery: store.projectBudgetRecovery,
+            reload: { _ = store.reloadProjectBudgets() }, restore: { _ = store.restoreProjectBudgetBackup() },
+            openFolder: store.openProjectBudgetFolder)
+        }
+
+        if store.usageAnalysis.projectBudgets.isEmpty, store.projectBudgetStorageIssue == nil {
           Label("尚未设置项目预算；可从右上角选择本月项目。", systemImage: "gauge.with.dots.needle.bottom.50percent")
             .font(.system(size: 11, weight: .medium))
             .foregroundStyle(DashboardColors.subtleText)
@@ -172,10 +183,12 @@ struct AdvancedInsightsView: View {
           )
         }
         .buttonStyle(.borderless)
+        .disabled(store.projectBudgetStorageIssue != nil)
         Button(role: .destructive) { store.removeProjectBudget(id: row.id) } label: {
           Image(systemName: "trash")
         }
         .buttonStyle(.borderless)
+        .disabled(store.projectBudgetStorageIssue != nil)
       }
       ProgressView(value: min(1, row.progress))
         .tint(budgetColor(row.risk))
@@ -265,6 +278,7 @@ struct AdvancedInsightsView: View {
 
 struct ProjectBudgetEditorState {
   var limitText: String
+  var originalBudget: ProjectBudget? = nil
   var saveError: String?
 
   var parsedLimit: Int? { try? ProjectBudgetInput.parse(limitText).get() }
@@ -292,7 +306,13 @@ struct ProjectBudgetEditor: View {
   @Environment(\.dismiss) private var dismiss
   let project: TokenProjectBucket
   @State var form: ProjectBudgetEditorState
-  let onSave: (Int) -> Result<Void, Error>
+  var storageIssue: ProjectBudgetStorageIssue? = nil
+  var recovery: ProjectBudgetRecovery? = nil
+  var recoveryMessage: String? = nil
+  var reload: () -> Bool = { false }
+  var restore: () -> Bool = { false }
+  var openFolder: () -> Void = {}
+  let onSave: (Int, ProjectBudget?) -> Result<Void, Error>
 
   var body: some View {
     VStack(alignment: .leading, spacing: 16) {
@@ -313,7 +333,17 @@ struct ProjectBudgetEditor: View {
       Text("输入大于 0 的整数，可使用英文逗号分隔千位。")
         .font(.caption)
         .foregroundStyle(.secondary)
-      if let message = form.validationMessage ?? form.saveError {
+      if let storageIssue {
+        ProjectBudgetRecoveryView(issue: storageIssue, recovery: recovery,
+          reload: { if reload() { form.saveError = nil } },
+          restore: { if restore() { form.saveError = nil } }, openFolder: openFolder)
+      }
+      if let recoveryMessage {
+        Label(recoveryMessage, systemImage: "exclamationmark.triangle.fill")
+          .font(.caption).foregroundStyle(.red)
+          .fixedSize(horizontal: false, vertical: true)
+      }
+      if let message = form.validationMessage ?? (storageIssue == nil ? form.saveError : nil) {
         Label(message, systemImage: "exclamationmark.triangle.fill")
           .font(.caption)
           .foregroundStyle(.red)
@@ -324,13 +354,39 @@ struct ProjectBudgetEditor: View {
         Button("取消") { dismiss() }
           .keyboardShortcut(.cancelAction)
         Button("保存") {
-          if form.save(using: onSave) { dismiss() }
+          let original = form.originalBudget
+          if form.save(using: { onSave($0, original) }) { dismiss() }
         }
         .keyboardShortcut(.defaultAction)
-        .disabled(form.parsedLimit == nil)
+        .disabled(form.parsedLimit == nil || storageIssue != nil)
       }
     }
     .padding(22)
     .frame(width: 420)
+  }
+}
+
+private struct ProjectBudgetRecoveryView: View {
+  let issue: ProjectBudgetStorageIssue
+  let recovery: ProjectBudgetRecovery?
+  let reload: () -> Void
+  let restore: () -> Void
+  let openFolder: () -> Void
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Label(issue.localizedDescription, systemImage: "exclamationmark.triangle.fill")
+        .font(.caption).foregroundStyle(.orange)
+        .fixedSize(horizontal: false, vertical: true)
+      if let recovery {
+        Button("恢复上次有效预算（\(recovery.budgetCount) 个项目）", action: restore)
+        Text("恢复前保留损坏原件；当前编辑框中的输入会保留，恢复后可继续保存。")
+          .font(.caption).foregroundStyle(.secondary)
+      }
+      HStack {
+        Button("重新读取", action: reload)
+        Button("打开预算文件夹", action: openFolder)
+      }
+    }
   }
 }
