@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 const api = {};
 for (const [name, channel] of Object.entries({
   bootstrap: "get-bootstrap",
+  localCapabilities: "local-capabilities", tiboPreferences: "tibo-preferences", openX: "open-x",
   refresh: "refresh",
   refreshRadar: "refresh-radar",
   setCompact: "set-compact",

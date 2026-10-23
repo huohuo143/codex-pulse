@@ -448,6 +448,8 @@ function openExternal(target) {
     throw new Error("不支持此链接");
   return shell.openExternal(u.href);
 }
+const capabilities = require('./core/local-capabilities');
+const xSource = new (require('./core/x-source').XSource)();
 function register() {
   const handle = (name, fn) =>
     ipcMain.handle(name, async (e, ...args) => {
@@ -455,11 +457,18 @@ function register() {
       if (!entry) throw new Error("未知窗口");
       return fn(entry[0], ...args);
     });
+  runtime.radar.xSource = () => xSource.fetch();
+  handle('local-capabilities', () => capabilities.inspect());
+  handle('tibo-preferences', (_, value) => {
+    if (value) { capabilities.save(store, value); if (!value.enabled) runtime.radar.analysisController?.abort(); runtime.radar.synchronizeSource(); runtime.publish(); }
+    return capabilities.preferences(store);
+  });
+  handle('open-x', () => xSource.show());
   handle("get-bootstrap", (key) => ({
     settings: windowSettings(key),
     platform: process.platform,
     version: app.getVersion(),
-    build: 2153,
+    build: 2157,
     status: runtime.state,
     radar: runtime.state.radar,
     exchangeRate: runtime.state.exchangeRate,
@@ -621,7 +630,7 @@ function restoreWindows() {
   }
 }
 async function start() {
-  require('./core/upgrade-backup').backupBeforeUpgrade(dataRoot, app.getVersion(), 2153);
+  require('./core/upgrade-backup').backupBeforeUpgrade(dataRoot, app.getVersion(), 2157);
   store = new Store(dataRoot);
   const old = store.read("settings", {});
   if (old.schemaVersion !== 2118 && fs.existsSync(store.file("settings"))) {
@@ -752,6 +761,7 @@ async function start() {
   app.on("activate", () => showMain());
 }
 app.on("before-quit", () => {
+  xSource.stop();
   quitting = true;
   clearTimeout(boundsTimer);
   clearInterval(watcherTimer);
