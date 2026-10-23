@@ -1,0 +1,82 @@
+{
+  "type": "object",
+  "properties": {
+    "state": {
+      "type": "string",
+      "enum": [
+        "announced",
+        "completed",
+        "not_found",
+        "uncertain"
+      ]
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "hard_reset",
+        "reset_card",
+        "none",
+        "uncertain"
+      ]
+    },
+    "summaryZh": {
+      "type": "string"
+    },
+    "timingZh": {
+      "type": "string"
+    },
+    "evidenceIDs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "deadline": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "localDateTime": {
+              "type": "string"
+            },
+            "sourceTimeZone": {
+              "type": "string"
+            },
+            "evidenceID": {
+              "type": "string"
+            },
+            "sourceQuote": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "localDateTime",
+            "sourceTimeZone",
+            "evidenceID",
+            "sourceQuote"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "completionEvidenceID": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "state",
+    "kind",
+    "summaryZh",
+    "timingZh",
+    "evidenceIDs",
+    "deadline",
+    "completionEvidenceID"
+  ],
+  "additionalProperties": false
+}
