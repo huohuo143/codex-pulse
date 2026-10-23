@@ -233,6 +233,7 @@ final class DashboardStore: ObservableObject {
   let fullReader = CodexStatusReader()
   let exchangeRateService: ExchangeRateService
   let codexRadarService: CodexRadarService
+  let xTiboSource: LocalXTiboSource
   let radarEvaluationArchive = RadarEvaluationArchive()
   var quotaHistoryStore = QuotaHistoryStore()
   let creditExpiryStore: CreditExpiryLedgerStore
@@ -287,12 +288,18 @@ final class DashboardStore: ObservableObject {
   var lastAutomaticRecoveryAt: Date?
   var automaticRecoveryAttempts = 0
 
-  init(startServices: Bool = true, radarService: CodexRadarService = CodexRadarService(),
+  init(startServices: Bool = true, radarService: CodexRadarService? = nil,
        alertLedgerStore: QuotaAlertLedgerStore = QuotaAlertLedgerStore(),
        expiryStore: CreditExpiryLedgerStore = CreditExpiryLedgerStore(),
        budgetStore: ProjectBudgetStore = ProjectBudgetStore(),
        eventStore: ReliabilityEventStore = ReliabilityEventStore()) {
-    codexRadarService = radarService
+    if startServices { TiboAnalysisPreferences.migrate() }
+    let xSource = LocalXTiboSource()
+    xTiboSource = xSource
+    codexRadarService = radarService ?? CodexRadarService(publicPageFetcher: {
+      if TiboAnalysisPreferences.load().usesX { return try await xSource.fetch() }
+      return try await CodexRadarService.fetchPublicTiboPage()
+    }, sourceIdentifier: { TiboAnalysisPreferences.load().usesX ? "x" : "public" })
     creditExpiryStore = expiryStore
     projectBudgetStore = budgetStore
     reliabilityEventStore = eventStore

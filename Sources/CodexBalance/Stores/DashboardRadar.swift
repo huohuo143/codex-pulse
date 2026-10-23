@@ -12,7 +12,8 @@ extension DashboardStore {
     guard codexRadarRefreshGate.request(force: force) else { return }
     recordRuntimeEvent("radar-request")
     codexRadarIsLoading = true
-    codexRadarStatusMessage = "正在检查 Tibo 发帖与回复，并由 GPT-6 Astra · High 分析…"
+    codexRadarStatusMessage = TiboAnalysisPreferences.load().enabled
+      ? "正在读取 Tibo 发帖与回复，并使用本机可用模型分析…" : "正在读取 Tibo 发帖与回复…"
     let service = codexRadarService
     Task {
       do {

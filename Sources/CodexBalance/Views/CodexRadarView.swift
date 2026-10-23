@@ -12,6 +12,9 @@ struct CodexRadarView: View {
   @AppStorage("radarCommunityExpanded") private var communityExpanded = false
   @State private var allTiboPostsExpanded = false
 
+  private var sourceLabel: String { snapshot?.tiboSourceID == "x" ? "X 官网 · Tibo 发帖与回复" : CodexRadarService.attributionText }
+  private var sourceURL: URL { snapshot?.tiboSourceID == "x" ? XTiboTimeline.profileURL : CodexRadarService.siteURL }
+
   var body: some View {
     VStack(spacing: 14) {
       TimelineView(.periodic(from: .now, by: snapshot?.tiboCompletionUntil(at: Date()) == nil ? 30 : 1)) { _ in
@@ -30,7 +33,7 @@ struct CodexRadarView: View {
           Text("Tibo 重置预告")
             .font(.system(size: 24, weight: .heavy, design: .rounded))
           Spacer()
-          Text("GPT-6 Astra · High")
+          Text(snapshot?.tiboModelLabel ?? "本机 Codex 模型")
             .font(.system(size: 12, weight: .bold))
             .foregroundStyle(palette.weekly)
         }
@@ -111,15 +114,15 @@ struct CodexRadarView: View {
         Text("每 10 分钟检查一次发帖与回复 · 仅保留最近 7 天 · 不预测概率")
           .font(.system(size: 12, weight: .semibold))
           .foregroundStyle(DashboardColors.subtleText)
-        Link(CodexRadarService.attributionText, destination: CodexRadarService.siteURL)
+        Link(sourceLabel, destination: sourceURL)
           .font(.system(size: 10, weight: .medium))
       }
     }
   }
 
   private func refreshStatus(at now: Date) -> some View {
-    let healthy = snapshot?.tiboRefreshIsHealthy(at: now) == true
-    let hasFailure = snapshot?.tiboAnalysisFailure != nil || (snapshot?.syncState?.consecutiveFailures ?? 0) > 0
+    let healthy = snapshot?.tiboDisplayRefreshIsHealthy(at: now) == true
+    let hasFailure = (snapshot?.tiboAnalysisEnabled != false && snapshot?.tiboAnalysisFailure != nil) || (snapshot?.syncState?.consecutiveFailures ?? 0) > 0
     let title = isLoading ? "正在检查与分析" : (healthy ? "刷新正常" : (hasFailure ? "刷新或分析未成功" : "等待刷新与分析"))
     let color: Color = isLoading ? palette.weekly : (healthy ? .green : .orange)
     return VStack(alignment: .leading, spacing: 10) {
@@ -233,9 +236,9 @@ struct CodexRadarView: View {
         }
 
         HStack {
-          Link(CodexRadarService.attributionText, destination: CodexRadarService.siteURL)
+          Link(sourceLabel, destination: sourceURL)
           Spacer()
-          Text("公开源收录的动态")
+          Text(snapshot?.tiboSourceID == "x" ? "X 页面实际加载的动态" : "公开源收录的动态")
         }
         .font(.system(size: 9, weight: .medium))
         .foregroundStyle(DashboardColors.subtleText)

@@ -77,8 +77,10 @@ struct ResetCalendarView: View {
           }
           Text("只展示已收录历史；空白日期不代表没有发生重置。")
             .font(.system(size: 10)).foregroundStyle(DashboardColors.subtleText)
+          Text("公共事件月历，所有账号共用。个人灵活额度、Full reset 数量和实际到账以当前账号的本机数据为准。")
+            .font(.system(size: 10)).foregroundStyle(DashboardColors.subtleText)
           if events.contains(where: { $0.historicalCatalogRevision != nil }) {
-            Text("含 2026 年 4—9 月公开历史补录；预告及无法核实日期的记录不计入。")
+            Text("内置公开历史可离线查看；7—9 月已核对记录随包提供，尚不能确认完整覆盖。安装后的新动态继续每 10 分钟读取 Tibo 发帖与回复。")
               .font(.system(size: 10)).foregroundStyle(DashboardColors.subtleText)
             Link("部分历史资料：codex-reset.com · CC BY 4.0",
               destination: URL(string: "https://codex-reset.com/data/codex-resets.json")!)
@@ -106,6 +108,15 @@ struct ResetCalendarView: View {
               .font(.system(size: 12, weight: .medium))
             Text("不同来源的覆盖范围与统计口径可能不同；保留原始总数，不据此补造或删除日历事件。")
               .font(.system(size: 10)).foregroundStyle(DashboardColors.subtleText)
+            if let verified = total.verifiedOn {
+              Text("内置月度统计 · 核对日期 \(verified) · 可离线查看")
+                .font(.system(size: 10)).foregroundStyle(DashboardColors.subtleText)
+            }
+            if total.hardResets != monthEvents.filter({ $0.kind == .hardReset }).count
+              || total.resetCards != monthEvents.filter({ $0.kind == .resetCard }).count {
+              Text("月度总数与可定位日期的条目尚未完全对应；未核实的日期保留为空白。")
+                .font(.system(size: 11, weight: .medium)).foregroundStyle(.orange)
+            }
             Link("查看 Codex Radar 历史说明", destination: URL(string: "https://codexradar.com/#reset-radar")!)
               .font(.system(size: 11))
           }.frame(maxWidth: .infinity, alignment: .leading)
@@ -150,7 +161,7 @@ struct ResetCalendarView: View {
   private var syncStatus: some View {
     VStack(alignment: .leading, spacing: 4) {
       if let success = snapshot?.lastSuccessAt {
-        Text("上次成功同步：\(time(success)) · 每 30 分钟自动同步")
+        Text("上次成功同步：\(time(success)) · 每 10 分钟随 Tibo 动态同步")
       } else { Text(isLoading ? "正在读取历史记录…" : "等待首次成功同步") }
       if let failure = snapshot?.failureMessage { Text(failure).foregroundStyle(.orange) }
     }.font(.system(size: 10)).foregroundStyle(DashboardColors.subtleText)

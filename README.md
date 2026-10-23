@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-2.12.26-8b7cff">
+  <img alt="Version" src="https://img.shields.io/badge/version-2.12.28-8b7cff">
   <img alt="macOS" src="https://img.shields.io/badge/macOS-14%2B-111827?logo=apple">
   <img alt="Mac architectures" src="https://img.shields.io/badge/Mac-arm64%20%7C%20x86__64-111827">
   <img alt="Swift" src="https://img.shields.io/badge/Swift-6.0-f05138?logo=swift&logoColor=white">
@@ -18,7 +18,19 @@
 
 `Codex 脉动` 将 Codex 的额度、Token 消耗、重置节奏和 Full reset 权益集中到一套原生 macOS 界面中。它既可以作为常驻悬浮框，也可以完全隐藏悬浮框，仅使用主窗口或 7 款桌面小组件。
 
-> 最新 macOS 发布版本：`2.12.26` build 2153，提供 Apple Silicon（arm64）安装包。主应用兼容 macOS 13；桌面小组件要求 macOS 14 或更高版本；安装包为 ad-hoc 签名、未公证版本。Windows x64 现已提供 2.12.26 build 2153 安装版、免安装版与源码包，见同版本发布页及 [Windows 说明](windows/README.md)。
+> macOS 版本：`2.12.28` build 2155，提供 Apple Silicon（arm64）安装包。主应用兼容 macOS 13；桌面小组件要求 macOS 14 或更高版本；安装包为 ad-hoc 签名、未公证版本。Windows x64 仍为 [2.12.26 build 2153](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.26)，本轮 macOS 新功能尚未移植至 Windows。
+
+公共重置历史为随包分发的公共事件记录；最近三个完整月份（2026 年 7—9 月）提供 20 条可定位日期的记录及原始月度总数，未声称完整覆盖。安装后的新预告继续读取 Tibo 在 X 上的发帖与回复。个人灵活额度、Full reset 数量/到期时间和实际到账以当前账号本机数据为准。详见 [历史依据及缺口](docs/RESET_HISTORY_SOURCES.md)。
+
+## 2.12.28 面向个人账号的本地分发版
+
+安装后读取使用者本机 Codex 登录和会话记录。Tibo 默认通过 Codex Radar 公开源读取，无需登录 X；设置中可选 X 官网“发帖与回复”页面，必要时由使用者在内嵌窗口自行登录。登录态只由本机 WebKit 保存，不提取其他浏览器 Cookie。公开源可能延迟或遗漏，X 只读取页面实际加载的近期内容，均不保证覆盖全部动态。
+
+新用户默认不开启模型分析；可以先查看动态，再在设置中启用并选择本机账号实际提供的模型与推理强度。自动模式使用当前账号的默认模型，不要求人人拥有 GPT-6 Astra。分析消耗使用者自己的 Codex 额度；API Key 登录按 API 计费。旧用户已有成功分析设置会迁移保留。
+
+额度、Full reset、账户汇总受当前账号权限与官方接口影响；缺失数据不会伪装成零或满额。本地 Token 只覆盖已读取的本机会话记录，不是网页端全部用量。未开启分析时显示“动态已更新”，不声称没有预告。保留十分钟检查、七天清理、北京时间期限、三种状态配色和到账 24 小时倒计时。
+
+详见[更新说明](docs/RELEASE_2.12.28.md)、[安装说明](docs/INSTALL_UPGRADE_2.12.28.md)与[验证范围](docs/VALIDATION_2.12.28.md)。
 
 ## 2.12.26 实际重置到账与24小时倒计时
 
@@ -114,7 +126,7 @@ Tibo 动态列表保留公开源收录的最新 Posts / Replies，并读取页�
 | 额度预测 | 本地记录官方额度百分点，估算消耗速度、耗尽区间、均衡日上限和风险等级 |
 | 原生提醒 | 用户主动开启后，按额度阈值、预测高风险和 Full reset 到期发送 macOS 通知 |
 | Token 统计 | 滚动 24 小时、最近 30 天按日趋势、多设备分色堆叠、今日、近 7 天、本月 Token，以及 input、cached input、output 和 model |
-| 重置雷达 | GPT-6 Astra / High 分析公开发帖与回复；预告、北京时间截止时间、到账 24 小时倒计时及真实刷新状态 |
+| 重置雷达 | 可选本机可用模型分析公开发帖与回复；预告、北京时间截止时间、到账 24 小时倒计时及真实刷新状态 |
 | 重置日历 | 北京时间历史月历、硬重置与重置卡筛选、确认来源、日期精度及独立离线历史 |
 | Full reset | 可用次数、获得时间和逐次到期日，只读展示，不提供消耗操作 |
 | 高级分析 | 最近 14 天、同期对比、月末推演、异常高峰、缓存/模型/项目集中度及智能诊断 |
@@ -203,7 +215,7 @@ flowchart LR
 - 项目预算保存于 `~/Library/Application Support/CodexSuanliMeter/project-budgets-v1.json`，高级分析只使用已有本机聚合结果。
 - 可靠性事件位于 `reliability-events-v1.json`；备份和每日摘要位于 `~/Library/Application Support/CodexSuanliMeter/automation/`。
 - Codex 额度和 Full reset 权益通过只读方式获取；Full reset 不提供兑换或消耗入口。
-- 重置雷达每 10 分钟读取 Codex Radar 收录的 Tibo 发帖与回复；补充公开 X 线程上下文，使用 GPT-6 Astra / High 判断预告与明确期限。手动刷新、重启和唤醒共享检查预算。
+- 重置雷达每 10 分钟读取 Codex Radar 公开源或可选的 X 官网发帖与回复页；开启分析后补充公开线程上下文，并使用当前账号可用的所选模型判断预告与明确期限。手动刷新、重启和唤醒共享检查预算。
 - 明确期限按原文时区换算为北京时间；确认到账后展示 24 小时，新预告立即替代。动态保留七天，历史月历独立保留。
 - USD/CNY 汇率来自 Frankfurter；网络失败时使用上次成功缓存。
 - 版本更新只读取项目公开 GitHub Release 标签、时间、说明和下载链接。
@@ -214,7 +226,7 @@ flowchart LR
 - Codex 会话日志只在本机只读解析，不上传原始消息。
 - Full reset 凭据和原始响应只在内存中短暂使用；缓存不保存 token、完整账户 ID、后台权益 ID 或原始响应。
 - Widget 快照只包含额度、公开雷达、权益到期时间和聚合 Token，不包含会话内容、项目路径、账户凭据、API Key 或兑换 ID。
-- 雷达仅把公开帖子及线程文本交给既有登录的 Codex CLI 做模型分析，不传入会话日志或账户详情。失败或过期时显示状态，不展示旧预告为正常结果；不读取 X Cookie。
+- 用户开启分析后，雷达仅把公开帖子及线程文本交给既有登录的 Codex CLI 做模型分析，不传入会话日志或账户详情。失败或过期时显示状态，不展示旧预告为正常结果；不提取其他浏览器的 X Cookie，内嵌 X 登录态仅由本机 WebKit 保存。
 - 会话解析缓存位于独立 Application Support 目录，只保存增量聚合所需结果。
 - 额度历史按本机匿名账户标识分开保存在 `~/Library/Application Support/CodexSuanliMeter/quota-history-<匿名标识>.json`（旧文件保留），不包含对话、项目路径或账户凭据。
 - 项目预算只保存项目识别名/本地路径和用户设定的 Token 上限，不上传、不写入 iCloud 或 Widget 快照。
@@ -225,13 +237,13 @@ flowchart LR
 
 ## 安装
 
-在 [v2.12.26 发布页](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.26) 下载 Apple Silicon Mac 安装包。完整步骤见 [安装与升级](docs/INSTALL_UPGRADE_2.12.26.md)，测试范围见 [验证说明](docs/VALIDATION_2.12.26.md)。Windows x64 安装版、免安装版与源码包现已同步提供于 [v2.12.26 发布页](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.26)。Windows 升级与验证范围见 [Windows 说明](windows/README.md) 和 [验收文档](windows/docs/VALIDATION_2.12.26.md)。
+在 [v2.12.28 发布页](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.28) 下载 Apple Silicon Mac 安装包。完整步骤见 [安装与升级](docs/INSTALL_UPGRADE_2.12.28.md)，测试范围见 [验证说明](docs/VALIDATION_2.12.28.md)。Windows x64 安装版、免安装版与源码包现已同步提供于 [v2.12.26 发布页](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.26)。Windows 升级与验证范围见 [Windows 说明](windows/README.md) 和 [验收文档](windows/docs/VALIDATION_2.12.26.md)。
 
 在 [Releases](https://github.com/huohuo143/codex-pulse/releases) 下载：
 
 ```text
-Codex-Pulse-v2.12.26-build2153-20261023-arm64.dmg
-Codex-Pulse-v2.12.26-build2153-20261023-arm64.dmg.sha256
+Codex-Pulse-v2.12.28-build2155-20261023-arm64.dmg
+Codex-Pulse-v2.12.28-build2155-20261023-arm64.dmg.sha256
 ```
 
 1. 打开 DMG。
@@ -243,7 +255,7 @@ Codex-Pulse-v2.12.26-build2153-20261023-arm64.dmg.sha256
 
 ## 与旧版并行
 
-| 项目 | Codex 脉动 2.12.26 | 旧算力码表 0.1.0 |
+| 项目 | Codex 脉动 2.12.28 | 旧算力码表 0.1.0 |
 | --- | --- | --- |
 | App | `Codex 脉动.app` | `算力码表.app` |
 | Bundle ID | `dev.codex.balance-dashboard.codex` | `dev.codex.balance-dashboard` |

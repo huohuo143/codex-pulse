@@ -19,6 +19,19 @@ struct TiboCompletionCycleTests {
     return value
   }
 
+  @Test func publicConfirmationCannotClaimPersonalEntitlementsOrArrival() throws {
+    let now = confirmed.addingTimeInterval(120)
+    var publicOnly = try snapshot(at: now, analysis: completed(at: now))
+    #expect(publicOnly.tiboStatusTitle(at: now) == "Tibo确认重置")
+    #expect(publicOnly.tiboStatusSummary(at: now).contains("本账号是否到账"))
+    publicOnly.tiboAnalysis?.kind = .reset_card
+    #expect(publicOnly.tiboStatusTitle(at: now) == "Tibo确认发卡")
+    publicOnly.quotaResetConfirmedAt = confirmed
+    #expect(publicOnly.tiboStatusTitle(at: now) == "重置已落实")
+    #expect(publicOnly.tiboStatusSummary(at: now).contains("本账号官方额度已恢复"))
+    #expect(publicOnly.tiboCompletionUntil(at: now) == confirmed.addingTimeInterval(86400))
+  }
+
   @Test func countdownUsesConfirmationSourceAndNeverRestartsOnRefreshOrRestart() throws {
     let first = try completed(at: confirmed.addingTimeInterval(120))
     let second = try completed(at: confirmed.addingTimeInterval(600))
@@ -26,14 +39,14 @@ struct TiboCompletionCycleTests {
     let restored = try JSONDecoder().decode(CodexRadarTiboAnalysis.self, from: JSONEncoder().encode(second))
     let snap = try snapshot(at: confirmed.addingTimeInterval(600), analysis: restored)
     #expect(snap.tiboCompletionUntil(at: confirmed.addingTimeInterval(600)) == confirmed.addingTimeInterval(86400))
-    #expect(snap.tiboStatusTitle(at: confirmed.addingTimeInterval(600)) == "重置已落实")
+    #expect(snap.tiboStatusTitle(at: confirmed.addingTimeInterval(600)) == "Tibo确认重置")
   }
 
   @Test(arguments: [86399.0, 86400.0, 86401.0])
   func exactTwentyFourHourBoundaryStartsNewCycle(seconds: Double) throws {
     let now = confirmed.addingTimeInterval(seconds)
     let value = try snapshot(at: now, analysis: completed(at: now))
-    #expect(value.tiboStatusTitle(at: now) == (seconds < 86400 ? "重置已落实" : "等待新重置"))
+    #expect(value.tiboStatusTitle(at: now) == (seconds < 86400 ? "Tibo确认重置" : "等待新重置"))
     #expect((value.tiboCompletionUntil(at: now) != nil) == (seconds < 86400))
   }
 

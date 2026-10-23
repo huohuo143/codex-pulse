@@ -207,7 +207,7 @@ public struct CodexWidgetSnapshot: Codable, Equatable, Sendable {
     if let until = result.radarCompletionUntil, until <= now {
       result.radarCompletionUntil = nil
       result.radarLevel = "等待新重置"
-      result.radarSummary = "上一轮到账确认已展示 24 小时，继续每 10 分钟检查新预告。"
+      result.radarSummary = "上一轮确认已展示 24 小时，继续每 10 分钟检查新预告。"
     }
     if !usageState(at: now).canDisplayValue {
       result.hourly24 = []; result.daily14 = []; result.topProjects = []; result.topCategories = []

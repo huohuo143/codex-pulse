@@ -211,7 +211,8 @@ struct CodexRadarTiboAnalysisTests {
     var completed = try await service.current(force: true)
     completed.quotaResetConfirmedAt = date.addingTimeInterval(-3600)
     #expect(completed.tiboCompletionUntil(at: clock.now()) == clock.now().addingTimeInterval(86400))
-    #expect(completed.tiboStatusSummary(at: clock.now()) == "新一轮已完成")
+    #expect(completed.tiboStatusSummary(at: clock.now()).contains("新一轮已完成"))
+    #expect(completed.tiboStatusSummary(at: clock.now()).contains("本账号是否到账"))
   }
 
   @Test func legacyAnnouncedHistoryUpgradesWithoutRevivingAnOlderCompletion() async throws {

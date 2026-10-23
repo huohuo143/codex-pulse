@@ -794,7 +794,7 @@ private struct CompactDashboardContent: View {
   }
 
   private var radarRefreshIsHealthy: Bool {
-    !store.codexRadarIsLoading && (store.codexRadarSnapshot?.tiboRefreshIsHealthy(at: now) ?? false)
+    !store.codexRadarIsLoading && (store.codexRadarSnapshot?.tiboDisplayRefreshIsHealthy(at: now) ?? false)
   }
 
   private var radarRefreshStatus: String {

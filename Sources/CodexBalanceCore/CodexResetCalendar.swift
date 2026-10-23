@@ -62,9 +62,12 @@ public struct CodexResetMonthlyTotal: Codable, Equatable, Identifiable, Sendable
   public var month: String
   public var hardResets: Int
   public var resetCards: Int
+  public var verifiedOn: String?
+  public var sourceURL: URL?
   public var id: String { month }
-  public init(month: String, hardResets: Int, resetCards: Int) {
+  public init(month: String, hardResets: Int, resetCards: Int, verifiedOn: String? = nil, sourceURL: URL? = nil) {
     self.month = month; self.hardResets = hardResets; self.resetCards = resetCards
+    self.verifiedOn = verifiedOn; self.sourceURL = sourceURL
   }
 }
 

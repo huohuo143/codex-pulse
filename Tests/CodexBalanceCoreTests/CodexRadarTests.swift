@@ -741,7 +741,7 @@ struct CodexRadarTests {
   @Test
   func publicSummaryKeepsSourceAttribution() {
     #expect(CodexRadarService.attributionText.contains("Codex Radar"))
-    #expect(CodexRadarService.attributionText.contains("GPT-6 Astra"))
+    #expect(CodexRadarService.attributionText.contains("可选本机 Codex 模型"))
     #expect(CodexRadarService.refreshInterval == 10 * 60)
   }
 

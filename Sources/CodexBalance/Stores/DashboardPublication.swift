@@ -105,7 +105,7 @@ extension DashboardStore {
       radarEvidenceUpdatedAt: radar?.tiboFeed?.posts.filter { radar?.tiboAnalysis?.evidenceIDs.contains($0.id) == true }.compactMap(\.publishedAt).max(),
       radarEvaluatedAt: radar?.tiboAnalysis?.analyzedAt,
       radarValidUntil: radar?.tiboStatusValidUntil,
-      radarSyncStatus: radar.map { $0.tiboRefreshIsHealthy(at: Date()) ? "刷新正常" : "等待刷新或分析" },
+      radarSyncStatus: radar.map { $0.tiboDisplayRefreshIsHealthy(at: Date()) ? "刷新正常" : "等待刷新或分析" },
       radarConsecutiveFailures: radar?.syncState?.consecutiveFailures,
       radarIsUsingCachedFeed: radar?.syncState?.isUsingCachedFeed,
       radarIsStale: radar?.syncState?.isStale,

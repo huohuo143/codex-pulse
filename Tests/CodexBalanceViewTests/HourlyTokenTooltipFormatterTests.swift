@@ -6,7 +6,7 @@ import CodexBalanceCore
 struct HourlyTokenTooltipFormatterTests {
   @Test
   func appMetadataUsesCurrentMaintainer() {
-    #expect(AppInfo.version == "2.12.27")
+    #expect(AppInfo.version == "2.12.28")
     #expect(AppInfo.author == "ZhangS")
     #expect(AppInfo.originalAuthor == "waytosea-oss")
   }

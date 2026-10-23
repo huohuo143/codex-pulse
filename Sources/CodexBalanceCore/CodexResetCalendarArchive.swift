@@ -5,11 +5,13 @@ struct CodexResetCalendarArchive: Sendable {
   private(set) var snapshot = CodexResetCalendarSnapshot()
   private let url: URL?
   private let historicalEvents: [CodexResetCalendarEvent]
+  private let historicalTotals: [CodexResetMonthlyTotal]
   private var loaded = false
   private var loadFailure: String?
 
-  init(url: URL?, historicalEvents: [CodexResetCalendarEvent] = []) {
+  init(url: URL?, historicalEvents: [CodexResetCalendarEvent] = [], historicalTotals: [CodexResetMonthlyTotal] = []) {
     self.url = url; self.historicalEvents = historicalEvents
+    self.historicalTotals = historicalTotals
   }
 
   mutating func load() {
@@ -33,6 +35,11 @@ struct CodexResetCalendarArchive: Sendable {
       }
     }
     let previous = snapshot.events
+    let previousTotals = snapshot.monthlyTotals
+    for total in historicalTotals where !snapshot.monthlyTotals.contains(where: { $0.month == total.month }) {
+      snapshot.monthlyTotals.append(total)
+    }
+    snapshot.monthlyTotals.sort { $0.month > $1.month }
     for event in historicalEvents {
       let existing = snapshot.events.filter { eventsMatch($0, event) }
       // Online corrections and old user caches take precedence over bundled
@@ -42,7 +49,7 @@ struct CodexResetCalendarArchive: Sendable {
       }) else { continue }
       merge(event)
     }
-    if snapshot.events != previous { persist() }
+    if snapshot.events != previous || snapshot.monthlyTotals != previousTotals { persist() }
   }
 
   mutating func update(json: Data?, html: Data?, at now: Date) {

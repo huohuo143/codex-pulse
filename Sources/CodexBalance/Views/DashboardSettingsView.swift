@@ -6,6 +6,7 @@ struct DashboardSettingsView: View {
 
   var body: some View {
     VStack(spacing: 14) {
+      settingsSection("本机账号、模型与 Tibo 来源") { LocalCodexSetupView() }
       settingsSection("全局外观") {
         Picker("背景模式", selection: $store.themeMode) {
           ForEach(DashboardThemeMode.allCases) { mode in
@@ -95,7 +96,7 @@ struct DashboardSettingsView: View {
         Picker("本地额度刷新间隔", selection: $store.refreshIntervalOption) {
           ForEach(RefreshIntervalOption.allCases) { Text($0.title).tag($0) }
         }
-        Text("额度独立刷新，会话用量随新活动更新。窗口隐藏且连续 5 分钟无会话活动时，额度检查自动降至 120 秒；恢复活动或手动刷新后立即检查。Tibo 动态每 10 分钟检查一次，由 GPT-6 Astra · High 分析。")
+        Text("额度独立刷新，会话用量随新活动更新。窗口隐藏且连续 5 分钟无会话活动时，额度检查自动降至 120 秒；恢复活动或手动刷新后立即检查。Tibo 动态每 10 分钟检查一次，模型分析可在上方启用。")
           .font(.caption)
           .foregroundStyle(DashboardColors.subtleText)
         HStack {
@@ -176,7 +177,7 @@ struct DashboardSettingsView: View {
       }
 
       settingsSection("Codex 重置雷达") {
-        Text("每 10 分钟读取公开源收录的 Tibo 发帖与回复，使用本机已登录的 Codex，以 GPT-6 Astra · High 判断是否有明确重置预告，不预测概率。只保留最近 7 天动态；区分重置预告、完成确认和重置卡。不读取 X 登录态或 Cookie。")
+        Text("每 10 分钟读取 Tibo 发帖与回复，默认无需 X 登录。启用分析后使用当前账号可用模型判断是否有明确重置预告，不预测概率。只保留最近 7 天；区分预告、完成确认和重置卡。")
           .font(.caption)
           .foregroundStyle(DashboardColors.subtleText)
         HStack {
@@ -190,7 +191,7 @@ struct DashboardSettingsView: View {
         Label(store.codexRadarStatusMessage, systemImage: "network")
           .font(.caption)
           .foregroundStyle(DashboardColors.subtleText)
-        Text("\(CodexRadarService.publicSummaryModeText) · 每 30 分钟同步 · \(CodexRadarService.attributionText)")
+        Text("每 10 分钟检查；数据源和模型可在上方设置。")
           .font(.system(size: 10, weight: .medium))
           .foregroundStyle(DashboardColors.subtleText)
       }

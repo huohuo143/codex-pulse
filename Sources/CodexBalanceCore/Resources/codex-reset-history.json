@@ -1,6 +1,6 @@
 {
-  "revision": 2,
-  "verifiedOn": "2026-10-18",
+  "revision": 3,
+  "verifiedOn": "2026-10-23",
   "events": [
     {
       "id": "public-history:2044943514832871564:hardReset",
@@ -588,5 +588,28 @@
     }
   ],
   "attribution": "Historical data includes adapted CC BY 4.0 records: Data: codex-reset.com (https://codex-reset.com/). Reviewed against ResetCue, ModelYard and other linked public archives; not a complete official ledger.",
-  "licenseURL": "https://creativecommons.org/licenses/by/4.0/"
+  "licenseURL": "https://creativecommons.org/licenses/by/4.0/",
+  "monthlyTotals": [
+    {
+      "month": "2026-07",
+      "hardResets": 11,
+      "resetCards": 3,
+      "verifiedOn": "2026-10-23",
+      "sourceURL": "https://codexradar.com/#reset-radar"
+    },
+    {
+      "month": "2026-08",
+      "hardResets": 9,
+      "resetCards": 1,
+      "verifiedOn": "2026-10-23",
+      "sourceURL": "https://codexradar.com/#reset-radar"
+    },
+    {
+      "month": "2026-09",
+      "hardResets": 2,
+      "resetCards": 4,
+      "verifiedOn": "2026-10-23",
+      "sourceURL": "https://codexradar.com/#reset-radar"
+    }
+  ]
 }

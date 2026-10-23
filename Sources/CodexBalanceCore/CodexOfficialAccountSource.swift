@@ -321,6 +321,45 @@ final class CodexAppServerRateLimitSource: @unchecked Sendable {
     )
   }
 
+  /// This instance is dedicated to a capability check, never shared with quota
+  /// polling. Retain only the authentication type; no email or credential leaves it.
+  func readCapabilities() throws -> LocalCodexCapabilities {
+    struct Account: Decodable { var type: String }
+    struct AccountPayload: Decodable { var account: Account? }
+    struct ModelPage: Decodable { var data: [LocalCodexModel]; var nextCursor: String? }
+    try ensureInitialized()
+    let accountID = nextID()
+    try send(["jsonrpc": "2.0", "id": accountID, "method": "account/read",
+              "params": ["refreshToken": false]])
+    let accountResponse = try JSONDecoder().decode(RPCResponse<AccountPayload>.self,
+      from: waitForResponse(id: accountID, timeout: 8))
+    guard accountResponse.error == nil, let payload = accountResponse.result else {
+      throw LiveRateLimitError.emptyResponse
+    }
+    guard let account = payload.account else {
+      return LocalCodexCapabilities(installed: true, message: "本机 Codex 尚未登录，请先登录自己的账号。")
+    }
+    var models: [LocalCodexModel] = []
+    var cursor: String?
+    var seen = Set<String>()
+    for _ in 0..<20 {
+      let modelID = nextID()
+      var params: [String: Any] = ["limit": 100]
+      if let cursor { params["cursor"] = cursor }
+      try send(["jsonrpc": "2.0", "id": modelID, "method": "model/list", "params": params])
+      let response = try JSONDecoder().decode(RPCResponse<ModelPage>.self,
+        from: waitForResponse(id: modelID, timeout: 8))
+      guard response.error == nil, let page = response.result else { throw LiveRateLimitError.emptyResponse }
+      models += page.data.filter { $0.availableForAnalysis && seen.insert($0.model).inserted }
+      guard let next = page.nextCursor, !next.isEmpty else {
+        return LocalCodexCapabilities(installed: true, accountType: account.type, models: models)
+      }
+      guard next != cursor else { throw LiveRateLimitError.emptyResponse }
+      cursor = next
+    }
+    throw LiveRateLimitError.emptyResponse
+  }
+
   private func ensureInitialized() throws {
     if initialized, process?.isRunning == true {
       return
@@ -564,11 +603,12 @@ final class CodexAppServerRateLimitSource: @unchecked Sendable {
     return nil
   }
 
-  private static func codexExecutableURL() -> URL? {
+  static func codexExecutableURL() -> URL? {
     let fm = FileManager.default
     let home = fm.homeDirectoryForCurrentUser.path
     if let bundled = bundledCodexExecutableURL(fileManager: fm) { return bundled }
     var candidates = [
+      "\(home)/.local/bin/codex",
       // npm 全局安装（-g）常见位置
       "\(home)/.npm-global/bin/codex",
       "/opt/homebrew/bin/codex",
@@ -592,7 +632,9 @@ final class CodexAppServerRateLimitSource: @unchecked Sendable {
     which.standardOutput = pipe
     which.standardError = FileHandle.nullDevice
     try? which.run()
-    which.waitUntilExit()
+    let deadline = Date().addingTimeInterval(3)
+    while which.isRunning && Date() < deadline { Thread.sleep(forTimeInterval: 0.05) }
+    if which.isRunning { which.terminate(); return nil }
     if let data = try? pipe.fileHandleForReading.readToEnd(),
        let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
        !path.isEmpty, fm.isExecutableFile(atPath: path) {

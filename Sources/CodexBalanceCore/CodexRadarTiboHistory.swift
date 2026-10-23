@@ -18,6 +18,7 @@ struct CodexRadarTiboHistory: Codable, Sendable {
   var analysisLastAttemptAt: Date? = nil
   var analysisFailureMessage: String? = nil
   var latestAnnouncementAt: Date? = nil
+  var sourceID: String? = nil
 
   mutating func retainRecent(at now: Date) {
     posts = CodexRadarTiboAnalyzer.retained(posts, at: now)

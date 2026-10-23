@@ -13,6 +13,57 @@ struct CodexResetCalendarTests {
     .init(id: id, kind: kind, day: day, confirmation: .official, title: id, summary: "fixture")
   }
 
+  @Test func offlineCalendarSurvivesReevaluationAndTenMinuteThrottleWithoutSourceSuccess() async throws {
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let calendarURL = folder.appendingPathComponent("calendar.json")
+    var archive = CodexResetCalendarArchive(url: calendarURL,
+      historicalEvents: CodexResetCalendarHistory.events(asOf: now),
+      historicalTotals: CodexResetCalendarHistory.monthlyTotals(asOf: now))
+    archive.load()
+    let date = now
+    let service = CodexRadarService(fetcher: { throw CodexRadarError.server(503) },
+      publicPageFetcher: { throw CodexRadarError.server(503) }, now: { date },
+      historyURL: folder.appendingPathComponent("tibo.json"), calendarHistoryURL: calendarURL,
+      minimumFetchInterval: 600)
+    let offline = try await service.current(force: true)
+    let reevaluated = try #require(await service.reevaluate())
+    let throttled = try await service.current(force: true)
+    for value in [offline, reevaluated, throttled] {
+      #expect(value.resetCalendar?.events.count == 33)
+      #expect(value.resetCalendar?.monthlyTotals.count == 3)
+      #expect(value.resetCalendar?.lastSuccessAt == nil)
+      #expect(value.syncState?.lastSuccessAt == nil)
+    }
+  }
+
+  @Test func completeMonthTotalsAreOfflineOnlyAndNeverInventDatesOrReplaceOnlineCorrections() throws {
+    let totals = CodexResetCalendarHistory.monthlyTotals(asOf: now)
+    #expect(Set(totals.map(\.month)) == Set(["2026-07", "2026-08", "2026-09"]))
+    #expect(totals.allSatisfy { $0.verifiedOn == "2026-10-23" && $0.sourceURL != nil })
+    #expect(CodexResetCalendarHistory.monthlyTotals(asOf: CodexResetCalendarDates.date("2026-09-15")!).map(\.month) == ["2026-07", "2026-08"])
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let url = folder.appendingPathComponent("calendar.json")
+    let events = CodexResetCalendarHistory.events(asOf: now)
+    var archive = CodexResetCalendarArchive(url: url, historicalEvents: events, historicalTotals: totals)
+    archive.load()
+    #expect(archive.snapshot.lastSuccessAt == nil)
+    #expect(archive.snapshot.monthlyTotals.count == 3)
+    #expect(archive.snapshot.events.filter { $0.day >= "2026-07-01" && $0.day < "2026-10-01" }.count == 20)
+    var corrected = archive.snapshot
+    corrected.monthlyTotals[0].hardResets = 42
+    let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601
+    try encoder.encode(corrected).write(to: url)
+    var restart = CodexResetCalendarArchive(url: url, historicalEvents: events, historicalTotals: totals)
+    restart.load()
+    #expect(restart.snapshot.monthlyTotals[0].hardResets == 42)
+    #expect(restart.snapshot.events.count == events.count)
+    #expect(restart.snapshot.lastSuccessAt == nil)
+    let legacy = Data(#"{"month":"2026-08","hardResets":9,"resetCards":1}"#.utf8)
+    #expect(try JSONDecoder().decode(CodexResetMonthlyTotal.self, from: legacy).verifiedOn == nil)
+  }
+
   @Test func mondayGridHandlesLeapYearsAndYearBoundaries() throws {
     for month in ["2024-02-01", "2026-12-01", "2027-01-01", "2026-02-01"] {
       let first = try #require(CodexResetCalendarDates.date(month))
@@ -284,7 +335,7 @@ struct CodexResetCalendarTests {
     var before = CodexResetCalendarArchive(url: url, historicalEvents: old); before.load()
     var after = CodexResetCalendarArchive(url: url, historicalEvents: history); after.load()
     #expect(after.snapshot.events.count == 33)
-    #expect(after.snapshot.events.allSatisfy { $0.historicalCatalogRevision == 2 })
+    #expect(after.snapshot.events.allSatisfy { $0.historicalCatalogRevision == 3 })
     var again = CodexResetCalendarArchive(url: url, historicalEvents: history); again.load()
     #expect(again.snapshot.events == after.snapshot.events)
     #expect(again.snapshot.lastSuccessAt == nil)
