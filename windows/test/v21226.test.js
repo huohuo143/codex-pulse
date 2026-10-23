@@ -23,7 +23,7 @@ function temporary(t) { const root = fs.mkdtempSync(path.join(os.tmpdir(), 'puls
 test('actual weekly refill ends announcement and countdown survives reload and the 24h boundary', () => {
   for (const age of [600000, 3600000, DAY - 1, DAY, DAY + 1]) {
     const now = arrival + age, data = tibo.presentation(snapshot(now), JSON.parse(JSON.stringify(histories())), now);
-    assert.equal(data.latestLevelLabel, age < DAY ? '已完成重置' : '等待新预告');
+    assert.equal(data.latestLevelLabel, age < DAY ? '重置已落实' : '等待新重置');
     assert.equal(data.completionUntil, age < DAY ? iso(arrival + DAY) : null);
     assert.equal(data.deadline, null); assert.equal(data.localCompletion, true);
   }
@@ -46,12 +46,12 @@ test('new announcement supersedes local completion; reanalysis of an old post ne
   const now = arrival + 1200000, data = snapshot(now);
   data.posts = [{ ...post, publishedAt: iso(arrival + 600000) }];
   assert.equal(tibo.presentation(data, histories(), now).latestLevelLabel, '重置已预告');
-  assert.equal(tibo.presentation(snapshot(now), histories(), now).latestLevelLabel, '已完成重置');
+  assert.equal(tibo.presentation(snapshot(now), histories(), now).latestLevelLabel, '重置已落实');
 });
 test('source/model failure preserves account arrival but never reports healthy refresh', () => {
   const now = arrival + 1200000, data = { ...snapshot(now), lastSuccessAt: now - DAY, refreshHealthy: false, analysisError: '模型失败', error: '离线' };
   const shown = tibo.presentation(data, histories(), now);
-  assert.equal(shown.latestLevelLabel, '已完成重置'); assert.equal(shown.refreshHealthy, false); assert.equal(shown.completionUntil, iso(arrival + DAY));
+  assert.equal(shown.latestLevelLabel, '重置已落实'); assert.equal(shown.refreshHealthy, false); assert.equal(shown.completionUntil, iso(arrival + DAY));
 });
 test('later public confirmation never restarts account display; a next day cycle may replace it', () => {
   const now = arrival + 3600000, data = snapshot(now);
@@ -90,9 +90,9 @@ test('prompt is bounded, read-only and explicitly excludes instructions in untru
   assert.throws(() => tibo.prompt([{ ...post, originalText: 'x'.repeat(260000) }], arrival), /过多/);
 });
 test('countdown runs on the wall clock and an expired deadline does not invent completion', () => {
-  const r = { latestLevelLabel: '已完成重置', completionUntil: iso(arrival + DAY) };
+  const r = { latestLevelLabel: '重置已落实', completionUntil: iso(arrival + DAY) };
   assert.ok(clock(r, arrival + 1000).detail.includes('23:59:59'));
-  assert.equal(clock(r, arrival + DAY).title, '等待新预告');
+  assert.equal(clock(r, arrival + DAY).title, '等待新重置');
   assert.ok(clock({ latestLevelLabel: '重置已预告', deadline: { at: iso(arrival) } }, arrival + 1).detail.includes('等待确认'));
 });
 test('all manual, automatic, network and restart checks share ten-minute floor even after model failure', async t => {
