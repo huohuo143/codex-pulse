@@ -16,7 +16,8 @@ struct TiboFreshnessViewTests {
     store.compactStyle = .rings
     store.compactSizeMode = .standard
     let now = Date()
-    for mode in ["fresh", "expired", "failed", "pending", "deadline", "completed"] {
+    let selectedModes = ProcessInfo.processInfo.environment["CODEX_PULSE_TIBO_RENDER_STATES"]?.split(separator: ",").map(String.init)
+    for mode in ["fresh", "expired", "failed", "pending", "deadline", "completed", "new-cycle"] where selectedModes?.contains(mode) != false {
       var snapshot = try JSONDecoder().decode(CodexRadarSnapshot.self, from: Data("{}".utf8))
       let success = now.addingTimeInterval(mode == "expired" ? -720 : -60)
       snapshot.syncState = .init(lastAttemptAt: success, lastSuccessAt: success)
@@ -35,6 +36,9 @@ struct TiboFreshnessViewTests {
         analysis.state = .completed; analysis.completedAt = now.addingTimeInterval(-3600)
         analysis.summaryZh = "验收示例：Tibo 已确认重置到账。"
       }
+      if mode == "new-cycle" {
+        analysis.state = .completed; analysis.completedAt = now.addingTimeInterval(-86401)
+      }
       snapshot.tiboAnalysis = analysis
       snapshot.tiboAnalysisAttemptAt = success
       if mode == "failed" { snapshot.tiboAnalysisFailure = "GPT-6 Astra 分析未完成，下一轮再试。" }
@@ -44,7 +48,7 @@ struct TiboFreshnessViewTests {
           nextSyncAt: success.addingTimeInterval(600), statusMessage: "验收示例", refresh: {})
         try render(card.environment(\.colorScheme, scheme), size: .init(width: 640, height: 730),
           to: folder.appendingPathComponent("tibo-main-\(mode)-\(scheme).png"))
-        let styles: [CompactStyle] = ["deadline", "completed"].contains(mode) ? CompactStyle.allCases : [.rings]
+        let styles: [CompactStyle] = ["deadline", "completed", "new-cycle"].contains(mode) ? CompactStyle.allCases : [.rings]
         for style in styles {
           for sizeMode in [CompactSizeMode.standard, .mini] {
             store.compactStyle = style; store.compactSizeMode = sizeMode

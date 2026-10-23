@@ -44,23 +44,27 @@ struct WidgetVisualAcceptanceTests {
     let folder = URL(fileURLWithPath: ProcessInfo.processInfo.environment["CODEX_PULSE_RENDER_DIR"]!)
     try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
     let now = Date()
-    for mode in ["announced", "deadline", "completed", "new-cycle"] {
+    let selectedModes = ProcessInfo.processInfo.environment["CODEX_PULSE_TIBO_RENDER_STATES"]?.split(separator: ",").map(String.init)
+    var rendered = 0
+    for mode in ["announced", "deadline", "completed", "new-cycle"] where selectedModes?.contains(mode) != false {
       var snapshot = CodexWidgetSnapshot.preview
       snapshot.radarAnnouncementActive = ["announced", "deadline"].contains(mode)
       if mode == "deadline" { snapshot.radarDeadlineAt = now.addingTimeInterval(3600) }
-      if mode == "completed" { snapshot.radarLevel = "已完成重置"; snapshot.radarCompletionUntil = now.addingTimeInterval(23 * 3600) }
-      if mode == "new-cycle" { snapshot.radarLevel = "等待新预告" }
+      if mode == "completed" { snapshot.radarLevel = "重置已落实"; snapshot.radarCompletionUntil = now.addingTimeInterval(23 * 3600) }
+      if mode == "new-cycle" { snapshot.radarLevel = "等待新重置" }
       let entry = CodexWidgetEntry(date: now, snapshot: snapshot, hasLiveData: true)
       for scheme in [ColorScheme.light, .dark] {
         for family in [WidgetFamily.systemSmall, .systemMedium] {
           try render(view(.radar, entry), family: family, scheme: scheme,
             file: folder.appendingPathComponent("widget-radar-\(mode)-\(family)-\(scheme).png"))
+          rendered += 1
         }
         try render(view(.overview, entry), family: .systemMedium, scheme: scheme,
           file: folder.appendingPathComponent("widget-overview-\(mode)-\(scheme).png"))
+        rendered += 1
       }
     }
-    print("VISUAL_WIDGET_ATTENTION rendered=24 output=\(folder.path)")
+    print("VISUAL_WIDGET_ATTENTION rendered=\(rendered) output=\(folder.path)")
   }
   @MainActor private func view(_ kind: CodexWidgetKind, _ entry: CodexWidgetEntry) -> AnyView {
     switch kind {

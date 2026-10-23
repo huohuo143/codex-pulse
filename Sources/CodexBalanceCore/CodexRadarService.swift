@@ -341,6 +341,7 @@ public actor CodexRadarService {
       persistTiboHistory(storedHistory)
       do {
         storedHistory.analysis = try await analyzer(CodexRadarTiboAnalyzer.retained(posts, at: checkedAt), checkedAt)
+        storedHistory.recordAnnouncement(at: now())
         storedHistory.analysisFailureMessage = nil
       } catch {
         storedHistory.analysisFailureMessage = (error as? LocalizedError)?.errorDescription
@@ -351,6 +352,7 @@ public actor CodexRadarService {
     snapshot.tiboAnalysis = storedHistory.analysis
     snapshot.tiboAnalysisAttemptAt = storedHistory.analysisLastAttemptAt
     snapshot.tiboAnalysisFailure = storedHistory.analysisFailureMessage
+    snapshot.tiboLatestAnnouncementAt = storedHistory.latestAnnouncementAt
     snapshot.resetCalendar = resetCalendarArchive.snapshot
     cachedSnapshot = snapshot
     cachedAt = now()
@@ -447,6 +449,7 @@ public actor CodexRadarService {
     snapshot.tiboAnalysis = history.analysis
     snapshot.tiboAnalysisAttemptAt = history.analysisLastAttemptAt
     snapshot.tiboAnalysisFailure = history.analysisFailureMessage
+    snapshot.tiboLatestAnnouncementAt = history.latestAnnouncementAt
     if let page = cachedPage(base: snapshot, cached: snapshot, history: history, at: date) {
       snapshot.localResetEstimate = CodexRadarResetScorer.estimate(from: page, now: date)
       snapshot.tiboFeed = page.tiboFeed

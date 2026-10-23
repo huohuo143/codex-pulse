@@ -6,6 +6,7 @@ import WidgetKit
 
 struct CodexOverviewWidgetView: View {
   @Environment(\.widgetRenderingMode) private var renderingMode
+  @Environment(\.colorScheme) private var colorScheme
   let entry: CodexWidgetEntry
   @Environment(\.widgetFamily) private var systemFamily
   @Environment(\.codexWidgetFamilyOverride) private var familyOverride
@@ -25,10 +26,10 @@ struct CodexOverviewWidgetView: View {
           KeyValueRow(
             title: "重置预告",
             value: announcementTitle(entry.snapshot),
-            tint: (entry.snapshot.radarAnnouncementActive == true || entry.snapshot.radarCompletionUntil != nil) ? (renderingMode == .fullColor ? .black : .primary) : radarTint(entry.snapshot.resetProbability24h)
+            tint: renderingMode == .fullColor ? radarAttentionTitleColor(entry.snapshot, scheme: colorScheme) : .primary
           )
           .padding(5)
-          .background(renderingMode != .fullColor ? Color.clear : (entry.snapshot.radarAnnouncementActive == true ? Color.orange : (entry.snapshot.radarCompletionUntil != nil ? Color.green : Color.clear)), in: RoundedRectangle(cornerRadius: 6))
+          .background(renderingMode != .fullColor ? Color.clear : (entry.snapshot.radarAnnouncementActive == true ? Color.orange : (entry.snapshot.radarCompletionUntil != nil ? radarCompletionBackground : Color.clear)), in: RoundedRectangle(cornerRadius: 6))
           if let until = entry.snapshot.radarCompletionUntil, entry.date < until {
             HStack {
               Text("展示剩余")
@@ -139,6 +140,7 @@ struct RadarWidgetView: View {
 
 private struct RadarAttentionCard: View {
   @Environment(\.widgetRenderingMode) private var renderingMode
+  @Environment(\.colorScheme) private var colorScheme
   let entry: CodexWidgetEntry
   let compact: Bool
   private var announced: Bool { entry.snapshot.radarAnnouncementActive == true }
@@ -153,6 +155,7 @@ private struct RadarAttentionCard: View {
           .font(.system(size: compact ? 20 : 24, weight: .black, design: .rounded))
           .lineLimit(1).minimumScaleFactor(0.65)
       }
+      .foregroundStyle(renderingMode == .fullColor ? radarAttentionTitleColor(entry.snapshot, scheme: colorScheme) : .primary)
       if let until = entry.snapshot.radarCompletionUntil, entry.date < until {
         Text("24小时展示剩余 · 新预告优先").font(.system(size: 9, weight: .bold))
         Text(timerInterval: entry.date...until, countsDown: true)
@@ -171,10 +174,21 @@ private struct RadarAttentionCard: View {
     }
     .frame(maxWidth: .infinity, alignment: .leading)
     .padding(8)
-    .foregroundStyle(renderingMode != .fullColor ? Color.primary : (active ? Color.black : CodexWidgetTheme.text))
-    .background(renderingMode != .fullColor ? Color.clear : (active ? (announced ? Color.orange : Color.green) : CodexWidgetTheme.track),
+    .foregroundStyle(renderingMode != .fullColor ? Color.primary : (announced ? Color.black : (completed ? .white : CodexWidgetTheme.text)))
+    .background(renderingMode != .fullColor ? Color.clear : (active ? (announced ? Color.orange : radarCompletionBackground) : CodexWidgetTheme.track),
       in: RoundedRectangle(cornerRadius: 10))
   }
+}
+
+private var radarCompletionBackground: Color { Color(red: 0.08, green: 0.28, blue: 0.18) }
+
+private func radarAttentionTitleColor(_ snapshot: CodexWidgetSnapshot, scheme: ColorScheme) -> Color {
+  if snapshot.radarAnnouncementActive == true { return Color(red: 0.68, green: 0, blue: 0.04) }
+  if snapshot.radarCompletionUntil != nil { return .white }
+  if snapshot.radarLevel == "等待新重置" {
+    return scheme == .dark ? Color(red: 0.25, green: 0.88, blue: 0.49) : Color(red: 0.12, green: 0.55, blue: 0.29)
+  }
+  return CodexWidgetTheme.text
 }
 
 private struct RadarDeadline: View {

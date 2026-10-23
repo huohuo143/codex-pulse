@@ -17,6 +17,7 @@ struct CodexRadarTiboHistory: Codable, Sendable {
   var analysis: CodexRadarTiboAnalysis? = nil
   var analysisLastAttemptAt: Date? = nil
   var analysisFailureMessage: String? = nil
+  var latestAnnouncementAt: Date? = nil
 
   mutating func retainRecent(at now: Date) {
     posts = CodexRadarTiboAnalyzer.retained(posts, at: now)
@@ -29,6 +30,14 @@ struct CodexRadarTiboHistory: Codable, Sendable {
     if analysisLastAttemptAt.map({ $0 < cutoff }) == true {
       analysisLastAttemptAt = nil; analysisFailureMessage = nil
     }
+    recordAnnouncement(at: now)
+  }
+
+  mutating func recordAnnouncement(at now: Date) {
+    let cutoff = now.addingTimeInterval(-CodexRadarTiboAnalyzer.retention)
+    latestAnnouncementAt = [latestAnnouncementAt,
+      analysis?.announcementPublishedAt(in: posts + (latestPosts ?? []), at: now)]
+      .compactMap { $0 }.filter { $0 >= cutoff && $0 <= now }.max()
   }
 }
 

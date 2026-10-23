@@ -19,9 +19,16 @@ public struct CodexRadarTiboAnalysis: Codable, Equatable, Sendable {
     switch state {
     case .announced: kind == .reset_card ? "发卡已预告" : "重置已预告"
     case .completed: "已有完成确认"
-    case .not_found: "未发现新预告"
+    case .not_found: "等待新重置"
     case .uncertain: "尚不能确认"
     }
+  }
+
+  func announcementPublishedAt(in posts: [CodexRadarTiboPost], at now: Date) -> Date? {
+    guard state == .announced, let analyzedAt, analyzedAt <= now else { return nil }
+    let cutoff = now.addingTimeInterval(-CodexRadarTiboAnalyzer.retention)
+    return posts.filter { evidenceIDs.contains($0.id) }.compactMap(\.publishedAt)
+      .filter { $0 >= cutoff && $0 <= now }.max()
   }
 }
 
@@ -34,23 +41,28 @@ public extension CodexRadarSnapshot {
   var tiboStatusSummary: String { tiboStatusSummary(at: Date()) }
 
   func resetCompletion(at now: Date) -> (date: Date, isLocal: Bool)? {
-    let local = quotaResetConfirmedAt.flatMap { $0 <= now ? $0 : nil }
+    let announcement = [tiboLatestAnnouncementAt,
+      tiboAnalysis?.announcementPublishedAt(in: tiboFeed?.posts ?? [], at: now)]
+      .compactMap { $0 }.filter { $0 <= now }.max()
+    // Once a new cycle was seen, an uncertain/failed later analysis must never
+    // resurrect an older completion. The boundary is retained across restarts.
+    func belongsToCurrentCycle(_ date: Date) -> Date? {
+      date <= now && announcement.map({ date >= $0 }) != false ? date : nil
+    }
+    let local = quotaResetConfirmedAt.flatMap(belongsToCurrentCycle)
     let official = tiboAnalysis?.state == .completed
-      ? tiboAnalysis?.completedAt.flatMap { $0 <= now ? $0 : nil } : nil
+      ? tiboAnalysis?.completedAt.flatMap(belongsToCurrentCycle) : nil
     // Prefer the account's first observed arrival over a later public statement.
     // This keeps the 24-hour display from restarting when Tibo confirms later.
     let preferOfficial = local.flatMap { local in official.map { $0 > local.addingTimeInterval(86400) } } == true
     guard let completed = (preferOfficial ? official : local ?? official) else { return nil }
-    if tiboAnalysis?.state == .announced,
-       let newest = tiboFeed?.posts.filter({ tiboAnalysis?.evidenceIDs.contains($0.id) == true })
-        .compactMap(\.publishedAt).filter({ $0 <= now }).max(), newest > completed { return nil }
     return (completed, local != nil && !preferOfficial)
   }
 
   func tiboStatusTitle(at now: Date) -> String {
     if let completed = resetCompletion(at: now) {
       return now < completed.date.addingTimeInterval(86400)
-        ? (!completed.isLocal && tiboAnalysis?.kind == .reset_card ? "重置卡已到账" : "已完成重置") : "等待新预告"
+        ? (!completed.isLocal && tiboAnalysis?.kind == .reset_card ? "重置卡已到账" : "重置已落实") : "等待新重置"
     }
     guard syncState?.lastSuccessAt != nil else { return "等待动态" }
     guard tiboSourceIsCurrent(at: now) else { return "动态已过期" }

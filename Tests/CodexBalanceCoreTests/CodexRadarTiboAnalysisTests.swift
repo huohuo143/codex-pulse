@@ -62,11 +62,13 @@ struct CodexRadarTiboAnalysisTests {
     history.analysis = .init(state: .announced, kind: .hard_reset, summaryZh: "旧分析", timingZh: "", evidenceIDs: ["124"], analyzedAt: boundary.addingTimeInterval(-1))
     history.analysisLastAttemptAt = boundary.addingTimeInterval(-1)
     history.analysisFailureMessage = "旧错误"
+    history.latestAnnouncementAt = boundary.addingTimeInterval(-1)
     history.recentSyncAttempts = [.init(startedAt: boundary.addingTimeInterval(-1), completedAt: boundary.addingTimeInterval(-1), succeeded: true)]
     history.retainRecent(at: date)
     #expect(history.posts.map(\.id) == ["123"])
     #expect(history.latestPosts?.map(\.id) == ["123"])
     #expect(history.analysis == nil && history.analysisLastAttemptAt == nil && history.analysisFailureMessage == nil)
+    #expect(history.latestAnnouncementAt == nil)
     #expect(history.recentSyncAttempts?.isEmpty == true)
     #expect(history.resetAt != nil) // Retention is not a fabricated reset event.
   }
@@ -152,6 +154,85 @@ struct CodexRadarTiboAnalysisTests {
     healthy.tiboAnalysis = try CodexRadarTiboAnalyzer.validate(output, posts: [post()], at: now)
     #expect(healthy.tiboRefreshIsHealthy(at: now))
     #expect(!healthy.tiboRefreshIsHealthy(at: now.addingTimeInterval(11 * 60 + 1)))
+  }
+
+  @Test(arguments: ["uncertain", "not_found", "failed"])
+  func newAnnouncementNeverRevivesPreviousCompletionAfterReanalysisOrRestart(mode: String) async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let clock = TiboAnalysisClock(date), firstDate = date, page = page, output = output
+    let arrival = date.addingTimeInterval(-3600), historyURL = root.appendingPathComponent("history.json")
+    let analyze: CodexRadarService.Analyzer = { posts, now in
+      if now == firstDate { return try CodexRadarTiboAnalyzer.validate(output, posts: posts, at: now) }
+      if mode == "failed" { throw CodexRadarTiboAnalysisError.failed }
+      return .init(state: CodexRadarTiboAnalysis.State(rawValue: mode)!, kind: .uncertain, summaryZh: "本轮不能确认新预告", timingZh: "",
+        evidenceIDs: [], analyzedAt: now)
+    }
+    func service() -> CodexRadarService {
+      CodexRadarService(fetcher: { throw CodexRadarError.invalidPayload }, publicPageFetcher: { page },
+        now: { clock.now() }, historyURL: historyURL, analyzer: analyze, minimumFetchInterval: 600)
+    }
+    let firstService = service()
+    var announced = try await firstService.current(force: true)
+    announced.quotaResetConfirmedAt = arrival
+    #expect(announced.tiboHasAnnouncement(at: date))
+    #expect(announced.tiboCompletionUntil(at: date) == nil)
+    clock.advance(600)
+    var reanalyzed = try await firstService.current(force: true)
+    reanalyzed.quotaResetConfirmedAt = arrival
+    let expected = mode == "failed" ? "分析未成功" : reanalyzed.tiboAnalysis?.title
+    #expect(reanalyzed.tiboStatusTitle(at: clock.now()) == expected)
+    #expect(reanalyzed.tiboCompletionUntil(at: clock.now()) == nil)
+    clock.advance(1)
+    var restored = try await service().current(force: true)
+    restored.quotaResetConfirmedAt = arrival
+    #expect(restored.tiboStatusTitle(at: clock.now()) == expected)
+    #expect(restored.tiboCompletionUntil(at: clock.now()) == nil)
+  }
+
+  @Test func newPublicCompletionUsesItsOwnCycleAfterSupersedingLocalArrival() async throws {
+    let clock = TiboAnalysisClock(date), firstDate = date, page = page, output = output
+    let stamp = ISO8601DateFormatter().string(from: date.addingTimeInterval(600))
+    let completedPage = Data("""
+      <section class="desktop-tibo-radar" data-tibo-posts-updated-at="\(stamp)">
+      <li class="reset-tibo-post" data-tibo-post-id="125" data-reset-relevance="direct">
+      <a href="https://x.com/thsottiaux/status/125">Tibo</a><time datetime="\(stamp)"></time>
+      <p class="reset-tibo-post-original">Today's Codex reset is now complete.</p></li></section>
+      """.utf8)
+    let completedOutput = Data(#"{"state":"completed","kind":"hard_reset","summaryZh":"新一轮已完成","timingZh":"","evidenceIDs":["125"],"completionEvidenceID":"125"}"#.utf8)
+    let service = CodexRadarService(fetcher: { throw CodexRadarError.invalidPayload },
+      publicPageFetcher: { clock.now() == firstDate ? page : completedPage },
+      now: { clock.now() }, analyzer: { posts, now in
+        if now == firstDate { return try CodexRadarTiboAnalyzer.validate(output, posts: posts, at: now) }
+        return try CodexRadarTiboAnalyzer.validate(completedOutput, posts: posts, at: now)
+      }, minimumFetchInterval: 600)
+    _ = try await service.current(force: true)
+    clock.advance(600)
+    var completed = try await service.current(force: true)
+    completed.quotaResetConfirmedAt = date.addingTimeInterval(-3600)
+    #expect(completed.tiboCompletionUntil(at: clock.now()) == clock.now().addingTimeInterval(86400))
+    #expect(completed.tiboStatusSummary(at: clock.now()) == "新一轮已完成")
+  }
+
+  @Test func legacyAnnouncedHistoryUpgradesWithoutRevivingAnOlderCompletion() async throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let historyURL = root.appendingPathComponent("history.json"), now = date.addingTimeInterval(600), page = page
+    var history = CodexRadarTiboHistory(resetAt: nil, posts: [post()])
+    history.lastAttemptAt = date; history.lastSuccessAt = date
+    history.analysis = try CodexRadarTiboAnalyzer.validate(output, posts: [post()], at: date)
+    CodexRadarTiboHistoryStore.save(history, to: historyURL)
+    let stored = try JSONSerialization.jsonObject(with: Data(contentsOf: historyURL)) as? [String: Any]
+    #expect(stored?["latestAnnouncementAt"] == nil)
+    let service = CodexRadarService(fetcher: { throw CodexRadarError.invalidPayload }, publicPageFetcher: { page },
+      now: { now }, historyURL: historyURL, analyzer: { _, time in
+        .init(state: .uncertain, kind: .uncertain, summaryZh: "暂不能确认", timingZh: "", evidenceIDs: [], analyzedAt: time)
+      }, minimumFetchInterval: 600)
+    var migrated = try await service.current(force: true)
+    migrated.quotaResetConfirmedAt = date.addingTimeInterval(-3600)
+    #expect(migrated.tiboStatusTitle(at: now) == "尚不能确认")
+    #expect(migrated.tiboCompletionUntil(at: now) == nil)
+    #expect(CodexRadarTiboHistoryStore.load(from: historyURL)?.latestAnnouncementAt == date)
   }
 }
 

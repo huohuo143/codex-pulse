@@ -22,7 +22,7 @@ struct DashboardRadarRecoveryTests {
       evidenceIDs: [], analyzedAt: now)
     store.codexRadarSnapshot = old
     store.updateRadarQuotaConfirmation(now: now)
-    #expect(store.codexRadarSnapshot?.tiboStatusTitle(at: now) == "已完成重置")
+    #expect(store.codexRadarSnapshot?.tiboStatusTitle(at: now) == "重置已落实")
     store.applyCodexRadarSnapshot(old)
     #expect(store.codexRadarSnapshot?.tiboCompletionUntil(at: now) == arrival.addingTimeInterval(86400))
     store.prepareAccount("separate-test-account")

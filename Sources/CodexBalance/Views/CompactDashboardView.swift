@@ -723,11 +723,17 @@ private struct CompactDashboardContent: View {
   }
   private var radarAttentionBanner: some View {
     let active = radarAnnounced || radarCompletionUntil != nil
-    let tint: Color = radarAnnounced ? .orange : .green
+    let tint: Color = radarAnnounced ? .orange : Color(red: 0.08, green: 0.28, blue: 0.18)
+    let waitingColor = colorScheme == .dark ? Color(red: 0.25, green: 0.88, blue: 0.49)
+      : Color(red: 0.12, green: 0.55, blue: 0.29)
+    let titleColor: Color = radarAnnounced ? Color(red: 0.68, green: 0, blue: 0.04)
+      : (radarCompletionUntil != nil ? .white
+        : (resetProbabilityText == "等待新重置" ? waitingColor : DashboardColors.text))
     return VStack(spacing: 3) {
       Label(resetProbabilityText, systemImage: radarAnnounced ? "megaphone.fill" : (radarCompletionUntil != nil ? "checkmark.seal.fill" : "scope"))
         .font(.system(size: mini ? 21 : 25, weight: .black, design: .rounded))
         .lineLimit(1).minimumScaleFactor(0.75)
+        .foregroundStyle(titleColor)
       if let until = radarCompletionUntil {
         HStack(spacing: 5) {
           Text("24小时展示剩余").font(.system(size: 11, weight: .bold))
@@ -747,7 +753,7 @@ private struct CompactDashboardContent: View {
     }
     .frame(maxWidth: .infinity)
     .frame(height: 76)
-    .foregroundStyle(active ? Color.black : DashboardColors.text)
+    .foregroundStyle(radarAnnounced ? Color.black : (radarCompletionUntil != nil ? .white : DashboardColors.text))
     .background(active ? tint : Color(nsColor: .windowBackgroundColor), in: RoundedRectangle(cornerRadius: 12))
     .overlay(RoundedRectangle(cornerRadius: 12).stroke(active ? tint.opacity(0.9) : Color.gray.opacity(0.3), lineWidth: 2))
     .shadow(color: active ? tint.opacity(0.45) : .clear, radius: 7)

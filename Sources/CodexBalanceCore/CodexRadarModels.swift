@@ -25,6 +25,8 @@ public struct CodexRadarSnapshot: Equatable, Decodable, Sendable {
   public var tiboAnalysisFailure: String? = nil
   /// First authoritative observation for this account; independent of the public feed.
   public var quotaResetConfirmedAt: Date? = nil
+  /// A newer announcement permanently supersedes completion from an older cycle.
+  public var tiboLatestAnnouncementAt: Date? = nil
 
   public var probability24hPercent: Int? {
     if syncState?.isStale == true { return nil }
