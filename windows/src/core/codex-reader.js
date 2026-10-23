@@ -6,6 +6,8 @@ const { StringDecoder } = require("node:string_decoder");
 const { createHash } = require("node:crypto");
 const { fetchLiveRateLimits } = require("./codex-app-server");
 const { SessionFileIndex } = require("./session-file-index");
+const { createZstdDecompress } = require('node:zlib');
+const { validateZstdFile } = require('./zstd-frame');
 
 // v5 invalidates caches produced before cumulative-total deduplication.
 const CACHE_SCHEMA = 5;
@@ -333,6 +335,8 @@ function normalizeWindow(window) {
 }
 
 function normalizeUsage(info = {}) {
+  // Codex emits quota-only token_count events with info: null.
+  if (!info || typeof info !== 'object') info = {};
   const total = info.total_token_usage || info.totalTokenUsage || {};
   const last = info.last_token_usage || info.lastTokenUsage || {};
   return {
@@ -679,6 +683,8 @@ class CodexReader {
       [
         path.join(this.codexHome, "sessions"),
         path.join(this.codexHome, "browser", "sessions"),
+        path.join(this.codexHome, "archived_sessions"),
+        path.join(this.codexHome, "browser", "archived_sessions"),
         appData && path.join(appData, "Codex", "sessions"),
         appData && path.join(appData, "com.openai.codex", "sessions"),
       ].filter(Boolean);
@@ -699,6 +705,7 @@ class CodexReader {
     this.watchers = [];
     this.lastSignature = null;
     this.lastStats = null;
+    this.fileErrors = new Map();
   }
 
   loadCache() {
@@ -707,7 +714,7 @@ class CodexReader {
       const stored = JSON.parse(fs.readFileSync(this.cachePath, "utf8"));
       if (stored.schemaVersion !== CACHE_SCHEMA) return;
       // Older v5 caches omitted token_count rows without rate_limits; rebuild them once.
-      if (stored.parserVersion !== 2118) return;
+      if (stored.parserVersion !== 2153) return;
       this.cache = new Map(
         (stored.files || [])
           .filter(([, value]) => value?.events)
@@ -722,7 +729,7 @@ class CodexReader {
     if (!this.cachePath) return;
     const payload = {
       schemaVersion: CACHE_SCHEMA,
-      parserVersion: 2118,
+      parserVersion: 2153,
       updatedAt: new Date().toISOString(),
       files: [...this.cache.entries()].map(([file, state]) => [file, cacheStateForDisk(state)]),
     };
@@ -795,7 +802,15 @@ class CodexReader {
         this.cache.size !== cacheSizeBefore
       )
         await this.saveCache().catch(() => {});
-      const events = batches
+      // Prefer one complete copy per session; compressed/archive duplicates do not add tokens.
+      const sessions = new Map();
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i], cached = this.cache.get(file.path);
+        const key = cached?.sessionID || path.basename(file.path).replace(/\.zst$/i, '');
+        const old = sessions.get(key);
+        if (!old || batches[i].length > old.length) sessions.set(key, batches[i]);
+      }
+      const events = [...sessions.values()]
         .flat()
         .sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp));
       const liveEvents = await this.liveReader().catch(() => []);
@@ -832,6 +847,7 @@ class CodexReader {
         sessionsRoot: this.sessionRoots.join(" | "),
         scannedFiles: files.length,
         eventCount: events.length,
+        statisticsWarning: this.fileErrors.size ? `${this.fileErrors.size} 个会话日志暂不可读取，统计可能不完整；将自动重试` : null,
         main,
         weekly,
         limits,
@@ -865,6 +881,7 @@ class CodexReader {
 
   async parseFile(file) {
     const cached = this.cache.get(file.path);
+    const compressed = /\.jsonl\.zst$/i.test(file.path);
     if (
       cached &&
       cached.mtimeMs === file.mtimeMs &&
@@ -887,6 +904,7 @@ class CodexReader {
     }
     // A prefix signature and file identity distinguish append from replacement.
     const append =
+      !compressed &&
       cached &&
       file.size > cached.size &&
       (!cached.identity || cached.identity === file.identity) &&
@@ -901,19 +919,25 @@ class CodexReader {
     let offset = state.offset || 0,
       partial = state.partial || "";
     try {
+      if (compressed) await validateZstdFile(file.path, file.size);
       const decoder = new StringDecoder("utf8");
-      const stream = fs.createReadStream(file.path, {
+      const input = fs.createReadStream(file.path, {
         start: offset,
         end: Math.max(offset, file.size - 1),
         highWaterMark: 256 * 1024,
       });
+      const stream = compressed ? input.pipe(createZstdDecompress()) : input;
+      if (compressed) input.on('error', error => stream.destroy(error));
       if (file.size > offset)
         for await (const buffer of stream) {
           offset += buffer.length;
           const text = partial + decoder.write(buffer);
           const lines = text.split(/\r?\n/);
           partial = lines.pop() || "";
-          for (const line of lines) this.consumeLine(line, state, file.path);
+          for (const line of lines) {
+            if (compressed && line.trim()) JSON.parse(line);
+            this.consumeLine(line, state, file.path);
+          }
         }
       else stream.destroy();
       // Do not advance past an incomplete UTF-8 sequence; read it again on append.
@@ -921,7 +945,15 @@ class CodexReader {
         ? decoder.lastTotal - decoder.lastNeed
         : 0;
       offset -= pending;
+      if (compressed && pending) throw new Error('压缩会话缺少完整字符');
+      if (compressed && partial.trim()) { JSON.parse(partial); this.consumeLine(partial, state, file.path); partial = ''; }
+      if (compressed) {
+        const after = await fsp.stat(file.path);
+        if (after.size !== file.size || after.mtimeMs !== file.mtimeMs) throw new Error('压缩日志在读取期间发生变化');
+      }
+      this.fileErrors.delete(file.path);
     } catch {
+      this.fileErrors.set(file.path, true);
       return cached?.events || [];
     }
     state.partial = partial;
@@ -938,6 +970,9 @@ class CodexReader {
 
   consumeLine(line, state, sourcePath) {
     if (!line) return;
+    if (/"type"\s*:\s*"session_meta"/.test(line)) {
+      try { const meta = JSON.parse(line); if (typeof meta.payload?.id === 'string' && meta.payload.id.length <= 200) state.sessionID = meta.payload.id; } catch {}
+    }
     if (!/"type"\s*:\s*"token_count"/.test(line)) {
       const cwd = line.includes('"cwd"') ? extractCwd(line) : null;
       if (cwd) {

@@ -54,7 +54,7 @@ const enums = {
   ],
   compactSizeMode: ["standard", "mini"],
   compactRingOrientation: ["horizontal", "vertical"],
-  selectedSection: ["overview", "trends", "insights", "settings"],
+  selectedSection: ["overview", "trends", "insights", 'calendar', "settings"],
   themeMode: ["system", "light", "dark"],
   alertPreset: ["standard", "early", "urgentOnly"],
 };

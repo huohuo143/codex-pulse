@@ -43,7 +43,7 @@ class SessionFileIndex {
     for (const child of children) {
       const file = path.join(directory, child.name);
       if (child.isDirectory()) await this.scan(file, entries, directories);
-      else if (child.isFile() && child.name.toLowerCase().endsWith(".jsonl")) {
+      else if (child.isFile() && /\.jsonl(?:\.zst)?$/i.test(child.name)) {
         try {
           const stat = await this.stat(file);
           if (stat.isFile()) this.record(file, stat, entries);
@@ -96,7 +96,7 @@ class SessionFileIndex {
         for (const [name, value] of entries) this.entries.set(name, value);
         for (const name of directories) this.directories.add(name);
         scanned.push(file);
-      } else if (stat.isFile() && file.toLowerCase().endsWith(".jsonl")) {
+      } else if (stat.isFile() && /\.jsonl(?:\.zst)?$/i.test(file)) {
         if (this.directories.has(file)) this.removeSubtree(file);
         this.record(file, stat);
       } else if (this.directories.has(file)) this.removeSubtree(file);
