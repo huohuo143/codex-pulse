@@ -218,10 +218,10 @@ function renderRadar(payload) {
   if (payload?.snapshot !== undefined) radar = payload.snapshot;
   const error = payload?.error;
   if (typeof renderRadarExtras === "function") renderRadarExtras();
-  const prediction = radar?.prediction;
-  const value = prediction?.probability24hPercent;
-  setAll("radarProbability", value == null ? "--%" : `${value}%`);
-  setAll("radarMicro", value == null ? "R --%" : `R ${value}%`);
+  const display = RadarDisplay.clock(radar);
+  setAll('radarProbability', display.title);
+  setAll('radarMicro', display.title);
+  setAll('radarClock', display.detail);
   setAll(
     "radarLevel",
     radar?.latestLevelLabel ||
@@ -234,7 +234,7 @@ function renderRadar(payload) {
   setAll(
     "radarUpdated",
     radar?.latestUpdate
-      ? `雷达更新于 ${formatDate(radar.latestUpdate)}`
+      ? `${radar.refreshHealthy ? '✓ 来源与分析成功' : '刷新待完成'} · ${formatDate(radar.latestUpdate)}`
       : "暂无更新时间",
   );
   setAll(
@@ -254,8 +254,8 @@ function renderRadar(payload) {
   $("#radarStatusText").textContent = error
     ? `更新失败：${error}`
     : radar?.latestUpdate
-      ? `公开源成功于 ${formatDate(radar.latestUpdate)} · 每 30 分钟同步 / 5 分钟重评`
-      : "每 30 分钟同步 · 数据来自公开源";
+      ? `公开源成功于 ${formatDate(radar.latestUpdate)} · GPT-6 Astra / High · 每 10 分钟检查${radar.analysisError ? ' · ' + radar.analysisError : ''}`
+      : '每 10 分钟检查 · GPT-6 Astra / High 分析公开动态';
 }
 
 function renderHourly(rows) {
@@ -748,7 +748,7 @@ function bindEvents() {
 async function start() {
   bindEvents();
   const bootstrap = await window.suanli.bootstrap();
-  appSubtitle = `v${bootstrap.version} · 顺滑浮窗与本地工作分析`;
+  appSubtitle = `v${bootstrap.version} · build ${bootstrap.build || 2153} · Windows`;
   $("#subtitle").textContent = appSubtitle;
   applySettings(bootstrap.settings);
   if (bootstrap.status) renderStatus(bootstrap.status);

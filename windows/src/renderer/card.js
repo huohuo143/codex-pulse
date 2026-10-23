@@ -115,9 +115,10 @@ function render(s) {
   if (type === "overview")
     html +=
       tokens(s) +
-      '<div class="card-row"><b>24h 重置概率</b><span>' +
-      percent(r?.prediction?.probability24hPercent) +
-      '</span></div><div class="card-row"><b>Full reset</b><span>' +
+      '<div class="card-row"><b>重置动态</b><span>' +
+      esc(RadarDisplay.clock(r).title) +
+      '</span></div><p class="reset-clock">' + esc(RadarDisplay.clock(r).detail) +
+      '</p><div class="card-row"><b>Full reset</b><span>' +
       (s.rateLimitResetCredits
         ? n(s.rateLimitResetCredits.availableCount)
         : "--") +
@@ -131,10 +132,10 @@ function render(s) {
   if (type === "radar")
     html =
       '<div class="card-value">' +
-      percent(r?.prediction?.probability24hPercent) +
-      '</div><p>24h 全局硬重置概率</p><p class="card-note">' +
+      esc(RadarDisplay.clock(r).title) +
+      '</div><p class="reset-clock">' + esc(RadarDisplay.clock(r).detail) + '</p><p class="card-note">' +
       esc(r?.latestSummary || "等待公开动态") +
-      '</p><p class="card-caption">公开资料：Codex Radar / Tibo<br>本地规则估算 · 非官方承诺</p>';
+      '</p><p class="card-caption">公开资料：Codex Radar / Tibo<br>GPT-6 Astra · High；以本账号官方额度为准</p>';
   if (type === "credits")
     html =
       '<div class="card-value">' +
@@ -185,6 +186,7 @@ function render(s) {
       (s.statisticsLoading ? "统计中" : n(t.rolling24HoursTokens)) +
       '</div><p class="card-caption">滚动 24 小时 Token</p><div class="mini-bars" id="hourBars"></div><p class="card-caption">最近 14 天</p><div class="mini-bars" id="dayBars"></div>';
   $("#content").innerHTML = html;
+  if (type === 'radar') $('#content').classList.add('announcement-card');
   const state =
     type === "radar"
       ? r?.sourceState
@@ -195,7 +197,7 @@ function render(s) {
     ? s.statisticsLoading
       ? "统计中"
       : "统计更新 " + date(s.statisticsAt)
-    : fresh[state] || fresh.unavailable;
+    : type === 'radar' ? (r?.refreshHealthy ? '✓ 来源与分析成功' : r?.analysisError || r?.error || '等待动态与分析') : fresh[state] || fresh.unavailable;
   if (type === "trend")
     for (const [id, rows] of [
       ["hourBars", t.hourly],
@@ -226,3 +228,5 @@ window.suanli.bootstrap().then((b) => {
 window.addEventListener("unhandledrejection", (e) => {
   $("#freshness").textContent = ErrorMessages.readable(e.reason, "操作失败");
 });
+
+setInterval(() => { if (status && ["overview", "radar"].includes(type)) render(status); }, 1000);

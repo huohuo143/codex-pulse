@@ -393,7 +393,7 @@ function renderRadarExtras() {
       const original = document.createElement("p");
       original.textContent = post.originalText || "公开页面摘要：" + (post.publicSummaryZh || "");
       const translation = document.createElement("p");
-      translation.textContent = post.publicSummaryZh ? "摘要不作为重置承诺计分；英文全文请查看原帖。" : post.translationZh || "";
+      translation.textContent = post.publicSummaryZh ? "公开摘要不作为模型分析依据；英文全文请查看原帖。" : post.translationZh || "";
       const button = document.createElement("button");
       button.textContent = "查看原帖 ↗";
       button.addEventListener("click", () =>

@@ -11,7 +11,7 @@
     const remove = document.querySelector("#removeBudget");
     const feedback = document.querySelector("#budgetFeedback");
     const drafts = new Map();
-    let budgets = [], projects = [], signature = "", pending = false;
+    let budgets = [], projects = [], signature = "", pending = false, lastState = null;
 
     function setFeedback(message = "", kind = "") {
       feedback.textContent = message;
@@ -35,9 +35,11 @@
       controls();
     }
     function sync(next) {
+      lastState = next;
       budgets = next.budgets || [];
+      const draftProjects = projects.filter(row => drafts.has(row.id));
       projects = [...new Map([
-        ...(next.tokenStats?.monthTopProjects || []), ...budgets,
+        ...draftProjects, ...(next.tokenStats?.monthTopProjects || []), ...budgets,
       ].map((row) => [row.id, row])).values()];
       const previous = project.value;
       const nextSignature = JSON.stringify(projects.map((row) =>
@@ -66,7 +68,13 @@
         if (removing) {
           if (!budgets.some((row) => row.id === id)) return;
           value = { id, remove: true };
-        } else value = { id, limit: input.parse(limit.value) };
+        } else {
+          value = { id, limit: input.parse(limit.value) };
+          if (!budgets.some(row => row.id === id) && !(lastState?.tokenStats?.monthTopProjects || []).some(row => row.id === id)) {
+            const projectDraft = projects.find(row => row.id === id);
+            if (projectDraft) value.projectDraft = { id, projectName: projectDraft.projectName, projectPath: projectDraft.projectPath };
+          }
+        }
       } catch (error) {
         drafts.set(id, limit.value);
         setFeedback(errors.readable(error), "error");
