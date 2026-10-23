@@ -1,103 +1,48 @@
 {
-  "schemaVersion": 1,
-  "tag_name": "v2.12.26",
-  "name": "Codex 脉动 2.12.26 · Mac / Windows · Build 2153",
-  "body": "Codex 脉动 **2.12.26 / Build 2153**（macOS Apple Silicon / Windows x64）。\r\n\r\n修复本账号已经重置，悬浮框和桌面小组件仍停留在预告状态的问题。\r\n\r\n- 根据本账号官方额度恢复和周周期重新开始的记录，自动切换为醒目的“已完成重置”与24小时倒计时；主界面、悬浮框、雷达和概览小组件一致显示。\r\n- 从首次检测到账时刻计时，刷新、重启和稍后的公开确认不延长展示；新预告立即优先替代，到期等待下一轮。\r\n- 已确认到账不会因后续公开源或模型暂时失败而消失，刷新状态仍独立如实显示；普通百分比修正或自然周期到期不冒充确认。\r\n- 本账号确认只代表当前账号；保留GPT-6 Astra / High对Tibo发帖及回复的十分钟分析与七天动态保留规则。\r\n\r\nmacOS 完整回归501项通过，0跳过、0失败；包含220张界面检查画面。已实际验证主界面、悬浮框、桌面小组件和重启后倒计时继续递减，保留原有设置与记录。详细范围见验证附件。\r\n\r\n下载DMG与SHA-256文件，运行镜像内“安装或更新（保留设置）.command”。主应用macOS 13+，小组件macOS 14+；ad-hoc签名、未公证。公开动态模型分析需要本机Codex/ChatGPT CLI既有登录及GPT-6 Astra权限，系统小组件刷新受macOS调度影响。\r\n\r\n历史日历来源与许可见 RESET_HISTORY_SOURCES 附件。\r\n\r\n\r\n## Windows x64 · build 2153\r\n\r\n本页现已提供 Windows 安装版（Installer）、免安装版（Portable）和 Windows 源码包，沿用旧版设置及数据目录，首次升级保留关键记录备份。\r\n\r\n- 支持普通及压缩会话日志、归档会话与去重统计，修复空用量事件导致整份日志跳过。\r\n- 修复大型旧雷达档案阻止升级启动，以及打包后外部模型无法读取格式文件的问题。\r\n- 实际到账与24小时倒计时、重置日历、八种悬浮样式及七张桌面卡片已适配。\r\n- 151 项测试全部通过；真实本地数据复查覆盖五个页面、独立历史用量计算、手动刷新、悬浮框和桌面卡片；打包程序实际通过 GPT-6 Astra / High 公开动态分析。\r\n\r\n下载文件名含 `Windows` 的 EXE。详情见 `WINDOWS-UPGRADE-2.12.26.md`、`WINDOWS-VALIDATION-2.12.26.md`，校验值见 `WINDOWS-SHA256SUMS-2.12.26.txt`。Windows 安装包未加商业签名；费用为 API 等价估算，缺少价格的模型明确标记为未计价。上传内容不含本地会话、登录凭据或账号用量。\r\n",
-  "html_url": "https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.26",
-  "published_at": "2026-10-22T17:36:15Z",
+  "tag_name": "v2.12.28",
+  "name": "Codex 脉动 2.12.28 · 本机账号分发版与离线公共历史",
+  "body": "# Codex 脉动 2.12.28 / Build 2155\n\n本轮 macOS 分发版让每位使用者读取自己的本机 Codex 账号、会话和可用模型，不依赖开发者的账号、路径或模型权限。\n\n- 新增本机登录与模型检测；自动模式跟随当前账号默认模型，也可指定模型和推理强度。模型菜单优先列出 GPT-6 Astra 与 GPT-6.1 Sol，推理档位随模型实际能力更新。没有对应权限时明确提示调整设置。\n- 新用户默认只读取 Tibo 动态，模型分析需自行开启，启用前提示额度消耗与 API Key 计费。旧用户已有分析配置会保留，包括 GPT-6 Astra / high。\n- Tibo 默认使用 Codex Radar 公开源，无需 X 登录。可选 X 官网“发帖与回复”页面；通过内嵌窗口自行登录，登录态由本机 WebKit 保存，不提取其他浏览器 Cookie，也不随安装包分发。\n- 公开源可能延迟或遗漏，X 只采集页面实际加载的近期内容。登录受限、空页面或解析失败显示原因，不解释为没有预告。切换来源会清除旧来源成功状态，并继续遵守十分钟检查间隔。\n- 关闭模型分析后仍可查看动态与真实刷新时间；未分析不代表没有预告。本账号实际到账仍触发 24 小时倒计时。\n- 内置 7—9 月可定位日期的 20 条公共历史记录及三个月原始月度统计；首次离线即可查看，未核实的日期不补造。后续仍持续读取 Tibo X 动态。\n- 公共完成声明显示“Tibo确认重置/发卡”，只有当前账号本地检测到额度恢复才显示“重置已落实”；灵活额度和 Full reset 权益不由公共历史推算。\n- 保留预告红色、等待绿色、落实白色，以及醒目的北京时间截止时间；新预告优先，刷新和重启不延长已有倒计时。\n\n每位使用者需在本机 Codex 登录；仅在网页端登录 ChatGPT 不足以提供本地数据。额度和 Full reset 以账号实际返回的数据为准；本地 Token 不覆盖没有本机会话记录的活动。模型分析需要支持隔离执行参数的近期 Codex CLI，版本不兼容时提示更新。\n\n本轮包面向 Apple Silicon Mac。主应用要求 macOS 13+，桌面小组件要求 macOS 14+。这是 ad-hoc 签名、未公证包，首次打开需由使用者按系统提示确认。桌面小组件的彩色显示仍受 macOS 小组件样式与调暗设置影响，应用不替其他使用者修改系统设置。\n\nWindows 仍使用 [2.12.26 / Build 2153](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.26)，本轮 macOS 新功能尚未移植。具体已验证和未验证范围见 [验证记录](https://github.com/huohuo143/codex-pulse/blob/v2.12.28/docs/VALIDATION_2.12.28.md)。\n\n[安装与升级](https://github.com/huohuo143/codex-pulse/blob/v2.12.28/docs/INSTALL_UPGRADE_2.12.28.md) · [历史来源和缺口](https://github.com/huohuo143/codex-pulse/blob/v2.12.28/docs/RESET_HISTORY_SOURCES.md)\n",
+  "html_url": "https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.28",
+  "published_at": "2026-10-23T09:25:04Z",
   "draft": false,
   "prerelease": false,
+  "schemaVersion": 1,
   "assets": [
     {
-      "name": "Codex-Pulse-v2.12.26-build2153-20261023-arm64.dmg",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.26/Codex-Pulse-v2.12.26-build2153-20261023-arm64.dmg",
-      "size": 7123573,
-      "state": "uploaded",
-      "digest": "sha256:c3f24aa2850e5c1ef3e8b9f3d18e5440945612d6cfb97f283c651b68694a78fc"
+      "name": "Codex-Pulse-v2.12.28-build2155-20261023-arm64.dmg",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.28/Codex-Pulse-v2.12.28-build2155-20261023-arm64.dmg",
+      "size": 7853781,
+      "state": "uploaded"
     },
     {
-      "name": "Codex-Pulse-v2.12.26-build2153-20261023-arm64.dmg.sha256",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.26/Codex-Pulse-v2.12.26-build2153-20261023-arm64.dmg.sha256",
+      "name": "Codex-Pulse-v2.12.28-build2155-20261023-arm64.dmg.sha256",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.28/Codex-Pulse-v2.12.28-build2155-20261023-arm64.dmg.sha256",
       "size": 116,
-      "state": "uploaded",
-      "digest": "sha256:63585b9fba1d309493504b4ca623faeebb68a7744a94c446db5a0a7cbdefea2d"
+      "state": "uploaded"
     },
     {
-      "name": "Codex-Pulse-Windows-2.12.26-build2153-Source.zip",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.26/Codex-Pulse-Windows-2.12.26-build2153-Source.zip",
-      "size": 2840034,
-      "state": "uploaded",
-      "digest": "sha256:7e84cd7167036b7119d9c1e78086391253f76e2d4b48fb9a6e9e3daeb9687038"
+      "name": "INSTALL_UPGRADE_2.12.28.md",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.28/INSTALL_UPGRADE_2.12.28.md",
+      "size": 2034,
+      "state": "uploaded"
     },
     {
-      "name": "Codex-Pulse-Windows-2.12.26-build2153-x64-Installer.exe",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.26/Codex-Pulse-Windows-2.12.26-build2153-x64-Installer.exe",
-      "size": 101206673,
-      "state": "uploaded",
-      "digest": "sha256:54d499b83ab08966f7ad61c3e5692aa8dc5c385ff15bc7d58bb7a37c6a388858"
-    },
-    {
-      "name": "Codex-Pulse-Windows-2.12.26-build2153-x64-Portable.exe",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.26/Codex-Pulse-Windows-2.12.26-build2153-x64-Portable.exe",
-      "size": 100880485,
-      "state": "uploaded",
-      "digest": "sha256:85c475a5b5967547e6ae66a02a15cdeda3d9cb5ecc2b01998e86da84fd55309f"
-    },
-    {
-      "name": "INSTALL_UPGRADE_2.12.26.md",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.26/INSTALL_UPGRADE_2.12.26.md",
-      "size": 1709,
-      "state": "uploaded",
-      "digest": "sha256:1f3b7aa57bf53cdf90652ecb2f2a4df8f6beb558436d6c71285ebd4970891430"
-    },
-    {
-      "name": "RELEASE_NOTES_2.12.26.md",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.26/RELEASE_NOTES_2.12.26.md",
-      "size": 1324,
-      "state": "uploaded",
-      "digest": "sha256:37ae8c1f6a1f3fe01c2ba4bb1b444d7bade00f22bd8dd60b6e257bd22034277a"
+      "name": "RELEASE_2.12.28.md",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.28/RELEASE_2.12.28.md",
+      "size": 2800,
+      "state": "uploaded"
     },
     {
       "name": "RESET_HISTORY_SOURCES.md",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.26/RESET_HISTORY_SOURCES.md",
-      "size": 11449,
-      "state": "uploaded",
-      "digest": "sha256:46b9dde72aaadcdb0ebfd2014acf011de817100a0df3b2bd5705d56aa174c2c5"
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.28/RESET_HISTORY_SOURCES.md",
+      "size": 13072,
+      "state": "uploaded"
     },
     {
-      "name": "SHA256SUMS-2.12.26.txt",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.26/SHA256SUMS-2.12.26.txt",
-      "size": 602,
-      "state": "uploaded",
-      "digest": "sha256:7bed258f0f968e027adf515fe3c93301d2b843054acc920761b1f79269d3a0fd"
-    },
-    {
-      "name": "VALIDATION_2.12.26.md",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.26/VALIDATION_2.12.26.md",
-      "size": 2289,
-      "state": "uploaded",
-      "digest": "sha256:fd2e5fc8ade743cb54f4bf2672bc7e39e244cc027639b79a77710713ea985731"
-    },
-    {
-      "name": "WINDOWS-SHA256SUMS-2.12.26.txt",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.26/WINDOWS-SHA256SUMS-2.12.26.txt",
-      "size": 361,
-      "state": "uploaded",
-      "digest": "sha256:6385643686a95e96dc1bbeb3d8d2af507b8ae8bd05ea022c2912bb2bbb6bef58"
-    },
-    {
-      "name": "WINDOWS-UPGRADE-2.12.26.md",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.26/WINDOWS-UPGRADE-2.12.26.md",
-      "size": 1736,
-      "state": "uploaded",
-      "digest": "sha256:6be0e92aa5614cb3ceabe81bc62ba6b0915b91ef2e9399d4e41309c9192bbc5d"
-    },
-    {
-      "name": "WINDOWS-VALIDATION-2.12.26.md",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.26/WINDOWS-VALIDATION-2.12.26.md",
-      "size": 5147,
-      "state": "uploaded",
-      "digest": "sha256:e1fc4db382bf620909648e28f69f0d8273397858d94a0b5f21d9925aa8f40ac0"
+      "name": "VALIDATION_2.12.28.md",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.28/VALIDATION_2.12.28.md",
+      "size": 4072,
+      "state": "uploaded"
     }
   ]
 }
