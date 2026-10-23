@@ -1,6 +1,6 @@
 {
   "name": "suanli-dashboard-windows",
-  "version": "2.12.3",
+  "version": "2.12.26",
   "description": "Codex 脉动 Windows：额度预测、Token、预算、雷达与桌面卡片",
   "main": "src/main.js",
   "author": "Tilo Liang",
@@ -21,7 +21,7 @@
   "build": {
     "appId": "dev.codex.balance-dashboard.codex.windows",
     "productName": "Codex 脉动",
-    "artifactName": "Codex-Pulse-Windows-${version}-${arch}-Portable.${ext}",
+    "artifactName": "Codex-Pulse-Windows-${version}-build2153-${arch}-Portable.${ext}",
     "directories": {
       "output": "dist"
     },
@@ -39,15 +39,20 @@
       ]
     },
     "nsis": {
-      "artifactName": "Codex-Pulse-Windows-${version}-${arch}-Installer.${ext}",
+      "artifactName": "Codex-Pulse-Windows-${version}-build2153-${arch}-Installer.${ext}",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Codex 脉动"
+      "shortcutName": "Codex 脉动",
+      "deleteAppDataOnUninstall": false
     },
     "portable": {
-      "artifactName": "Codex-Pulse-Windows-${version}-${arch}-Portable.${ext}"
-    }
+      "artifactName": "Codex-Pulse-Windows-${version}-build2153-${arch}-Portable.${ext}"
+    },
+    "buildVersion": "2.12.26.2153"
+  },
+  "engines": {
+    "node": ">=24.0.0"
   }
 }
