@@ -1,47 +1,35 @@
 {
-  "tag_name": "v2.12.28",
-  "name": "Codex 脉动 2.12.28 · 本机账号分发版与离线公共历史",
-  "body": "# Codex 脉动 2.12.28 / Build 2155\n\n本轮 macOS 分发版让每位使用者读取自己的本机 Codex 账号、会话和可用模型，不依赖开发者的账号、路径或模型权限。\n\n- 新增本机登录与模型检测；自动模式跟随当前账号默认模型，也可指定模型和推理强度。模型菜单优先列出 GPT-6 Astra 与 GPT-6.1 Sol，推理档位随模型实际能力更新。没有对应权限时明确提示调整设置。\n- 新用户默认只读取 Tibo 动态，模型分析需自行开启，启用前提示额度消耗与 API Key 计费。旧用户已有分析配置会保留，包括 GPT-6 Astra / high。\n- Tibo 默认使用 Codex Radar 公开源，无需 X 登录。可选 X 官网“发帖与回复”页面；通过内嵌窗口自行登录，登录态由本机 WebKit 保存，不提取其他浏览器 Cookie，也不随安装包分发。\n- 公开源可能延迟或遗漏，X 只采集页面实际加载的近期内容。登录受限、空页面或解析失败显示原因，不解释为没有预告。切换来源会清除旧来源成功状态，并继续遵守十分钟检查间隔。\n- 关闭模型分析后仍可查看动态与真实刷新时间；未分析不代表没有预告。本账号实际到账仍触发 24 小时倒计时。\n- 内置 7—9 月可定位日期的 20 条公共历史记录及三个月原始月度统计；首次离线即可查看，未核实的日期不补造。后续仍持续读取 Tibo X 动态。\n- 公共完成声明显示“Tibo确认重置/发卡”，只有当前账号本地检测到额度恢复才显示“重置已落实”；灵活额度和 Full reset 权益不由公共历史推算。\n- 保留预告红色、等待绿色、落实白色，以及醒目的北京时间截止时间；新预告优先，刷新和重启不延长已有倒计时。\n\n每位使用者需在本机 Codex 登录；仅在网页端登录 ChatGPT 不足以提供本地数据。额度和 Full reset 以账号实际返回的数据为准；本地 Token 不覆盖没有本机会话记录的活动。模型分析需要支持隔离执行参数的近期 Codex CLI，版本不兼容时提示更新。\n\n本轮包面向 Apple Silicon Mac。主应用要求 macOS 13+，桌面小组件要求 macOS 14+。这是 ad-hoc 签名、未公证包，首次打开需由使用者按系统提示确认。桌面小组件的彩色显示仍受 macOS 小组件样式与调暗设置影响，应用不替其他使用者修改系统设置。\n\nWindows 仍使用 [2.12.26 / Build 2153](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.26)，本轮 macOS 新功能尚未移植。具体已验证和未验证范围见 [验证记录](https://github.com/huohuo143/codex-pulse/blob/v2.12.28/docs/VALIDATION_2.12.28.md)。\n\n[安装与升级](https://github.com/huohuo143/codex-pulse/blob/v2.12.28/docs/INSTALL_UPGRADE_2.12.28.md) · [历史来源和缺口](https://github.com/huohuo143/codex-pulse/blob/v2.12.28/docs/RESET_HISTORY_SOURCES.md)\n",
-  "html_url": "https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.28",
-  "published_at": "2026-10-23T09:25:04Z",
+  "tag_name": "v2.12.29",
+  "name": "Codex 脉动 2.12.29 · 公开回复更新与小组件刷新修复",
+  "body": "# Codex 脉动 2.12.29 / Build 2157\n\n修复公开线程缓存长期不更新的问题：即使 Tibo 原帖内容没有变化，也会定期重新读取线程，避免后来追加的回复一直停留在旧缓存之外。\n\n- 最新动态仍每十分钟读取一次；线程补充读取每轮最多三次，当前预告和截止时间的证据优先，其他近期线程轮换检查。\n- 公开线程读取使用 Reader 的缓存刷新选项；每条线程保存最近尝试与成功时间，重启不绕过检查间隔。读取失败保留原有已核验上下文及其时间，模型能区分历史上下文和新读取。\n- 继续使用默认公开源，无需 X 登录；预告、北京时间截止时间及刷新健康状态继续共用主 App、悬浮框和小组件的数据。\n- 预告或截止时间更新后立即请求小组件重载，不再排队等待普通额度变化的合并刷新，减少新数据已到而旧画面短暂过期的现象。实际绘制仍由 macOS WidgetKit 调度。\n- 本次比对中，公开源最近七天的 53 条动态均已收录，包括本轮预告和时间回复；七天以外的七条记录按既有规则清理。此结论仅覆盖公开源实际收录的内容，不代表 X 全量动态没有遗漏。\n\n本机账号、模型、主题、小组件布局及个人权益数据保持原有配置。提供上一版本和数据备份，可回滚。\n\nApple Silicon macOS 13+；桌面小组件要求 macOS 14+。ad-hoc 签名，未公证。X 登录来源未完成真人登录验收；Windows 沿用现有版本。\n\n验证：80 项相关测试通过，已完成本机安装、正常退出重启及悬浮框/桌面小组件自然刷新观察。X 登录后的真实读取未完成实测。\n\n[完整验收记录](https://github.com/huohuo143/codex-pulse/blob/v2.12.29/docs/VALIDATION_2.12.29.md) · [安装与升级](https://github.com/huohuo143/codex-pulse/blob/v2.12.28/docs/INSTALL_UPGRADE_2.12.28.md)\n\nWindows 继续使用 [2.12.26 / Build 2153](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.26)，本轮更新仅面向 Apple Silicon Mac。\n",
+  "html_url": "https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.29",
+  "published_at": "2026-10-23T13:03:37Z",
   "draft": false,
   "prerelease": false,
   "schemaVersion": 1,
   "assets": [
     {
-      "name": "Codex-Pulse-v2.12.28-build2155-20261023-arm64.dmg",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.28/Codex-Pulse-v2.12.28-build2155-20261023-arm64.dmg",
-      "size": 7853781,
+      "name": "Codex-Pulse-v2.12.29-build2157-20261023-arm64.dmg",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.29/Codex-Pulse-v2.12.29-build2157-20261023-arm64.dmg",
+      "size": 7854840,
       "state": "uploaded"
     },
     {
-      "name": "Codex-Pulse-v2.12.28-build2155-20261023-arm64.dmg.sha256",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.28/Codex-Pulse-v2.12.28-build2155-20261023-arm64.dmg.sha256",
+      "name": "Codex-Pulse-v2.12.29-build2157-20261023-arm64.dmg.sha256",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.29/Codex-Pulse-v2.12.29-build2157-20261023-arm64.dmg.sha256",
       "size": 116,
       "state": "uploaded"
     },
     {
-      "name": "INSTALL_UPGRADE_2.12.28.md",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.28/INSTALL_UPGRADE_2.12.28.md",
-      "size": 2034,
+      "name": "RELEASE_2.12.29.md",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.29/RELEASE_2.12.29.md",
+      "size": 1554,
       "state": "uploaded"
     },
     {
-      "name": "RELEASE_2.12.28.md",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.28/RELEASE_2.12.28.md",
-      "size": 2800,
-      "state": "uploaded"
-    },
-    {
-      "name": "RESET_HISTORY_SOURCES.md",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.28/RESET_HISTORY_SOURCES.md",
-      "size": 13072,
-      "state": "uploaded"
-    },
-    {
-      "name": "VALIDATION_2.12.28.md",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.28/VALIDATION_2.12.28.md",
-      "size": 4072,
+      "name": "VALIDATION_2.12.29.md",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.29/VALIDATION_2.12.29.md",
+      "size": 3716,
       "state": "uploaded"
     }
   ]
