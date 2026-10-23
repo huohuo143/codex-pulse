@@ -23,7 +23,7 @@ const errors = [];
     }
     assert.ok(boot.status.weekly, 'Live quota unavailable');
     assert.equal(boot.status.statisticsLoading, false);
-    assert.equal(boot.version, '2.12.26'); assert.equal(boot.build, 2153);
+    assert.equal(boot.version, '2.12.29'); assert.equal(boot.build, 2157);
     assert.equal(boot.status.statisticsWarning, null);
     assert.ok(boot.status.scannedFiles >= 21);
     await page.evaluate(() => window.suanli.showSection('overview'));

@@ -51,7 +51,7 @@ async function independentTotals(roots) {
     const page = await poll(async () => app.windows().find(p => p.url().includes('surface=main')), Boolean, 'Main window missing');
     page.on('pageerror', e => errors.push(e.message));
     const boot = await poll(() => page.evaluate(() => window.suanli.bootstrap()), b => b.status.weekly && !b.status.statisticsLoading && b.status.tokenStats.monthTokens > 0, 'Real quota or usage unavailable');
-    assert.equal(boot.version, '2.12.26'); assert.equal(boot.build, 2153); assert.equal(boot.status.statisticsWarning, null);
+    assert.equal(boot.version, '2.12.29'); assert.equal(boot.build, 2157); assert.equal(boot.status.statisticsWarning, null);
     for (const name of ['quota', 'flexible', 'reset']) assert.equal(boot.status.sourceStates[name], 'fresh'); checks.push('live quota, flexible balance and Full reset fresh');
     for (const section of ['overview', 'trends', 'insights', 'calendar', 'settings']) {
       await page.locator(`[data-section="${section}"]`).click();

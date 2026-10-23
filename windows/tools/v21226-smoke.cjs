@@ -1,16 +1,17 @@
 const fs = require('node:fs'), path = require('node:path'), assert = require('node:assert/strict');
 const { _electron: electron } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const root = path.resolve(process.argv[2] || path.join(__dirname, '..'));
-const output = path.join(root, 'validation-2153' + (process.env.PULSE_TEST_SCALE ? '-scale-' + process.env.PULSE_TEST_SCALE : ''));
+const output = path.join(root, 'validation-2157' + (process.env.PULSE_TEST_SCALE ? '-scale-' + process.env.PULSE_TEST_SCALE : ''));
 fs.mkdirSync(output, { recursive: true });
 const support = path.join(output, 'profile-' + Date.now()), sessions = path.join(support, 'sessions'); fs.mkdirSync(sessions, { recursive: true });
 const now = Date.now(), arrival = now - 600000, DAY = 86400000;
 const iso = at => new Date(at).toISOString();
-const tokenLog = JSON.stringify({ type: 'session_meta', payload: { id: 'synthetic-windows-2153', cwd: 'C:\\synthetic-project' } }) + '\n' + JSON.stringify({ timestamp: iso(now), type: 'event_msg', payload: { type: 'token_count', info: { total_token_usage: { total_tokens: 123 }, last_token_usage: { total_tokens: 123, input_tokens: 100, output_tokens: 23 } } } }) + '\n';
+const tokenLog = JSON.stringify({ type: 'session_meta', payload: { id: 'synthetic-windows-2157', cwd: 'C:\\synthetic-project' } }) + '\n' + JSON.stringify({ timestamp: iso(now), type: 'event_msg', payload: { type: 'token_count', info: { total_token_usage: { total_tokens: 123 }, last_token_usage: { total_tokens: 123, input_tokens: 100, output_tokens: 23 } } } }) + '\n';
 fs.writeFileSync(path.join(sessions, 'synthetic.jsonl.zst'), require('node:zlib').zstdCompressSync(Buffer.from(tokenLog)));
 const rows = [{ recordedAt: iso(arrival - 300000), remainingPercent: 5, resetsAt: iso(arrival + 5 * DAY), windowMinutes: 10080 }, { recordedAt: iso(arrival), remainingPercent: 100, resetsAt: iso(arrival + 7 * DAY), windowMinutes: 10080 }];
 fs.writeFileSync(path.join(support, 'quota-history-fixture-account.json'), JSON.stringify(rows));
 fs.writeFileSync(path.join(support, 'settings.json'), JSON.stringify({ schemaVersion: 2118, selectedSection: 'overview', themeMode: 'dark', palette: 'mintDawn', dailyBackup: false, autoUpdates: false, oneDriveSync: false }));
+fs.writeFileSync(path.join(support, 'tibo-preferences-v1.json'), JSON.stringify({enabled:true,model:'gpt-6-astra',effort:'high',source:'public'}));
 const errors = [], checks = []; let activeApp;
 async function launch() {
   const env = { ...process.env, CODEX_PULSE_SUPPORT_DIR: support, CODEX_PULSE_SESSION_ROOT: sessions, CODEX_PULSE_OFFLINE: '1', CODEX_PULSE_ACCEPTANCE: '0' }; delete env.ELECTRON_RUN_AS_NODE;
@@ -37,14 +38,14 @@ async function launch() {
     };
   }, { appPath, resetsAt: iso(arrival + 7 * DAY) });
   await page.evaluate(() => window.suanli.refresh());
-  await page.waitForFunction(() => document.querySelector('.radar-main [data-bind="radarProbability"]').textContent === '已完成重置');
+  await page.waitForFunction(() => document.querySelector('.radar-main [data-bind="radarProbability"]').textContent === '重置已落实');
   return { app, page, appPath };
 }
 (async () => {
   let { app, page, appPath } = await launch();
   try {
     const boot = await page.evaluate(() => window.suanli.bootstrap());
-    assert.equal(boot.version, '2.12.26'); assert.equal(boot.build, 2153); checks.push('version/build');
+    assert.equal(boot.version, '2.12.29'); assert.equal(boot.build, 2157); checks.push('version/build');
     const navigationFits = await page.evaluate(() => [...document.querySelectorAll('.segmented-control button')].every(button => {
       const range = document.createRange(); range.selectNodeContents(button); const text = range.getBoundingClientRect(), box = button.getBoundingClientRect();
       return text.left >= box.left && text.right <= box.right + 1 && text.height < 25;
@@ -70,7 +71,7 @@ async function launch() {
         const footer = document.querySelector('.compact-reset-clock'), box = footer.getBoundingClientRect(), gauge = [...document.querySelectorAll('.compact-gauge')].find(el => el.getBoundingClientRect().width > 0)?.getBoundingClientRect();
         return { title: footer.querySelector('strong').textContent, detail: footer.querySelector('span').textContent, clipped: box.left < 0 || box.right > innerWidth + 1 || box.bottom > innerHeight + 1 || box.top < 0, gaugeOverlap: !!gauge && box.top < gauge.bottom - 1 };
       });
-      assert.equal(view.title, '已完成重置'); assert.ok(view.detail.includes('到账展示剩余')); assert.equal(view.clipped, false, style + ' footer clipped'); assert.equal(view.gaugeOverlap, false, style + ' overlaps quota ring');
+      assert.equal(view.title, '重置已落实'); assert.ok(view.detail.includes('到账展示剩余')); assert.equal(view.clipped, false, style + ' footer clipped'); assert.equal(view.gaugeOverlap, false, style + ' overlaps quota ring');
       await floating.screenshot({ path: path.join(output, `floating-${style}-${size}.png`) });
     }
     checks.push('16 floating style/size combinations');
@@ -78,7 +79,7 @@ async function launch() {
       await page.evaluate(type => window.suanli.setCard({ type, enabled: true }), type);
       let card;
       for (let n = 0; n < 100; n++) { card = app.windows().find(w => w.url().includes('surface=' + type) && w.url().includes('card.html')); if (card) break; await page.waitForTimeout(50); }
-      assert.ok(card); await card.waitForFunction(() => document.querySelector('#content').textContent.includes('已完成重置'));
+      assert.ok(card); await card.waitForFunction(() => document.querySelector('#content').textContent.includes('重置已落实'));
       assert.ok((await card.locator('.reset-clock').innerText()).includes('到账展示剩余'));
       await card.screenshot({ path: path.join(output, 'card-' + type + '.png') });
     }

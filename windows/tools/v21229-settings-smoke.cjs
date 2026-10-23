@@ -1,0 +1,24 @@
+const fs=require('fs'),path=require('path'),assert=require('assert/strict');
+const {_electron}=require(process.env.PLAYWRIGHT_MODULE);
+const stage=process.argv[2],profile=fs.mkdtempSync(path.join(stage,'settings-audit-'));
+fs.mkdirSync(path.join(profile,'sessions'));
+fs.writeFileSync(path.join(profile,'settings.json'),JSON.stringify({schemaVersion:2118,selectedSection:'settings',oneDriveSync:false,autoUpdates:false,dailyBackup:false,notifications:false}));
+const env={...process.env,CODEX_PULSE_SUPPORT_DIR:profile,CODEX_PULSE_SESSION_ROOT:path.join(profile,'sessions'),CODEX_PULSE_OFFLINE:'1'};delete env.ELECTRON_RUN_AS_NODE;
+(async()=>{const app=await _electron.launch({executablePath:process.env.PULSE_TEST_EXECUTABLE,cwd:stage,env});const errors=[];try{
+const page=await app.firstWindow();page.on('pageerror',e=>errors.push(e.message));await page.waitForSelector('#analysisEnabled');
+assert.equal(await page.locator('#analysisEnabled').isChecked(),false);
+await page.locator('#detectModels').click();await page.waitForFunction(()=>document.querySelector('#localAccount').textContent.includes('已登录'));
+assert.ok(await page.locator('#analysisModel option').count()>1);
+await page.locator('#analysisModel').selectOption('gpt-6.1-sol');await page.locator('#analysisEffort').selectOption('high');await page.locator('#analysisEnabled').check();await page.locator('#saveAnalysis').click();await page.waitForFunction(()=>document.querySelector('#analysisResult').textContent.includes('已保存'));
+assert.deepEqual(await page.evaluate(()=>window.suanli.tiboPreferences()),{enabled:true,model:'gpt-6.1-sol',effort:'high',source:'public'});
+await page.locator('#analysisEnabled').uncheck();await page.locator('#saveAnalysis').click();
+assert.equal((await page.evaluate(()=>window.suanli.tiboPreferences())).enabled,false);
+await page.locator('#tiboSource').selectOption('x');await page.locator('#saveAnalysis').click();
+assert.equal((await page.evaluate(()=>window.suanli.tiboPreferences())).source,'x');
+await page.locator('#openTiboX').click();
+let x;for(let i=0;i<50;i++){x=app.windows().find(p=>p!==page);if(x)break;await new Promise(r=>setTimeout(r,100));}assert.ok(x);
+const prefs=await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows().find(w=>w.getTitle().includes('X'))?.webContents.getLastWebPreferences());
+assert.equal(prefs.nodeIntegration,false);assert.equal(prefs.contextIsolation,true);assert.equal(prefs.sandbox,true);
+await page.screenshot({path:path.join(stage,'settings-2157.png')});
+assert.deepEqual(errors,[]);const report={version:'2.12.29',build:2157,passed:true,checks:['new user analysis off','real login/model detection','model/effort settings persisted','analysis can be disabled','X source persisted','isolated X window opens with sandbox'],xHumanLoginTested:false,errors};fs.writeFileSync(path.join(stage,'settings-audit.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
+}finally{await app.close()}})().catch(e=>{console.error(e);process.exitCode=1});
