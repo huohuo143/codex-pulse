@@ -28,3 +28,10 @@
 .calendar-event { border-top: 1px solid var(--border); padding: 18px 0; }.calendar-event h3 { font-size: 16px; margin-bottom: 10px; }.calendar-event p { font-size: 13px; line-height: 1.8; overflow-wrap: anywhere; }.calendar-event button { margin: 10px 8px 0 0; font-size: 12px; }
 .calendar-note { color: var(--muted); font-size: 11px; line-height: 1.8; white-space: pre-line; margin-top: 12px; overflow-wrap: anywhere; }
 @media(max-width: 680px) { .reset-calendar { padding: 14px; }.calendar-grid { gap: 3px; }.calendar-day { min-height: 76px; }.calendar-day small { padding: 2px; font-size: 9px; }.section-nav { flex-wrap: wrap; } }
+
+body[data-reset-state="announced"] { --reset-state-color:#ff656f; }
+body[data-reset-state="waiting"] { --reset-state-color:#18cba0; }
+body[data-reset-state="completed"] { --reset-state-color:#ffffff; }
+[data-bind="radarProbability"],[data-bind="radarMicro"],.reset-clock,.compact-reset-clock strong { color:var(--reset-state-color); }
+body[data-card="radar"] .card-value { color:var(--reset-state-color); }
+#analysisModel,#analysisEffort,#tiboSource { max-width:100%;margin:8px 0; }

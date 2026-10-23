@@ -254,8 +254,8 @@ function renderRadar(payload) {
   $("#radarStatusText").textContent = error
     ? `更新失败：${error}`
     : radar?.latestUpdate
-      ? `公开源成功于 ${formatDate(radar.latestUpdate)} · GPT-6 Astra / High · 每 10 分钟检查${radar.analysisError ? ' · ' + radar.analysisError : ''}`
-      : '每 10 分钟检查 · GPT-6 Astra / High 分析公开动态';
+      ? `公开源成功于 ${formatDate(radar.latestUpdate)} · 可选本机模型 · 每 10 分钟检查${radar.analysisError ? ' · ' + radar.analysisError : ''}`
+      : '每 10 分钟检查 · 可选本机模型 分析公开动态';
 }
 
 function renderHourly(rows) {
@@ -748,7 +748,7 @@ function bindEvents() {
 async function start() {
   bindEvents();
   const bootstrap = await window.suanli.bootstrap();
-  appSubtitle = `v${bootstrap.version} · build ${bootstrap.build || 2153} · Windows`;
+  appSubtitle = `v${bootstrap.version} · build ${bootstrap.build || 2157} · Windows`;
   $("#subtitle").textContent = appSubtitle;
   applySettings(bootstrap.settings);
   if (bootstrap.status) renderStatus(bootstrap.status);

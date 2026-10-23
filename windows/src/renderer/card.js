@@ -102,6 +102,8 @@ function cost(c) {
 }
 function render(s) {
   status = s;
+  document.body.dataset.card = type;
+  document.body.dataset.resetState = s.radar?.latestLevelLabel?.includes("预告") ? "announced" : s.radar?.localCompletion && s.radar?.completionUntil ? "completed" : "waiting";
   $("#cardTitle").textContent = labels[type] || "Codex 脉动";
   const t = s.tokenStats,
     r = s.radar;
@@ -135,7 +137,7 @@ function render(s) {
       esc(RadarDisplay.clock(r).title) +
       '</div><p class="reset-clock">' + esc(RadarDisplay.clock(r).detail) + '</p><p class="card-note">' +
       esc(r?.latestSummary || "等待公开动态") +
-      '</p><p class="card-caption">公开资料：Codex Radar / Tibo<br>GPT-6 Astra · High；以本账号官方额度为准</p>';
+      '</p><p class="card-caption">公开资料：Codex Radar / Tibo<br>可选本机模型；以本账号官方额度为准</p>';
   if (type === "credits")
     html =
       '<div class="card-value">' +
