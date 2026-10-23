@@ -517,7 +517,7 @@ class Runtime extends EventEmitter {
   diagnostics() {
     return {
       version: require("../../package.json").version,
-      build: 2153,
+      build: 2157,
       platform: process.platform,
       arch: process.arch,
       generatedAt: new Date().toISOString(),

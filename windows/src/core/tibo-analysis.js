@@ -67,21 +67,30 @@ function validate(result, posts, now) {
     analyzedAt: new Date(now).toISOString(), model: MODEL, reasoningEffort: EFFORT };
 }
 function prompt(posts, now) {
-  const items = retained(posts, now).filter(p => p.originalText).map(({ id, url, publishedAt, originalText, threadContext = '' }) => ({ id, url, publishedAt, originalText, threadContext }));
+  const items = retained(posts, now).filter(p => p.originalText).map(({ id, url, publishedAt, originalText, threadContext = '', threadContextCheckedAt, threadContextAttemptedAt }) => ({ id, url, publishedAt, originalText, threadContext, threadContextCheckedAt, threadContextAttemptedAt }));
   const data = JSON.stringify(items);
   if (Buffer.byteLength(data) > 250000) throw new Error('本次公开动态过多，未提交不完整分析');
   return fs.readFileSync(path.join(__dirname, 'resources/tibo-prompt.txt'), 'utf8').replace('{{NOW}}', new Date(now).toISOString()).replace('{{POSTS}}', data);
 }
-async function analyze(posts, now = Date.now(), { timeout = 180000, signal } = {}) {
+async function analyze(posts, now = Date.now(), { timeout = 180000, signal, preferences = { model: MODEL, effort: EFFORT } } = {}) {
+  const capabilities = require('./local-capabilities');
+  const selected = capabilities.selection(preferences, await capabilities.inspect());
   const input = prompt(posts, now);
   const command = codexCandidates().find(p => /\.exe$/i.test(p) && fs.existsSync(p));
-  if (!command) throw new Error('找不到本机 Codex 可执行程序，无法使用 GPT-6 Astra 分析');
+  if (!command) throw new Error('找不到本机 Codex 可执行程序，无法分析');
+  const { promisify } = require('node:util');
+  const execFile = promisify(require('node:child_process').execFile);
+  const probe = args => execFile(command, args, { windowsHide: true, timeout: 8000, maxBuffer: 128000 }).then(r => r.stdout);
+  const [help, features] = await Promise.all([probe(['exec','--help']), probe(['features','list'])]);
+  const available = new Set(features.split(/\r?\n/).map(l=>l.trim().split(/\s+/)[0]));
+  if (!['--ignore-user-config','--ephemeral','--output-schema','--output-last-message'].every(x=>help.includes(x)) || !available.has('shell_tool') || !available.has('unified_exec')) throw new Error('请更新本机 Codex CLI，以支持隔离分析');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'CodexPulse-Tibo-'));
   // The external Codex process cannot resolve Electron's virtual ASAR paths.
   const output = path.join(dir, 'result.json'), schema = path.join(dir, 'schema.json');
-  const args = ['exec', '--ignore-user-config', '--ephemeral', '--skip-git-repo-check', '-s', 'read-only', '-C', dir, '-m', MODEL,
-    '-c', 'model_reasoning_effort="high"', '-c', 'web_search="disabled"', '--enable', 'skip_host_skill_discovery'];
-  for (const name of ['shell_tool', 'unified_exec', 'apps', 'browser_use', 'computer_use', 'in_app_browser', 'multi_agent', 'memories', 'hooks', 'image_generation', 'view_image', 'workspace_dependencies', 'goals', 'artifact']) args.push('--disable', name);
+  const args = ['exec', '--ignore-user-config', '--ephemeral', '--skip-git-repo-check', '-s', 'read-only', '-C', dir, '-m', selected.model,
+    '-c', 'model_reasoning_effort=' + JSON.stringify(selected.effort), '-c', 'web_search="disabled"', '-c', 'approval_policy="never"'];
+  if (available.has('skip_host_skill_discovery')) args.push('--enable','skip_host_skill_discovery');
+  for (const name of ['plugins','agent_message_board','browser_use_external','chronicle','shell_tool', 'unified_exec', 'apps', 'browser_use', 'computer_use', 'in_app_browser', 'multi_agent', 'memories', 'hooks', 'image_generation', 'view_image', 'workspace_dependencies', 'goals', 'artifact']) if (available.has(name)) args.push('--disable', name);
   args.push('--output-schema', schema, '--output-last-message', output, '--json', '-');
   try {
     fs.writeFileSync(schema, fs.readFileSync(path.join(__dirname, 'resources/tibo-schema.json')), { flag: 'wx', mode: 0o600 });
@@ -93,12 +102,12 @@ async function analyze(posts, now = Date.now(), { timeout = 180000, signal } = {
       signal?.addEventListener('abort', abort, { once: true });
       const timer = setTimeout(() => { timedOut = true; child.kill(); }, timeout);
       child.once('error', () => { clearTimeout(timer); signal?.removeEventListener('abort', abort); reject(new Error('Codex 分析进程启动失败')); });
-      child.once('close', code => { clearTimeout(timer); signal?.removeEventListener('abort', abort); code === 0 && !timedOut && !signal?.aborted ? resolve() : reject(new Error(timedOut ? 'GPT-6 Astra · High 分析超时，下一轮再试' : 'GPT-6 Astra · High 分析未完成，请检查 Codex 登录及模型权限')); });
+      child.once('close', code => { clearTimeout(timer); signal?.removeEventListener('abort', abort); code === 0 && !timedOut && !signal?.aborted ? resolve() : reject(new Error(timedOut ? '本机模型 分析超时，下一轮再试' : '本机模型 分析未完成，请检查 Codex 登录及模型权限')); });
       child.stdin.on('error', () => {});
       child.stdin.end(input);
     });
     if (fs.statSync(output).size > 32768) throw new Error('模型输出超过上限');
-    return validate(JSON.parse(fs.readFileSync(output, 'utf8')), posts, Date.now());
+    return { ...validate(JSON.parse(fs.readFileSync(output, 'utf8')), posts, Date.now()), model: selected.model, reasoningEffort: selected.effort };
   } finally { if (path.dirname(dir) === path.resolve(os.tmpdir())) fs.rmSync(dir, { recursive: true, force: true }); }
 }
 
@@ -112,7 +121,10 @@ function latestConfirmedAt(snapshots, now) {
   return confirmed;
 }
 function presentation(snapshot, history, now) {
-  const analysis = snapshot.analysis, local = Date.parse(latestConfirmedAt(history, now)), official = analysis?.state === 'completed' ? Date.parse(analysis.completedAt) : NaN;
+  const analysis = snapshot.analysisEnabled === false ? null : snapshot.analysis;
+  const boundary = Math.max(Date.parse(snapshot.latestAnnouncementAt) || 0, analysis?.state === 'announced' ? Math.max(0, ...(snapshot.posts || []).filter(p=>analysis.evidenceIDs.includes(p.id)).map(p=>Date.parse(p.publishedAt))) : 0);
+  const current = value => { const at=Date.parse(value); return at>=boundary && at<=now ? at : NaN; };
+  const local = current(latestConfirmedAt(history, now)), official = analysis?.state === 'completed' ? current(analysis.completedAt) : NaN;
   const preferOfficial = Number.isFinite(local) && official > local + DAY;
   let completed = preferOfficial ? official : Number.isFinite(local) ? local : official;
   const newest = Math.max(-Infinity, ...(snapshot.posts || []).filter(p => analysis?.evidenceIDs?.includes(p.id) && Date.parse(p.publishedAt) <= now).map(p => Date.parse(p.publishedAt)));
@@ -121,10 +133,12 @@ function presentation(snapshot, history, now) {
   let title, summary, completionUntil = null, deadline = null;
   if (Number.isFinite(completed) && completed <= now) {
     completionUntil = now < completed + DAY ? new Date(completed + DAY).toISOString() : null;
-    title = completionUntil ? (!Number.isFinite(local) || preferOfficial) && analysis?.kind === 'reset_card' ? '重置卡已到账' : '已完成重置' : '等待新预告';
+    title = completionUntil ? Number.isFinite(local) && !preferOfficial ? '重置已落实' : analysis?.kind === 'reset_card' ? 'Tibo确认发卡' : 'Tibo确认重置' : '等待新重置';
     summary = completionUntil ? Number.isFinite(local) && !preferOfficial ? '本账号官方额度已恢复，周额度周期已重新开始。从首次检测到账展示 24 小时；仅代表当前账号。' : analysis?.summaryZh || '已有完成确认' : '上一轮到账确认已展示 24 小时，继续检查新的重置预告。';
+  } else if (healthy && snapshot.analysisEnabled === false) {
+    title = '动态已更新'; summary = '模型分析未开启；未分析不代表没有预告。可在设置中开启本机模型分析。';
   } else if (healthy && analysis) {
-    title = { announced: analysis.kind === 'reset_card' ? '发卡已预告' : '重置已预告', completed: '已有完成确认', not_found: '未发现新预告', uncertain: '尚不能确认' }[analysis.state];
+    title = { announced: analysis.kind === 'reset_card' ? '发卡已预告' : '重置已预告', completed: '已有完成确认', not_found: '等待新重置', uncertain: '尚不能确认' }[analysis.state];
     summary = analysis.summaryZh;
     if (analysis.state === 'announced' && analysis.deadline) {
       const at = deadlineDate(analysis.deadline);
@@ -132,7 +146,7 @@ function presentation(snapshot, history, now) {
     }
   } else {
     title = !snapshot.lastSuccessAt ? '等待动态' : now >= snapshot.lastSuccessAt + 660000 ? '动态已过期' : snapshot.error ? '动态未更新' : snapshot.analysisError ? '分析未成功' : '等待分析';
-    summary = snapshot.error || snapshot.analysisError || '等待 GPT-6 Astra · High 完成本轮发帖与回复分析';
+    summary = snapshot.error || snapshot.analysisError || '等待 本机模型 完成本轮发帖与回复分析';
   }
   return { ...snapshot, latestLevelLabel: title, latestSummary: summary, deadline, completionUntil, completedAt: Number.isFinite(completed) ? new Date(completed).toISOString() : null, localCompletion: Number.isFinite(local) && !preferOfficial, refreshHealthy: !!healthy, prediction: null };
 }

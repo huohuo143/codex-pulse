@@ -3,7 +3,7 @@ function retryAfter(value, now) {
   if (/^\s*\d+(?:\.\d+)?\s*$/.test(value)) return now + Number(value) * 1000;
   return Math.max(now, Date.parse(value) || 0);
 }
-async function request(fetcher, url, { type = "html", timeout = 30000, attempts = 3, now = () => Date.now(), sleep = ms => new Promise(r => setTimeout(r, ms)) } = {}) {
+async function request(fetcher, url, { type = "html", timeout = 30000, attempts = 3, now = () => Date.now(), headers = {}, sleep = ms => new Promise(r => setTimeout(r, ms)) } = {}) {
   const deadline = Date.now() + timeout;
   for (let attempt = 0; attempt < attempts; attempt++) {
     const left = deadline - Date.now();
@@ -13,7 +13,7 @@ async function request(fetcher, url, { type = "html", timeout = 30000, attempts 
     try {
       return await Promise.race([
         (async () => {
-          const response = await fetcher(url, { headers: { Accept: type === "json" ? "application/json" : "text/html" }, signal: controller.signal });
+          const response = await fetcher(url, { headers: { Accept: type === "json" ? "application/json" : "text/html", ...headers }, signal: controller.signal });
           if (!response.ok) {
             const e = new Error("公开源 HTTP " + response.status);
             e.transient = [408, 425, 500, 502, 503, 504].includes(response.status);

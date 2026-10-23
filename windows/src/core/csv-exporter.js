@@ -8,7 +8,7 @@ function makeCSV(stats, { cnyRate, generatedAt = new Date() } = {}) {
   cnyRate = Number.isFinite(cnyRate) && cnyRate > 0 ? cnyRate : null;
   const rows = [];
   const add = (...cells) => rows.push(cells.map(csvCell).join(","));
-  add("Codex 脉动 2.12.26 build 2153 用量导出");
+  add("Codex 脉动 2.12.29 build 2157 用量导出");
   add("生成时间", generatedAt.toISOString());
   add("说明", "金额为 API 等价预估，不是 ChatGPT/Codex 订阅实际账单；Reasoning 已包含在 Output 中，不重复计费");
   add("统计口径", "摘要、小时、日、模型和工作类型均为本机；模型和工作类型按本月统计；最近调用为保留记录");

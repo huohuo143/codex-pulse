@@ -65,7 +65,7 @@ class ResetCalendar {
   constructor(store) {
     this.store = store;
     const saved = store?.read('reset-calendar-v1', null);
-    this.state = { schemaVersion: 1, events: mergeEvents(bundled.events, saved?.events || []), monthlyTotals: saved?.monthlyTotals || [], lastSuccessAt: saved?.lastSuccessAt || null, error: null, attribution: bundled.attribution || null };
+    this.state = { schemaVersion: 1, events: mergeEvents(bundled.events, saved?.events || []), monthlyTotals: [...new Map([...(bundled.monthlyTotals || []), ...(saved?.monthlyTotals || [])].map(r => [r.month, r])).values()], lastSuccessAt: saved?.lastSuccessAt || null, error: null, attribution: bundled.attribution || null };
   }
   update(html, raw, now) {
     try {

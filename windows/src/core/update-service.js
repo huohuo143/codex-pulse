@@ -25,6 +25,11 @@ function trustedURL(value, prefix) {
   try { const u = new URL(value); return u.protocol === 'https:' && u.hostname === 'github.com' && !u.username && !u.password && !u.search && !u.hash && u.href.startsWith(prefix); }
   catch { return false; }
 }
+function windowsAsset(r) {
+  const prefix = REPOSITORY + '/releases/download/' + r.tag_name + '/';
+  const assets = (r.assets || []).filter(a => a && (!a.state || a.state === 'uploaded') && trustedURL(a.browser_download_url, prefix));
+  return assets.find(a => /windows.*x64.*(?:安装版|installer|setup)\.exe$/i.test(a.name) && !/portable|免安装/i.test(a.name)) || assets.find(a => /windows.*x64.*\.exe$/i.test(a.name));
+}
 function validRelease(r) {
   if (!r || r.draft || r.prerelease || !parse(r.tag_name) || parse(r.tag_name).pre) return false;
   const page = REPOSITORY + '/releases/tag/' + r.tag_name;
@@ -74,6 +79,7 @@ class UpdateService {
         try {
           const manifest = await this.request(this.manifestEndpoint);
           if (manifest.schemaVersion !== 1 || !validRelease(manifest) || !time(manifest.published_at)) throw new Error('公开版本清单无效');
+          if (!windowsAsset(manifest)) throw new Error('该版本没有 Windows 安装包');
           release = manifest; source = 'manifest';
         } catch { /* The API is a bounded fallback, never a parallel extra request. */ }
       }
@@ -81,7 +87,7 @@ class UpdateService {
         if (time(this.state.apiRetryAt) > this.now()) { const e = new Error('GitHub 版本接口暂时限流'); e.rateLimited = true; throw e; }
         const rows = await this.request(ENDPOINT);
         if (!Array.isArray(rows)) throw new Error('版本信息无效');
-        release = rows.filter(validRelease).sort((a, b) => compare(b.tag_name, a.tag_name))[0]; source = 'api';
+        release = rows.filter(r => validRelease(r) && windowsAsset(r)).sort((a, b) => compare(b.tag_name, a.tag_name))[0] || rows.filter(validRelease).sort((a,b)=>compare(b.tag_name,a.tag_name))[0]; source = 'api';
         if (!release) throw new Error('暂无正式版本信息');
       }
       const prefix = REPOSITORY + '/releases/download/' + release.tag_name + '/';

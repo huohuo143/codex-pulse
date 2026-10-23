@@ -5,9 +5,9 @@
   function clock(radar, now = Date.now()) {
     const until = Date.parse(radar?.completionUntil);
     if (Number.isFinite(until)) {
-      if (now >= until) return { title: '等待新预告', detail: '上一轮到账确认已展示 24 小时', kind: 'waiting' };
+      if (now >= until) return { title: '等待新重置', detail: '上一轮到账确认已展示 24 小时', kind: 'waiting' };
       const seconds = Math.ceil((until - now) / 1000), hours = Math.floor(seconds / 3600), minutes = Math.floor(seconds % 3600 / 60);
-      return { title: radar.latestLevelLabel, detail: `到账展示剩余 ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`, kind: 'completed' };
+      return { title: radar.latestLevelLabel, detail: `${radar.localCompletion ? "到账" : "公开确认"}展示剩余 ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`, kind: radar.localCompletion ? 'completed' : 'waiting' };
     }
     if (radar?.deadline) return { title: radar.latestLevelLabel, detail: '北京时间 ' + beijing(radar.deadline.at) + (Date.parse(radar.deadline.at) <= now ? ' · 期限已过，等待确认' : ' 前到账'), kind: 'announced' };
     return { title: radar?.latestLevelLabel || '等待动态', detail: '', kind: 'waiting' };
