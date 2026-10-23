@@ -51,6 +51,11 @@ enum CodexRadarHTTPClient {
       request.setValue(accept, forHTTPHeaderField: "Accept")
       request.setValue("no-cache, no-store, max-age=0", forHTTPHeaderField: "Cache-Control")
       request.setValue("no-cache", forHTTPHeaderField: "Pragma")
+      // Reader has its own page cache, separate from URLSession and HTTP caches.
+      // Ask for a fresh public thread so later replies are not hidden by it.
+      if url.host?.lowercased() == "r.jina.ai" {
+        request.setValue("true", forHTTPHeaderField: "X-No-Cache")
+      }
       request.setValue("CodexPulse/2.11.3 (public-read-only-radar-sync)", forHTTPHeaderField: "User-Agent")
       do {
         let (data, response) = try await boundedResponse(

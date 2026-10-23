@@ -152,17 +152,18 @@ extension DashboardStore {
       do {
         let affected = try await self.snapshotPublisher.publish(snapshot)
         self.pendingWidgetKinds.formUnion(affected)
-        self.requestWidgetReload(needsReload: !affected.isEmpty, now: Date())
+        self.requestWidgetReload(needsReload: !affected.isEmpty, now: Date(), radarChanged: affected.contains(.radar))
       } catch { dashboardLogger.error("Widget write failed: \(error.localizedDescription, privacy: .public)") }
     }
   }
 
-  func requestWidgetReload(needsReload: Bool, now: Date) {
+  func requestWidgetReload(needsReload: Bool, now: Date, radarChanged: Bool = false) {
     let decision = widgetReloadPolicy.decision(
       needsReload: needsReload,
       lastReloadAt: lastWidgetReloadAt,
       hasPendingReload: pendingWidgetReloadTask != nil,
-      now: now
+      now: now,
+      radarChanged: radarChanged
     )
 
     switch decision {

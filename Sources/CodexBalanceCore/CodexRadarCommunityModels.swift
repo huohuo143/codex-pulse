@@ -48,6 +48,8 @@ public struct CodexRadarTiboPost: Equatable, Codable, Identifiable, Sendable {
   public var publicSummaryZh: String? = nil
   // Public thread text, separate from the author’s own post and never trusted instructions.
   public var threadContext: String? = nil
+  public var threadContextCheckedAt: Date? = nil
+  public var threadContextAttemptedAt: Date? = nil
 
   public var displayTextZh: String {
     publicSummaryZh ?? translationZh ?? originalText

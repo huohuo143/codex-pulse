@@ -20,25 +20,51 @@ enum CodexRadarTiboThread {
   }
 
   static func enrich(_ posts: [CodexRadarTiboPost], previous: [CodexRadarTiboPost], activeDeadlineID: String? = nil,
+                     activeEvidenceIDs: [String] = [], at now: Date = Date(),
                      fetcher: CodexRadarService.ThreadFetcher) async -> [CodexRadarTiboPost] {
     var result = posts
-    let candidates = posts.indices.sorted { (posts[$0].publishedAt ?? .distantPast) > (posts[$1].publishedAt ?? .distantPast) }.prefix(6)
-    // An announced deadline remains relevant when ordinary new posts arrive.
-    // Preserve its verified context without widening the network request budget.
-    if let id = activeDeadlineID, let i = posts.firstIndex(where: { $0.id == id }),
-       let cached = previous.first(where: { $0.id == id && $0.originalText == posts[i].originalText }) {
-      result[i].threadContext = cached.threadContext
+    let latest = Array(posts.indices.sorted {
+      if posts[$0].publishedAt != posts[$1].publishedAt {
+        return (posts[$0].publishedAt ?? .distantPast) > (posts[$1].publishedAt ?? .distantPast)
+      }
+      return posts[$0].id > posts[$1].id
+    }.prefix(6))
+    // Recheck the pending announcement and its deadline even after unrelated
+    // posts arrive. Two priority slots leave room for other recent threads.
+    var seen = Set<String>()
+    let priorityIDs = ([activeDeadlineID].compactMap { $0 } + activeEvidenceIDs)
+      .filter { seen.insert($0).inserted }.prefix(2)
+    let priority = priorityIDs.compactMap { id in posts.firstIndex { $0.id == id } }
+    let candidates = priority + latest.filter { !priority.contains($0) }
+    for i in candidates {
+      if let cached = previous.first(where: { $0.id == posts[i].id && $0.originalText == posts[i].originalText }) {
+        result[i].threadContext = cached.threadContext
+        result[i].threadContextCheckedAt = cached.threadContextCheckedAt
+        result[i].threadContextAttemptedAt = cached.threadContextAttemptedAt
+      }
+    }
+
+    // Rotate non-priority threads by their last attempt so one failure cannot
+    // starve the remaining replies. Legacy caches have no timestamp and are due.
+    let rotated = candidates.filter { !priority.contains($0) }.sorted {
+      let left = result[$0].threadContextAttemptedAt ?? .distantPast
+      let right = result[$1].threadContextAttemptedAt ?? .distantPast
+      return left == right ? candidates.firstIndex(of: $0)! < candidates.firstIndex(of: $1)! : left < right
     }
     var requests = 0
-    for i in candidates {
+    for i in priority + rotated {
       guard readerURL(for: posts[i]) != nil else { continue }
-      if let cached = previous.first(where: { $0.id == posts[i].id && $0.originalText == posts[i].originalText }),
-         let context = cached.threadContext {
+      if let attempted = result[i].threadContextAttemptedAt,
+         attempted <= now, now.timeIntervalSince(attempted) < CodexRadarService.refreshInterval { continue }
+      guard requests < 3 else { break }
+      requests += 1
+      result[i].threadContextAttemptedAt = now
+      if let context = try? await fetcher(posts[i]), !context.isEmpty {
         result[i].threadContext = context
-      } else if requests < 3 {
-        requests += 1
-        result[i].threadContext = try? await fetcher(posts[i])
+        result[i].threadContextCheckedAt = now
       }
+      // A failed supplementary read keeps the last verified relationship and
+      // its original timestamp; it never pretends the cached thread is fresh.
     }
     return result
   }

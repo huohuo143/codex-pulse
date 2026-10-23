@@ -351,7 +351,10 @@ public actor CodexRadarService {
     if let analyzer, analysisPreferences?().enabled != false,
        pageError == nil, var posts = page?.tiboFeed.posts {
       if let threadFetcher {
-        posts = await CodexRadarTiboThread.enrich(posts, previous: previousThreadPosts, activeDeadlineID: storedHistory.analysis?.deadline?.evidenceID, fetcher: threadFetcher)
+        posts = await CodexRadarTiboThread.enrich(posts, previous: previousThreadPosts,
+          activeDeadlineID: storedHistory.analysis?.deadline?.evidenceID,
+          activeEvidenceIDs: storedHistory.analysis?.state == .announced ? storedHistory.analysis?.evidenceIDs ?? [] : [],
+          at: checkedAt, fetcher: threadFetcher)
         guard sourceIdentifier() == requestedSource else {
           return reevaluate(snapshot: makeUnavailableSnapshot(), at: now())
         }

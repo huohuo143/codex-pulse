@@ -4,6 +4,19 @@ import Testing
 
 @Suite("Radar connection recovery")
 struct CodexRadarConnectionTests {
+  @Test func publicThreadRevalidationBypassesReaderCacheWithoutCookies() async throws {
+    for host in ["r.jina.ai", "radar.test"] {
+      let scenario = RadarConnectionScenario([.response(200, Data("fresh thread".utf8))])
+      let (url, session) = RadarConnectionURLProtocol.session(for: scenario, host: host)
+      defer { session.invalidateAndCancel() }
+      _ = try await CodexRadarService.fetch(url: url, accept: "text/plain", session: session, options: .singleCheck)
+      let request = try #require(scenario.lastRequest)
+      #expect(request.value(forHTTPHeaderField: "X-No-Cache") == (host == "r.jina.ai" ? "true" : nil))
+      #expect(request.value(forHTTPHeaderField: "Cookie") == nil)
+      #expect(request.httpShouldHandleCookies == false)
+      #expect(scenario.requestCount == 1)
+    }
+  }
   @Test
   func aConnectionLostOnceRecoversDuringTheSameRefresh() async throws {
     let pageURL = URL(fileURLWithPath: #filePath)
@@ -237,11 +250,14 @@ private final class RadarConnectionScenario: @unchecked Sendable {
   private var count = 0
   private var stops = 0
   private var timeouts: [TimeInterval] = []
+  private var request: URLRequest?
 
   init(_ results: [Result]) { self.results = results }
   var requestCount: Int { lock.withLock { count } }
   var stopCount: Int { lock.withLock { stops } }
   var requestTimeouts: [TimeInterval] { lock.withLock { timeouts } }
+  var lastRequest: URLRequest? { lock.withLock { request } }
+  func record(_ request: URLRequest) { lock.withLock { self.request = request } }
   func stopped() { lock.withLock { stops += 1 } }
   func next(timeout: TimeInterval) -> Result {
     lock.withLock {
@@ -265,14 +281,16 @@ private final class RadarConnectionURLProtocol: URLProtocol, @unchecked Sendable
   private static let scenarios = RadarConnectionScenarios()
   private var scenario: RadarConnectionScenario?
 
-  static func session(for scenario: RadarConnectionScenario) -> (URL, URLSession) {
+  static func session(for scenario: RadarConnectionScenario, host: String = "radar.test") -> (URL, URLSession) {
     let id = UUID().uuidString
     scenarios.register(scenario, id: id)
     let config = URLSessionConfiguration.ephemeral
     config.protocolClasses = [RadarConnectionURLProtocol.self]
-    return (URL(string: "https://radar.test/\(id)")!, URLSession(configuration: config))
+    return (URL(string: "https://\(host)/\(id)")!, URLSession(configuration: config))
   }
-  override class func canInit(with request: URLRequest) -> Bool { request.url?.host == "radar.test" }
+  override class func canInit(with request: URLRequest) -> Bool {
+    request.url.map { scenarios.get($0.lastPathComponent) != nil } == true
+  }
   override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
   override func startLoading() {
     guard let url = request.url, let scenario = Self.scenarios.get(url.lastPathComponent) else {
@@ -280,6 +298,7 @@ private final class RadarConnectionURLProtocol: URLProtocol, @unchecked Sendable
       return
     }
     self.scenario = scenario
+    scenario.record(request)
     switch scenario.next(timeout: request.timeoutInterval) {
     case .failure(let error):
       client?.urlProtocol(self, didFailWithError: error)

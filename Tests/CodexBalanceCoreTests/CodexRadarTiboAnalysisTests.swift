@@ -103,7 +103,7 @@ struct CodexRadarTiboAnalysisTests {
     #expect(await count.lastIDs == ["124", "123"])
     clock.advance(1)
     _ = try await restarted.current(force: true)
-    #expect(await count.threadFetches == 2) // Restart uses persisted contexts; no duplicate thread reads.
+    #expect(await count.threadFetches == 4) // At the next ten-minute check, existing threads are revalidated for new replies.
     #expect(await count.fetches == 2)
     #expect(await count.analyses == 2)
   }

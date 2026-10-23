@@ -4,6 +4,25 @@ import Testing
 
 @Suite
 struct WidgetSnapshotTests {
+  @Test func freshRadarResultDoesNotWaitBehindPendingQuotaReload() {
+    let now = Date(timeIntervalSince1970: 1_792_758_000)
+    let policy = CodexWidgetReloadPolicy(minimumInterval: 60)
+    var before = CodexWidgetSnapshot.preview
+    before.radarLastSuccessAt = now.addingTimeInterval(-600)
+    var quotaOnly = before; quotaOnly.remainingPercent = (before.remainingPercent ?? 50) - 1
+    #expect(!quotaOnly.affectedKinds(comparedTo: before).contains(.radar))
+    #expect(policy.decision(needsReload: true, lastReloadAt: now.addingTimeInterval(-5),
+      hasPendingReload: false, now: now) == .schedule(after: 55))
+    var fresh = quotaOnly
+    fresh.radarLastSuccessAt = now
+    fresh.radarValidUntil = now.addingTimeInterval(660)
+    fresh.radarDeadlineAt = now.addingTimeInterval(3600)
+    #expect(policy.decision(needsReload: true, lastReloadAt: now.addingTimeInterval(-5),
+      hasPendingReload: true, now: now,
+      radarChanged: fresh.affectedKinds(comparedTo: quotaOnly).contains(.radar)) == .reloadNow)
+    #expect(policy.decision(needsReload: false, lastReloadAt: now,
+      hasPendingReload: false, now: now, radarChanged: true) == .none)
+  }
   @Test
   func snapshotRoundTripsWithoutPrivateFields() throws {
     let root = FileManager.default.temporaryDirectory

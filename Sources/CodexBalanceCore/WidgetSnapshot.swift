@@ -323,9 +323,13 @@ package struct CodexWidgetReloadPolicy: Sendable {
     needsReload: Bool,
     lastReloadAt: Date?,
     hasPendingReload: Bool,
-    now: Date
+    now: Date,
+    radarChanged: Bool = false
   ) -> CodexWidgetReloadDecision {
     guard needsReload else { return .none }
+    // A ten-minute radar result must not queue behind frequent quota updates:
+    // the old entry can otherwise expire while the new snapshot is on disk.
+    if radarChanged { return .reloadNow }
     guard let lastReloadAt else { return .reloadNow }
 
     let remaining = minimumInterval - now.timeIntervalSince(lastReloadAt)
