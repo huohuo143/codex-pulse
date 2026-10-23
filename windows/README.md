@@ -1,20 +1,20 @@
-# Codex 脉动 Windows 2.12.26 · build 2153
+# Codex 脉动 Windows 2.12.29 · build 2157
 
-面向 Windows 10/11 x64 的主面板、系统托盘、独立悬浮框和七类桌面卡片。基于已有 Windows 2.12.3 迁移 macOS 2.12.26 的重置预告、历史日历和本账号到账确认。
+面向 Windows 10/11 x64 的主面板、系统托盘、独立悬浮框和七类桌面卡片。基于 Windows 2.12.26 适配 macOS 2.12.29：可选本机模型、隔离的 X 登录、公开线程定期复查、重置周期边界与三色状态。
 
 ## 下载与使用
 
 交付文件在 `dist`：
 
-- `Codex-Pulse-Windows-2.12.26-build2153-x64-Installer.exe`：安装向导，保留原应用标识、设置与历史。
-- `Codex-Pulse-Windows-2.12.26-build2153-x64-Portable.exe`：免安装版，双击运行，无需另装 Node.js。
-- `SHA256SUMS-2.12.26.txt`：SHA-256 校验值。
+- `Codex-Pulse-Windows-2.12.29-build2157-x64-Installer.exe`：安装向导，保留原应用标识、设置与历史。
+- `Codex-Pulse-Windows-2.12.29-build2157-x64-Portable.exe`：免安装版，双击运行，无需另装 Node.js。
+- `SHA256SUMS-2.12.29.txt`：SHA-256 校验值。
 
 需要本机已安装并登录 Codex。预告分析另需既有账号可用的 GPT-6 Astra 模型权限；没有权限、超时或断网时会显示实际失败状态。离线日历和本地统计仍可使用。关闭主窗口后继续在托盘运行，从托盘选择退出才结束后台任务。
 
 ## 本版适配
 
-- 每 10 分钟读取公开源收录的 Tibo 发帖与回复，使用本机 Codex 的 GPT-6 Astra / High 分析明确预告；主界面、全部悬浮样式和桌面卡片取消概率评分。
+- 每 10 分钟读取公开源收录的 Tibo 发帖与回复，使用本机 Codex 的 用户选择的本机可用模型 分析明确预告；主界面、全部悬浮样式和桌面卡片取消概率评分。
 - 校验公开回复线程、原帖依据和逐字引用，明确的截止时间由程序换算为北京时间；PST、PDT 与 PT 分别处理，含糊或重复的夏令时时刻不猜测。
 - 当前账户官方周额度同时回升、周周期提前重新开始时确认到账。普通数值修正、自然到期、短周期变化、未来样本和长时间缺测不算本次重置。
 - “已完成重置”和 24 小时展示倒计时以首次检测到账的历史采样为起点，刷新、重启和较晚公开确认不会延长；新预告优先。到账事实和来源／模型刷新状态分别展示。
@@ -57,4 +57,4 @@ npm run dist:win
 
 测试隔离：`CODEX_PULSE_SUPPORT_DIR` 使用独立配置目录；`CODEX_PULSE_SESSION_ROOT` 指定测试日志；`CODEX_PULSE_OFFLINE=1` 关闭测试实例的自动网络／同步；正式使用无需设置。
 
-详见 [功能对应](docs/v2.12.26-feature-parity.md)、[升级说明](docs/UPGRADE_2.12.26.md)、[验收范围](docs/VALIDATION_2.12.26.md) 和 [历史来源](docs/RESET_HISTORY_SOURCES.md)。
+详见 [功能对应](docs/VALIDATION_2.12.29.md)、[升级说明](docs/UPGRADE_2.12.29.md)、[验收范围](docs/VALIDATION_2.12.29.md) 和 [历史来源](docs/RESET_HISTORY_SOURCES.md)。
