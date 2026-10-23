@@ -10,6 +10,7 @@
     <title>Codex 脉动</title>
     <link rel="stylesheet" href="styles.css" />
     <link rel="stylesheet" href="mac-aligned.css" />
+    <link rel="stylesheet" href="v21226.css" />
   </head>
   <body
     class="loading"
@@ -47,8 +48,8 @@
           </div>
         </div>
         <div class="compact-radar">
-          <span>◎ 24h 重置概率</span
-          ><strong data-bind="radarProbability">--%</strong>
+          <span>◎ 24h 重置动态</span
+          ><strong data-bind="radarProbability">等待动态</strong>
         </div>
         <div id="compactCredits" class="compact-credits">
           <span>Full reset</span><strong data-bind="creditCount">-- 次</strong
@@ -67,14 +68,14 @@
             <strong data-bind="weekly">--%</strong><span>7天剩余</span
             ><small class="five-label">5h <b data-bind="fiveHour">--%</b></small
             ><small>24h · <b data-bind="rolling24">0</b></small
-            ><small>重置 · <b data-bind="radarProbability">--%</b></small>
+            ><small>重置 · <b data-bind="radarProbability">等待动态</b></small>
           </div>
         </div>
       </section>
       <section class="compact-layout layout-square">
         <label>CODEX · 7天</label><strong data-bind="weekly">--%</strong>
         <div class="quota-bar"><i class="js-quota-bar"></i></div>
-        <div><span>◎ 24h重置</span><b data-bind="radarProbability">--%</b></div>
+        <div><span>◎ 重置动态</span><b data-bind="radarProbability">等待动态</b></div>
         <div><span>滚动24h</span><b data-bind="rolling24">0</b></div>
         <div><span>Full reset</span><b data-bind="creditCount">-- 次</b></div>
       </section>
@@ -86,19 +87,19 @@
         </div>
         <i></i>
         <div>
-          <span>重置概率</span><strong data-bind="radarProbability">--%</strong>
+          <span>重置动态</span><strong data-bind="radarProbability">等待动态</strong>
         </div>
       </section>
       <section class="compact-layout layout-bars">
         <div>
-          <span>Codex · 7天剩余</span><b data-bind="radarMicro">R --%</b
+          <span>Codex · 7天剩余</span><b data-bind="radarMicro">等待动态</b
           ><strong data-bind="weekly">--%</strong>
         </div>
         <div class="quota-bar"><i class="js-quota-bar"></i></div>
       </section>
       <section class="compact-layout layout-barsQuad">
         <div>
-          <span>Codex · 7天剩余</span><b data-bind="radarMicro">R --%</b
+          <span>Codex · 7天剩余</span><b data-bind="radarMicro">等待动态</b
           ><strong data-bind="weekly">--%</strong>
         </div>
         <div class="quota-bar"><i class="js-quota-bar"></i></div>
@@ -109,11 +110,11 @@
       </section>
       <section class="compact-layout layout-badge">
         <i>C</i><strong data-bind="weekly">--%</strong><em></em
-        ><b data-bind="radarMicro">R --%</b>
+        ><b data-bind="radarMicro">等待动态</b>
       </section>
       <section class="compact-layout layout-badgeQuad">
         <i>C</i><strong data-bind="weekly">--%</strong><em></em
-        ><b data-bind="radarMicro">R --%</b><em></em
+        ><b data-bind="radarMicro">等待动态</b><em></em
         ><span>24h <b data-bind="rolling24">0</b></span>
       </section>
     </main>
@@ -123,7 +124,7 @@
         <div class="brand">
           <div>
             <h1>Codex 脉动</h1>
-            <p id="subtitle">v2.12.3 · 顺滑浮窗与本地工作分析</p>
+            <p id="subtitle">v2.12.26 · build 2153 · 顺滑浮窗与本地工作分析</p>
           </div>
         </div>
         <div class="window-actions no-drag">
@@ -203,7 +204,7 @@
                 <div>
                   <label>Codex</label
                   ><small data-bind="radarLevel">等待公开摘要</small
-                  ><strong data-bind="radarProbability">--%</strong>
+                  ><strong data-bind="radarProbability">等待动态</strong>
                   <p data-bind="radarSummary">
                     正在读取 Codex Radar / Tibo 公开动态…
                   </p>
@@ -215,8 +216,8 @@
               </div>
               <div class="attribution">
                 <button class="link-button radarSource">
-                  公开资料来自 Codex Radar / Tibo · 概率为本机估算 ↗</button
-                ><span>每 30 分钟自动同步</span>
+                  公开资料来自 Codex Radar / Tibo · GPT-6 Astra / High 分析 ↗</button
+                ><span>每 10 分钟检查</span>
               </div>
             </article>
             <article class="card tibo-card">
@@ -496,7 +497,7 @@
             <div class="setting-row">
               <div>
                 <label>本地额度刷新间隔</label
-                ><small>建议 30s；雷达固定每 30 分钟同步</small>
+                ><small>建议 30s；雷达每 10 分钟检查</small>
               </div>
               <select id="refreshSeconds">
                 <option value="5">5s</option>
@@ -512,15 +513,13 @@
           <article class="card settings-card">
             <h3>Codex 重置雷达</h3>
             <p>
-              读取 Codex Radar / Tibo 公开动态，本机每 5 分钟重评，30
-              分钟同步，超过 90 分钟未成功读取时停止展示概率。无需 API Key 或 X
-              Cookie。
+              每 10 分钟读取公开源收录的 Tibo 发帖与回复，由 GPT-6 Astra / High 分析明确预告。需要本机 Codex 登录和模型权限；不读取 X Cookie。
             </p>
             <div class="button-row">
               <button id="settingsRadarRefresh">↻ 立即同步重置雷达</button
               ><button class="radarSource">打开数据源 ↗</button>
             </div>
-            <small id="radarStatusText">每 30 分钟同步 · 数据来自公开源</small>
+            <small id="radarStatusText">每 10 分钟检查 · 以当前账号官方额度为准</small>
           </article>
           <article class="card settings-card">
             <h3>自动启动与同步</h3>
@@ -540,7 +539,7 @@
           </article>
           <article class="card settings-card">
             <h3>关于</h3>
-            <p>Codex 脉动 Windows 2.12.3</p>
+            <p>Codex 脉动 Windows 2.12.26 · build 2153</p>
             <small
               >dev.codex.balance-dashboard.codex.windows ·
               日志和凭据不会被上传</small
@@ -557,9 +556,13 @@
     <script src="../core/display-labels.js"></script>
     <script src="error-message.js"></script>
     <script src="budget-editor.js"></script>
+    <script src="../core/radar-display.js"></script>
+    <script src="../core/credit-amount.js"></script>
+    <script src="expiry-editor.js"></script>
     <script src="app.js"></script>
     <script src="../core/quota-history.js"></script>
     <script src="enhanced.js"></script>
     <script src="mac-aligned.js"></script>
+    <script src="v21226.js"></script>
   </body>
 </html>

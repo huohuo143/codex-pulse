@@ -152,9 +152,9 @@ test("automatic backup waits for account selection and keeps old daily files", t
   const root = temp(t), r = runtime(t, root); r.store.write("settings", { notifications: true });
   const old = path.join(root, "backups", "2026-10-01.json"); fs.mkdirSync(path.dirname(old)); fs.writeFileSync(old, "legacy");
   r.maintenance(); assert.equal(fs.existsSync(r.backupArchive.directory(now)), false);
-  r.changeScope("account-a"); r.store.write("quota-history-account-a", [{ remainingPercent: 60 }]); r.maintenance();
+  r.changeScope("account-a"); r.store.write("quota-history-account-a", [{ recordedAt: now.toISOString(), remainingPercent: 60, resetsAt: new Date(now.getTime() + 7 * 86400000).toISOString(), windowMinutes: 10080 }]); r.maintenance();
   assert.equal(r.backupArchive.hasBackup(now, [r.store.file("quota-history-account-a")]), true);
-  r.changeScope("account-b"); r.store.write("quota-history-account-b", [{ remainingPercent: 20 }]); r.maintenance();
+  r.changeScope("account-b"); r.store.write("quota-history-account-b", [{ recordedAt: now.toISOString(), remainingPercent: 20, resetsAt: new Date(now.getTime() + 7 * 86400000).toISOString(), windowMinutes: 10080 }]); r.maintenance();
   assert.equal(r.backupArchive.hasBackup(now, [r.store.file("quota-history-account-a"), r.store.file("quota-history-account-b")]), true);
   assert.equal(fs.readFileSync(old, "utf8"), "legacy");
 });

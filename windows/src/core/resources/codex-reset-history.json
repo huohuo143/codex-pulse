@@ -1,0 +1,592 @@
+{
+  "revision": 2,
+  "verifiedOn": "2026-10-18",
+  "events": [
+    {
+      "id": "public-history:2044943514832871564:hardReset",
+      "aliases": [
+        "x:2044943514832871564"
+      ],
+      "kind": "hardReset",
+      "day": "2026-04-17",
+      "usesConfirmationDate": true,
+      "publishedAt": "2026-04-17T00:58:21Z",
+      "publicationURL": "https://x.com/thsottiaux/status/2044943514832871564",
+      "confirmedAt": "2026-04-17T00:58:21Z",
+      "confirmation": "publicArchive",
+      "title": "Codex 一周年重置",
+      "summary": "存档记载已经让 Codex 为所有套餐执行重置。 按公开存档交叉核对；本次未直接读取 X 原帖，具体实际发生时分未知。",
+      "evidenceURL": "https://x.com/thsottiaux/status/2044943514832871564",
+      "sourceURL": "https://codex-reset.com/timeline",
+      "corroborationURLs": [
+        "https://resetcue.com/history"
+      ]
+    },
+    {
+      "id": "public-history:2048997818673537399:hardReset",
+      "aliases": [
+        "x:2048997818673537399"
+      ],
+      "kind": "hardReset",
+      "day": "2026-04-28",
+      "usesConfirmationDate": true,
+      "publishedAt": "2026-04-28T05:28:43Z",
+      "publicationURL": "https://x.com/thsottiaux/status/2048997818673537399",
+      "confirmedAt": "2026-04-28T05:28:43Z",
+      "confirmation": "publicArchive",
+      "title": "GPT-5.5 期间付费套餐重置",
+      "summary": "存档中的原文明确表述已为所有付费套餐重置限制。 按公开存档交叉核对；本次未直接读取 X 原帖，具体实际发生时分未知。",
+      "evidenceURL": "https://x.com/thsottiaux/status/2048997818673537399",
+      "sourceURL": "https://codex-reset.com/timeline",
+      "corroborationURLs": [
+        "https://resetcue.com/history"
+      ]
+    },
+    {
+      "id": "codex-speed-window-2026-05-16-gpt-55-degradation",
+      "aliases": [
+        "codex-speed-window-2026-05-16-gpt-55-degradation-close",
+        "x:2055707616605835333"
+      ],
+      "kind": "hardReset",
+      "day": "2026-05-17",
+      "usesConfirmationDate": true,
+      "confirmation": "publicArchive",
+      "title": "GPT-5.5 能力退化补偿重置",
+      "summary": "公开订阅源的窗口关闭/完成记录，按北京时间确认日期归日。窗口关闭时间不作为逐户实际重置时间；未独立核验官方完成原帖。",
+      "sourceURL": "https://codexradar.com/feed.xml",
+      "evidenceURL": "https://x.com/thsottiaux/status/2055707616605835333"
+    },
+    {
+      "id": "codex-speed-window-2026-05-20-codex",
+      "aliases": [
+        "codex-speed-window-2026-05-20-codex-close",
+        "x:2056806923391877438"
+      ],
+      "kind": "hardReset",
+      "day": "2026-05-20",
+      "usesConfirmationDate": true,
+      "confirmation": "publicArchive",
+      "title": "Sam 点赞承诺的速率限制重置",
+      "summary": "公开订阅源的窗口关闭/完成记录，按北京时间确认日期归日。窗口关闭时间不作为逐户实际重置时间；未独立核验官方完成原帖。",
+      "sourceURL": "https://codexradar.com/feed.xml",
+      "evidenceURL": "https://x.com/bossnayamoss/status/2056806923391877438"
+    },
+    {
+      "id": "codex-speed-window-2026-05-24-codex",
+      "aliases": [
+        "codex-speed-window-2026-05-24-codex-close",
+        "x:2058280452851638313"
+      ],
+      "kind": "hardReset",
+      "day": "2026-05-24",
+      "usesConfirmationDate": true,
+      "confirmation": "publicArchive",
+      "title": "长会话压缩耗额异常补偿重置",
+      "summary": "公开订阅源的窗口关闭/完成记录，按北京时间确认日期归日。窗口关闭时间不作为逐户实际重置时间；未独立核验官方完成原帖。",
+      "sourceURL": "https://codexradar.com/feed.xml",
+      "evidenceURL": "https://x.com/thsottiaux/status/2058280452851638313"
+    },
+    {
+      "id": "codex-speed-window-2026-05-31-codex",
+      "aliases": [
+        "codex-speed-window-2026-05-31-codex-close",
+        "x:2061106703446450392"
+      ],
+      "kind": "hardReset",
+      "day": "2026-05-31",
+      "usesConfirmationDate": true,
+      "confirmation": "publicArchive",
+      "title": "500 万用户庆祝重置",
+      "summary": "公开订阅源的窗口关闭/完成记录，按北京时间确认日期归日。窗口关闭时间不作为逐户实际重置时间；未独立核验官方完成原帖。",
+      "sourceURL": "https://codexradar.com/feed.xml",
+      "evidenceURL": "https://x.com/thsottiaux/status/2061106703446450392"
+    },
+    {
+      "id": "codex-speed-window-2026-06-04-codex",
+      "aliases": [
+        "codex-speed-window-2026-06-04-codex-close",
+        "x:2062329981548802523"
+      ],
+      "kind": "hardReset",
+      "day": "2026-06-04",
+      "usesConfirmationDate": true,
+      "confirmation": "publicArchive",
+      "title": "Codex 可靠性事故补偿重置",
+      "summary": "公开订阅源的窗口关闭/完成记录，按北京时间确认日期归日。窗口关闭时间不作为逐户实际重置时间；未独立核验官方完成原帖。",
+      "sourceURL": "https://codexradar.com/feed.xml",
+      "evidenceURL": "https://x.com/thsottiaux/status/2062329981548802523"
+    },
+    {
+      "id": "codex-radar-history:2026-06-12:reset-card",
+      "aliases": [],
+      "kind": "resetCard",
+      "day": "2026-06-12",
+      "usesConfirmationDate": false,
+      "confirmation": "publicArchive",
+      "title": "首张可保存重置卡",
+      "summary": "据 Codex Radar「统计口径与历史说明」已纳入的独立发放批次：首张保存重置机制。具体到账时分未公布；此记录依据站长公开历史统计，未独立核验官方完成原帖。",
+      "sourceURL": "https://codexradar.com/#reset-radar"
+    },
+    {
+      "id": "codex-speed-window-2026-06-17-codex",
+      "aliases": [
+        "codex-speed-window-2026-06-17-codex-close",
+        "x:2067358081898483746",
+        "x:2067399435009622521"
+      ],
+      "kind": "hardReset",
+      "day": "2026-06-18",
+      "usesConfirmationDate": true,
+      "confirmation": "community",
+      "title": "Codex 用量限制重置 · 社区到账确认",
+      "summary": "公开订阅源明确注明用户确认已到账、原帖下有 automatic reset applied 反馈，并非 Tibo/Sam 官方完成帖；按确认日期归日。 另经其他公开档案核对到相关完成性表述与原帖标识；同一原帖中的硬重置和重置卡分别计数，不推定逐户实际时分。",
+      "sourceURL": "https://codexradar.com/feed.xml",
+      "evidenceURL": "https://x.com/thsottiaux/status/2067399435009622521",
+      "corroborationURLs": [
+        "https://codex-reset.com/timeline",
+        "https://resetcue.com/history"
+      ]
+    },
+    {
+      "id": "codex-radar-history:2026-06-18:reset-card",
+      "aliases": [
+        "x:2067399435009622521"
+      ],
+      "kind": "resetCard",
+      "day": "2026-06-18",
+      "usesConfirmationDate": false,
+      "confirmation": "publicArchive",
+      "title": "额外 banked reset 重置卡",
+      "summary": "据 Codex Radar「统计口径与历史说明」已纳入的独立发放批次：额外 banked reset。具体到账时分未公布；此记录依据站长公开历史统计，未独立核验官方完成原帖。 另经其他公开档案核对到相关完成性表述与原帖标识；同一原帖中的硬重置和重置卡分别计数，不推定逐户实际时分。",
+      "sourceURL": "https://codexradar.com/#reset-radar",
+      "evidenceURL": "https://x.com/thsottiaux/status/2067399435009622521",
+      "corroborationURLs": [
+        "https://codex-reset.com/timeline",
+        "https://ahaframe.com/en/tools/codex-reset/history/"
+      ]
+    },
+    {
+      "id": "public-history:2071381664853319742:hardReset",
+      "aliases": [
+        "x:2071381664853319742"
+      ],
+      "kind": "hardReset",
+      "day": "2026-06-29",
+      "usesConfirmationDate": true,
+      "publishedAt": "2026-06-28T23:54:07Z",
+      "publicationURL": "https://x.com/thsottiaux/status/2071381664853319742",
+      "confirmedAt": "2026-06-28T23:54:07Z",
+      "confirmation": "publicArchive",
+      "title": "用量异常调查期间硬重置",
+      "summary": "存档中的原文明确区分即时硬重置与已储存的重置卡，并说明已执行硬重置。 按公开存档交叉核对；本次未直接读取 X 原帖，具体实际发生时分未知。",
+      "evidenceURL": "https://x.com/thsottiaux/status/2071381664853319742",
+      "sourceURL": "https://codex-reset.com/timeline",
+      "corroborationURLs": [
+        "https://resetcue.com/history"
+      ]
+    },
+    {
+      "id": "codex-radar-history:2026-06-30:reset-card",
+      "aliases": [],
+      "kind": "resetCard",
+      "day": "2026-06-30",
+      "usesConfirmationDate": false,
+      "confirmation": "publicArchive",
+      "title": "额外 banked reset 重置卡",
+      "summary": "据 Codex Radar「统计口径与历史说明」已纳入的独立发放批次：额外 banked reset。具体到账时分未公布；此记录依据站长公开历史统计，未独立核验官方完成原帖。",
+      "sourceURL": "https://codexradar.com/#reset-radar"
+    },
+    {
+      "id": "codex-radar-history:2026-07-02:reset-card",
+      "aliases": [],
+      "kind": "resetCard",
+      "day": "2026-07-02",
+      "usesConfirmationDate": false,
+      "confirmation": "publicArchive",
+      "title": "AIE World's Fair 全员重置卡",
+      "summary": "据 Codex Radar「统计口径与历史说明」已纳入的独立发放批次：全员发放。具体到账时分未公布；此记录依据站长公开历史统计，未独立核验官方完成原帖。",
+      "sourceURL": "https://codexradar.com/#reset-radar"
+    },
+    {
+      "id": "public-history:2075641131002700120:hardReset",
+      "aliases": [
+        "x:2075641131002700120"
+      ],
+      "kind": "hardReset",
+      "day": "2026-07-11",
+      "usesConfirmationDate": true,
+      "publishedAt": "2026-07-10T17:59:43Z",
+      "publicationURL": "https://x.com/thsottiaux/status/2075641131002700120",
+      "confirmedAt": "2026-07-10T17:59:43Z",
+      "confirmation": "publicArchive",
+      "title": "Codex 与 ChatGPT Work 已重置",
+      "summary": "原文前半明确说明已重置；后半另一次稍后重置的预告不额外计数。 按公开存档交叉核对；本次未直接读取 X 原帖，具体实际发生时分未知。",
+      "evidenceURL": "https://x.com/thsottiaux/status/2075641131002700120",
+      "sourceURL": "https://codex-reset.com/tibo/x/2026-07-10",
+      "corroborationURLs": [
+        "https://resetcue.com/history"
+      ]
+    },
+    {
+      "id": "codex-radar-history:2026-07-13:reset-card",
+      "aliases": [
+        "x:2076418567143408112"
+      ],
+      "kind": "resetCard",
+      "day": "2026-07-13",
+      "usesConfirmationDate": false,
+      "confirmation": "publicArchive",
+      "title": "50 万用户补偿重置卡",
+      "summary": "据 Codex Radar「统计口径与历史说明」已纳入的独立发放批次：50 万是受益用户数，此处仅计一次发卡批次。具体到账时分未公布；此记录依据站长公开历史统计，未独立核验官方完成原帖。 另经其他公开档案核对到相关完成性表述与原帖标识；同一原帖中的硬重置和重置卡分别计数，不推定逐户实际时分。",
+      "sourceURL": "https://codexradar.com/#reset-radar",
+      "evidenceURL": "https://x.com/thsottiaux/status/2076418567143408112",
+      "corroborationURLs": [
+        "https://codex-reset.com/timeline",
+        "https://ahaframe.com/en/tools/codex-reset/history/"
+      ]
+    },
+    {
+      "id": "codex-radar-history:2026-07-14:reset-card",
+      "aliases": [
+        "x:2076735790567338203"
+      ],
+      "kind": "resetCard",
+      "day": "2026-07-14",
+      "usesConfirmationDate": false,
+      "confirmation": "publicArchive",
+      "title": "全员重置卡发放",
+      "summary": "据 Codex Radar「统计口径与历史说明」已纳入的独立发放批次：全员发放。具体到账时分未公布；此记录依据站长公开历史统计，未独立核验官方完成原帖。 另经其他公开档案核对到相关完成性表述与原帖标识；同一原帖中的硬重置和重置卡分别计数，不推定逐户实际时分。",
+      "sourceURL": "https://codexradar.com/#reset-radar",
+      "evidenceURL": "https://x.com/thsottiaux/status/2076735790567338203",
+      "corroborationURLs": [
+        "https://codex-reset.com/timeline",
+        "https://ahaframe.com/en/tools/codex-reset/history/"
+      ]
+    },
+    {
+      "id": "public-history:2078320950488297917:hardReset",
+      "aliases": [
+        "x:2078320950488297917"
+      ],
+      "kind": "hardReset",
+      "day": "2026-07-18",
+      "usesConfirmationDate": true,
+      "publishedAt": "2026-07-18T03:28:22Z",
+      "publicationURL": "https://x.com/thsottiaux/status/2078320950488297917",
+      "confirmedAt": "2026-07-18T03:28:22Z",
+      "confirmation": "publicArchive",
+      "title": "付费用户周末重置",
+      "summary": "存档记载付费用户使用额度已恢复，按该次完成性报告归日。 按公开存档交叉核对；本次未直接读取 X 原帖，具体实际发生时分未知。",
+      "evidenceURL": "https://x.com/thsottiaux/status/2078320950488297917",
+      "sourceURL": "https://codex-reset.com/tibo/x/2026-07-18",
+      "corroborationURLs": [
+        "https://resetcue.com/history"
+      ]
+    },
+    {
+      "id": "public-history:2081096447718723984:hardReset",
+      "aliases": [
+        "x:2081096447718723984"
+      ],
+      "kind": "hardReset",
+      "day": "2026-07-26",
+      "usesConfirmationDate": true,
+      "publishedAt": "2026-07-25T19:17:12Z",
+      "publicationURL": "https://x.com/thsottiaux/status/2081096447718723984",
+      "confirmedAt": "2026-07-25T19:17:12Z",
+      "confirmation": "publicArchive",
+      "title": "服务中断后重置",
+      "summary": "存档明确报告已为 Codex 与 ChatGPT Work 用户重置；事故时间与确认时间分开。 按公开存档交叉核对；本次未直接读取 X 原帖，具体实际发生时分未知。",
+      "evidenceURL": "https://x.com/thsottiaux/status/2081096447718723984",
+      "sourceURL": "https://codex-reset.com/tibo/x/2026-07-25",
+      "corroborationURLs": [
+        "https://resetcue.com/history"
+      ]
+    },
+    {
+      "id": "public-history:2081940052154933696:hardReset",
+      "aliases": [
+        "x:2081940052154933696"
+      ],
+      "kind": "hardReset",
+      "day": "2026-07-28",
+      "usesConfirmationDate": true,
+      "publishedAt": "2026-07-28T03:09:23Z",
+      "publicationURL": "https://x.com/thsottiaux/status/2081940052154933696",
+      "confirmedAt": "2026-07-28T03:09:23Z",
+      "confirmation": "publicArchive",
+      "title": "付费用户用量限制重置",
+      "summary": "存档明确报告所有付费用户的限制已经重置。 按公开存档交叉核对；本次未直接读取 X 原帖，具体实际发生时分未知。",
+      "evidenceURL": "https://x.com/thsottiaux/status/2081940052154933696",
+      "sourceURL": "https://codex-reset.com/tibo/x/2026-07-28",
+      "corroborationURLs": [
+        "https://resetcue.com/history"
+      ]
+    },
+    {
+      "id": "public-history:2082317452755751098:hardReset",
+      "aliases": [
+        "x:2082317452755751098"
+      ],
+      "kind": "hardReset",
+      "day": "2026-07-29",
+      "usesConfirmationDate": true,
+      "publishedAt": "2026-07-29T04:09:02Z",
+      "publicationURL": "https://x.com/thsottiaux/status/2082317452755751098",
+      "confirmedAt": "2026-07-29T04:09:02Z",
+      "confirmation": "publicArchive",
+      "title": "Sol 用量说明同期重置",
+      "summary": "存档明确报告已重置；同帖的消耗说明不另计事件。 按公开存档交叉核对；本次未直接读取 X 原帖，具体实际发生时分未知。",
+      "evidenceURL": "https://x.com/thsottiaux/status/2082317452755751098",
+      "sourceURL": "https://codex-reset.com/tibo/x/2026-07-29",
+      "corroborationURLs": [
+        "https://resetcue.com/history"
+      ]
+    },
+    {
+      "id": "public-history:2083395449814229287:hardReset",
+      "aliases": [
+        "x:2083395449814229287"
+      ],
+      "kind": "hardReset",
+      "day": "2026-08-01",
+      "usesConfirmationDate": true,
+      "publishedAt": "2026-08-01T03:32:37Z",
+      "publicationURL": "https://x.com/thsottiaux/status/2083395449814229287",
+      "confirmedAt": "2026-08-01T03:32:37Z",
+      "confirmation": "publicArchive",
+      "title": "效率改进周末重置",
+      "summary": "存档明确表述已重置 Codex 与 ChatGPT Work 用量限制。 按公开存档交叉核对；本次未直接读取 X 原帖，具体实际发生时分未知。",
+      "evidenceURL": "https://x.com/thsottiaux/status/2083395449814229287",
+      "sourceURL": "https://codex-reset.com/tibo/x/2026-08-01",
+      "corroborationURLs": [
+        "https://resetcue.com/history"
+      ]
+    },
+    {
+      "id": "public-history:2086188036493344823:hardReset",
+      "aliases": [
+        "x:2086188036493344823"
+      ],
+      "kind": "hardReset",
+      "day": "2026-08-09",
+      "usesConfirmationDate": true,
+      "publishedAt": "2026-08-08T20:29:22Z",
+      "publicationURL": "https://x.com/thsottiaux/status/2086188036493344823",
+      "confirmedAt": "2026-08-08T20:29:22Z",
+      "confirmation": "publicArchive",
+      "title": "GPT-5.6 Sol 期间重置",
+      "summary": "存档明确报告已为付费用户重置；后续周一重置预告不另计。 按公开存档交叉核对；本次未直接读取 X 原帖，具体实际发生时分未知。",
+      "evidenceURL": "https://x.com/thsottiaux/status/2086188036493344823",
+      "sourceURL": "https://codex-reset.com/tibo/x/2026-08-08",
+      "corroborationURLs": [
+        "https://resetcue.com/history"
+      ]
+    },
+    {
+      "id": "public-history:2086972802457063486:hardReset",
+      "aliases": [
+        "x:2086972802457063486",
+        "x:2086972933566857393",
+        "x:2086189414292865249"
+      ],
+      "kind": "hardReset",
+      "day": "2026-08-11",
+      "usesConfirmationDate": true,
+      "publishedAt": "2026-08-11T00:27:44Z",
+      "publicationURL": "https://x.com/thsottiaux/status/2086972802457063486",
+      "confirmedAt": "2026-08-11T00:27:44Z",
+      "confirmation": "publicArchive",
+      "title": "周一预告的重置完成",
+      "summary": "公开档案保存完成性回复；原预告与随后说明合为一次。 按公开存档交叉核对；本次未直接读取 X 原帖，具体实际发生时分未知。",
+      "evidenceURL": "https://x.com/thsottiaux/status/2086972802457063486",
+      "sourceURL": "https://codex-reset.com/tibo/x/2026-08-11",
+      "corroborationURLs": [
+        "https://tibo.modelyard.dev/reset-history/",
+        "https://ahaframe.com/en/tools/codex-reset/history/"
+      ]
+    },
+    {
+      "id": "codex-radar-history:2026-08-22:reset-card",
+      "aliases": [
+        "x:2090964822422949999"
+      ],
+      "kind": "resetCard",
+      "day": "2026-08-22",
+      "usesConfirmationDate": false,
+      "confirmation": "publicArchive",
+      "title": "20M 里程碑全员重置卡",
+      "summary": "据 Codex Radar「统计口径与历史说明」已纳入的独立发放批次：全员发放。具体到账时分未公布；此记录依据站长公开历史统计，未独立核验官方完成原帖。 另经其他公开档案核对到相关完成性表述与原帖标识；同一原帖中的硬重置和重置卡分别计数，不推定逐户实际时分。",
+      "sourceURL": "https://codexradar.com/#reset-radar",
+      "evidenceURL": "https://x.com/thsottiaux/status/2090964822422949999",
+      "corroborationURLs": [
+        "https://codex-reset.com/timeline",
+        "https://ahaframe.com/en/tools/codex-reset/history/"
+      ]
+    },
+    {
+      "id": "public-history:2091688655828246890:hardReset",
+      "aliases": [
+        "x:2091688655828246890"
+      ],
+      "kind": "hardReset",
+      "day": "2026-08-24",
+      "usesConfirmationDate": true,
+      "publishedAt": "2026-08-24T00:46:51Z",
+      "publicationURL": "https://x.com/thsottiaux/status/2091688655828246890",
+      "confirmedAt": "2026-08-24T00:46:51Z",
+      "confirmation": "publicArchive",
+      "title": "用量问题修复后重置完成",
+      "summary": "存档明确说明重置已传播到账户，实际各户生效时分未公布。 按公开存档交叉核对；本次未直接读取 X 原帖，具体实际发生时分未知。",
+      "evidenceURL": "https://x.com/thsottiaux/status/2091688655828246890",
+      "sourceURL": "https://codex-reset.com/tibo/x/2026-08-24",
+      "corroborationURLs": [
+        "https://resetcue.com/history"
+      ]
+    },
+    {
+      "id": "public-history:2092316228497063958:hardReset",
+      "aliases": [
+        "x:2092316228497063958"
+      ],
+      "kind": "hardReset",
+      "day": "2026-08-26",
+      "usesConfirmationDate": true,
+      "publishedAt": "2026-08-25T18:20:36Z",
+      "publicationURL": "https://x.com/thsottiaux/status/2092316228497063958",
+      "confirmedAt": "2026-08-25T18:20:36Z",
+      "confirmation": "publicArchive",
+      "title": "静默重置反馈确认",
+      "summary": "存档保存确认性回复，另有追踪站列为已完成。各站对早前观察时段有差异，仅按该确认帖的北京时间归日，不推定实际发生日期。 按公开存档交叉核对；本次未直接读取 X 原帖，具体实际发生时分未知。",
+      "evidenceURL": "https://x.com/thsottiaux/status/2092316228497063958",
+      "sourceURL": "https://codex-reset.com/tibo/x/2026-08-25",
+      "corroborationURLs": [
+        "https://ahaframe.com/en/tools/codex-reset/history/",
+        "https://codexreset.today/zh/"
+      ]
+    },
+    {
+      "id": "public-history:2093014447833116908:hardReset",
+      "aliases": [
+        "x:2093014447833116908"
+      ],
+      "kind": "hardReset",
+      "day": "2026-08-28",
+      "usesConfirmationDate": true,
+      "publishedAt": "2026-08-27T16:35:05Z",
+      "publicationURL": "https://x.com/thsottiaux/status/2093014447833116908",
+      "confirmedAt": "2026-08-27T16:35:05Z",
+      "confirmation": "publicArchive",
+      "title": "恢复全新用量的重置报告",
+      "summary": "公开存档与独立档案均记载新用量已经恢复；不据比喻用语估算额度。 按公开存档交叉核对；本次未直接读取 X 原帖，具体实际发生时分未知。",
+      "evidenceURL": "https://x.com/thsottiaux/status/2093014447833116908",
+      "sourceURL": "https://codex-reset.com/tibo/x/2026-08-27",
+      "corroborationURLs": [
+        "https://resetcue.com/history"
+      ]
+    },
+    {
+      "id": "public-history:2094251180121854309:hardReset",
+      "aliases": [
+        "x:2094251180121854309"
+      ],
+      "kind": "hardReset",
+      "day": "2026-08-31",
+      "usesConfirmationDate": true,
+      "publishedAt": "2026-08-31T02:29:25Z",
+      "publicationURL": "https://x.com/thsottiaux/status/2094251180121854309",
+      "confirmedAt": "2026-08-31T02:29:25Z",
+      "confirmation": "publicArchive",
+      "title": "2500 万用户里程碑重置",
+      "summary": "公开档案明确记载已为付费订阅重置；只采用完成帖，不将附近的庆祝暗示另计。 按公开存档交叉核对；本次未直接读取 X 原帖，具体实际发生时分未知。",
+      "evidenceURL": "https://x.com/thsottiaux/status/2094251180121854309",
+      "sourceURL": "https://tibo.modelyard.dev/reset-history/",
+      "corroborationURLs": [
+        "https://willcodexresets.com/zh-TW/history"
+      ]
+    },
+    {
+      "id": "codex-radar-history:2026-09-08:hard-reset",
+      "aliases": [
+        "x:2097174560412246215"
+      ],
+      "kind": "hardReset",
+      "day": "2026-09-08",
+      "usesConfirmationDate": false,
+      "confirmation": "publicArchive",
+      "title": "9 月 8 日直接重置",
+      "summary": "据 Codex Radar「统计口径与历史说明」明确记载的日期。原预告 10:00 不作为实际完成时间。具体实际时分未知，未独立核验官方完成原帖。 另经其他公开档案核对到相关完成性表述与原帖标识；同一原帖中的硬重置和重置卡分别计数，不推定逐户实际时分。",
+      "sourceURL": "https://codexradar.com/#reset-radar",
+      "evidenceURL": "https://x.com/thsottiaux/status/2097174560412246215",
+      "corroborationURLs": [
+        "https://codex-reset.com/timeline",
+        "https://resetcue.com/history"
+      ]
+    },
+    {
+      "id": "public-history:2098685367058612394:hardReset",
+      "aliases": [
+        "x:2098685367058612394",
+        "x:2098612714704891959"
+      ],
+      "kind": "hardReset",
+      "day": "2026-09-12",
+      "usesConfirmationDate": true,
+      "publishedAt": "2026-09-12T08:09:17Z",
+      "publicationURL": "https://x.com/thsottiaux/status/2098685367058612394",
+      "confirmedAt": "2026-09-12T08:09:17Z",
+      "confirmation": "publicArchive",
+      "title": "Astra 质量更新后重置完成",
+      "summary": "多个档案均保存已全部传播完成的确认，原午夜前到账预告合入同一事件。 按公开存档交叉核对；本次未直接读取 X 原帖，具体实际发生时分未知。",
+      "evidenceURL": "https://x.com/thsottiaux/status/2098685367058612394",
+      "sourceURL": "https://codex-reset.com/tibo/x/2026-09-12",
+      "corroborationURLs": [
+        "https://resetcue.com/history"
+      ]
+    },
+    {
+      "id": "codex-radar-history:2026-09-23:reset-card",
+      "aliases": [],
+      "kind": "resetCard",
+      "day": "2026-09-23",
+      "usesConfirmationDate": false,
+      "confirmation": "publicArchive",
+      "title": "9 月第 4 批重置卡",
+      "summary": "据 Codex Radar「统计口径与历史说明」已纳入的独立发放批次：站长确认已发放；9 月 22 日预告与本次发卡为同一事件，不另计一次硬重置。具体到账时分未公布；此记录依据站长公开历史统计，未独立核验官方完成原帖。",
+      "sourceURL": "https://codexradar.com/#reset-radar"
+    },
+    {
+      "id": "codex-speed-window-2026-09-26-codex",
+      "aliases": [
+        "codex-speed-window-2026-09-26-codex-close",
+        "x:2103911959544610829"
+      ],
+      "kind": "hardReset",
+      "day": "2026-09-27",
+      "usesConfirmationDate": true,
+      "confirmation": "publicArchive",
+      "title": "Codex 与 ChatGPT Work 用量限制重置",
+      "summary": "公开订阅源的窗口关闭/完成记录，按北京时间确认日期归日。窗口关闭时间不作为逐户实际重置时间；未独立核验官方完成原帖。 网页历史说明同时注明 9 月 27 日实际时分未知、未核实官方完成帖，保留这一证据限制。",
+      "sourceURL": "https://codexradar.com/feed.xml",
+      "evidenceURL": "https://x.com/thsottiaux/status/2103911959544610829",
+      "corroborationURLs": [
+        "https://resetcue.com/history",
+        "https://tibo.modelyard.dev/reset-history/"
+      ]
+    },
+    {
+      "id": "codex-radar-history:2026-10-03:hard-reset",
+      "aliases": [],
+      "kind": "hardReset",
+      "day": "2026-10-03",
+      "usesConfirmationDate": false,
+      "confirmation": "publicArchive",
+      "title": "10 月 3 日凌晨直接重置",
+      "summary": "据 Codex Radar「统计口径与历史说明」明确记载的日期。站长记载凌晨（约），不补造时分；来源同时记载 Pro 500 未按预期重置、仍在调查，未核实逐户到账。具体实际时分未知，未独立核验官方完成原帖。",
+      "sourceURL": "https://codexradar.com/#reset-radar"
+    }
+  ],
+  "attribution": "Historical data includes adapted CC BY 4.0 records: Data: codex-reset.com (https://codex-reset.com/). Reviewed against ResetCue, ModelYard and other linked public archives; not a complete official ledger.",
+  "licenseURL": "https://creativecommons.org/licenses/by/4.0/"
+}

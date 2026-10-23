@@ -4,7 +4,8 @@ const { EventEmitter } = require("node:events");
 const { Store } = require("./storage");
 const { UsageClient } = require("./usage-client");
 const { OfficialSource } = require("./official-source");
-const { RadarService } = require("./radar-v2110");
+const { RadarService } = require("./radar-announcements");
+const { presentation } = require('./tibo-analysis');
 const { ExchangeRateService } = require("./exchange-rate");
 const { OneDriveSync } = require("./onedrive-sync");
 const { UpdateService } = require("./update-service");
@@ -134,7 +135,11 @@ class Runtime extends EventEmitter {
           );
           if (next !== this.history) {
             this.history = next;
-            this.store.write("quota-history-" + this.scope, next);
+            this.historyDirty = true;
+          }
+          if (this.historyDirty) {
+            try { this.store.write('quota-history-' + this.scope, this.history); this.historyDirty = false; }
+            catch { /* Keep fresh samples in memory; protected storage exposes the error. */ }
           }
         }
         this.state.exchangeRate = await this.exchange.current();
@@ -167,6 +172,7 @@ class Runtime extends EventEmitter {
           statisticsLoading: false,
           scannedFiles: result.scannedFiles,
           eventCount: result.eventCount,
+          statisticsWarning: result.statisticsWarning,
           metrics: result.metrics,
           sessionsRoot: result.sessionsRoot,
           codexHome: result.codexHome,
@@ -218,6 +224,7 @@ class Runtime extends EventEmitter {
     this.scope = scope || null;
     this.notificationRetries.clear();
     this.history = this.scope ? this.store.read("quota-history-" + this.scope, []) : [];
+    this.historyDirty = false;
     this.ledger = this.scope ? this.accountLedgers.get(this.scope) || this.store.read("alert-ledger-" + this.scope, {}) : {};
     this.state.quotaHistory = [];
     this.state.forecast = null;
@@ -279,7 +286,8 @@ class Runtime extends EventEmitter {
     const prediction = forecast(this.history, current, now);
     this.state.forecast = prediction;
     this.state.quotaHistory = quotaHistory.points(this.history, 30, now);
-    this.state.radar = this.radar.snapshot();
+    this.state.radar = presentation(this.radar.snapshot(), this.history, now);
+    this.state.resetCalendar = this.state.radar.calendar || null;
     this.state.updates = this.updates.state;
     this.state.budgets = this.budgets;
     this.state.creditExpiry = this.store.read("credit-expiry-v1", null);
@@ -292,6 +300,7 @@ class Runtime extends EventEmitter {
         confirmed: false,
       };
     this.state.creditExpiryBatches = expiryLedger.forAccount(this.store.read("credit-expiry-batches-v1", []), this.scope);
+    this.state.recordHealth = Object.fromEntries(['project-budgets-v1', 'credit-expiry-batches-v1', 'credit-expiry-v1', ...(this.scope ? ['quota-history-' + this.scope] : [])].map(name => [name, this.store.protected(name).health()]));
     const alert = alerts({
       weekly: account.weekly,
       forecast: prediction,
@@ -322,7 +331,7 @@ class Runtime extends EventEmitter {
         return "critical";
       }
     };
-    return [
+    const checks = [
       {
         id: "officialQuota",
         label: "官方额度",
@@ -338,7 +347,7 @@ class Runtime extends EventEmitter {
         label: "Token 统计",
         state: this.usageFailure
           ? "critical"
-          : this.state.statisticsLoading
+          : this.state.statisticsWarning ? 'warning' : this.state.statisticsLoading
             ? "unknown"
             : "healthy",
       },
@@ -352,13 +361,13 @@ class Runtime extends EventEmitter {
         id: "quotaHistory",
         label: "账户额度历史",
         state: this.scope
-          ? fileHealth("quota-history-" + this.scope, "unknown")
+          ? this.store.protected('quota-history-' + this.scope).health().state
           : "unknown",
       },
       {
         id: "projectBudgets",
         label: "项目预算",
-        state: fileHealth("project-budgets-v1"),
+        state: this.store.protected('project-budgets-v1').health().state,
       },
       {
         id: "widgetSnapshot",
@@ -373,6 +382,8 @@ class Runtime extends EventEmitter {
         state: this.launchWatcherFailure ? "warning" : "healthy",
       },
     ];
+    checks.push({ id: 'creditExpiry', label: '灵活额度记录', ...this.store.protected('credit-expiry-batches-v1').health() });
+    return checks;
   }
   maintenance() {
     for (const [scope, ledger] of this.pendingLedgerWrites)
@@ -394,7 +405,12 @@ class Runtime extends EventEmitter {
         },
         radar: this.state.radar
           ? {
-              prediction: this.state.radar.prediction,
+              latestLevelLabel: this.state.radar.latestLevelLabel,
+              latestSummary: this.state.radar.latestSummary,
+              deadline: this.state.radar.deadline,
+              completionUntil: this.state.radar.completionUntil,
+              completedAt: this.state.radar.completedAt,
+              refreshHealthy: this.state.radar.refreshHealthy,
               lastSuccessAt: this.state.radar.lastSuccessAt,
             }
           : null,
@@ -409,7 +425,8 @@ class Runtime extends EventEmitter {
       try {
         const sources = ["settings", "quota-history-" + this.scope,
           "alert-ledger-" + this.scope, "project-budgets-v1", "model-prices-v1",
-          "credit-expiry-v1", "credit-expiry-batches-v1"].map(name => this.store.file(name));
+          "credit-expiry-v1", "credit-expiry-batches-v1", 'reset-calendar-v1', 'radar-announcements-v2'].map(name => this.store.file(name));
+        for (const record of this.store.records.values()) if (fs.existsSync(record.backup)) sources.push(record.backup);
         const now = new Date(this.now());
         if (!this.backupArchive.hasBackup(now, sources)) {
           const result = this.backupArchive.backup(sources, now);
@@ -433,12 +450,13 @@ class Runtime extends EventEmitter {
       this.store.write("last-summary-day", day);
     }
   }
-  setBudget({ id, limit, remove = false }) {
+  setBudget({ id, limit, remove = false, projectDraft }) {
     if (typeof id !== "string" || typeof remove !== "boolean" || (!remove && (!Number.isSafeInteger(limit) || limit <= 0)))
       throw new Error("预算必须为正整数；删除请使用删除预算操作");
+    const restoredDraft = projectDraft && projectDraft.id === id && typeof projectDraft.projectName === 'string' && typeof projectDraft.projectPath === 'string' && projectDraft.projectName.length <= 1000 && projectDraft.projectPath.length <= 4096 ? projectDraft : null;
     const project = this.state.tokenStats.monthTopProjects.find(
         (p) => p.id === id,
-      ),
+      ) || restoredDraft,
       old = this.budgets.find((b) => b.id === id);
     if (!project && !old) throw new Error("请选择已识别项目");
     if (remove && !old) throw new Error("预算不存在");
@@ -475,10 +493,21 @@ class Runtime extends EventEmitter {
     this.publish();
   }
   setExpiryBatch(value) {
+    if (value.accountScope && value.accountScope !== this.scope) throw new Error('账户已切换，请核对草稿后重新提交');
     const rows = expiryLedger.save(this.store.read("credit-expiry-batches-v1", []), value, this.scope);
     this.store.write("credit-expiry-batches-v1", rows);
     this.publish();
     return this.state.creditExpiryBatches;
+  }
+  recordAction({ name, action }) {
+    const allowed = ['project-budgets-v1', 'credit-expiry-batches-v1', 'credit-expiry-v1', ...(this.scope ? ['quota-history-' + this.scope] : [])];
+    if (!allowed.includes(name) || !['reload', 'restore'].includes(action)) throw new Error('未知记录操作');
+    const record = this.store.protected(name);
+    const value = action === 'restore' ? record.restore() : record.reload();
+    if (name === 'project-budgets-v1') this.budgets = value;
+    if (name.startsWith('quota-history-')) { this.history = value; this.historyDirty = false; }
+    this.publish();
+    return record.health();
   }
   async checkUpdates(force = false) {
     await this.updates.check(force);
@@ -488,7 +517,7 @@ class Runtime extends EventEmitter {
   diagnostics() {
     return {
       version: require("../../package.json").version,
-      build: 2129,
+      build: 2153,
       platform: process.platform,
       arch: process.arch,
       generatedAt: new Date().toISOString(),
@@ -517,6 +546,7 @@ class Runtime extends EventEmitter {
     this.stopped = true;
     this.accountEpoch++;
     this.timers.forEach(clearInterval);
+    this.radar.stop?.();
     this.usage.close();
   }
 }

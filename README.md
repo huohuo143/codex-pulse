@@ -18,7 +18,7 @@
 
 `Codex 脉动` 将 Codex 的额度、Token 消耗、重置节奏和 Full reset 权益集中到一套原生 macOS 界面中。它既可以作为常驻悬浮框，也可以完全隐藏悬浮框，仅使用主窗口或 7 款桌面小组件。
 
-> 最新 macOS 发布版本：`2.12.26` build 2153，提供 Apple Silicon（arm64）安装包。主应用兼容 macOS 13；桌面小组件要求 macOS 14 或更高版本；安装包为 ad-hoc 签名、未公证版本。Windows 公开安装包仍见 v2.12.2 发布页。
+> 最新 macOS 发布版本：`2.12.26` build 2153，提供 Apple Silicon（arm64）安装包。主应用兼容 macOS 13；桌面小组件要求 macOS 14 或更高版本；安装包为 ad-hoc 签名、未公证版本。Windows x64 现已提供 2.12.26 build 2153 安装版、免安装版与源码包，见同版本发布页及 [Windows 说明](windows/README.md)。
 
 ## 2.12.26 实际重置到账与24小时倒计时
 
@@ -225,7 +225,7 @@ flowchart LR
 
 ## 安装
 
-在 [v2.12.26 发布页](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.26) 下载 Apple Silicon Mac 安装包。完整步骤见 [安装与升级](docs/INSTALL_UPGRADE_2.12.26.md)，测试范围见 [验证说明](docs/VALIDATION_2.12.26.md)。本次发布针对 macOS；Windows x64 安装版、免安装版继续从 [v2.12.2 发布页](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.2) 下载。
+在 [v2.12.26 发布页](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.26) 下载 Apple Silicon Mac 安装包。完整步骤见 [安装与升级](docs/INSTALL_UPGRADE_2.12.26.md)，测试范围见 [验证说明](docs/VALIDATION_2.12.26.md)。Windows x64 安装版、免安装版与源码包现已同步提供于 [v2.12.26 发布页](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.26)。Windows 升级与验证范围见 [Windows 说明](windows/README.md) 和 [验收文档](windows/docs/VALIDATION_2.12.26.md)。
 
 在 [Releases](https://github.com/huohuo143/codex-pulse/releases) 下载：
 
@@ -367,3 +367,4 @@ ARCH=arm64 ./script/create_transfer_package.sh
 ## License
 
 本项目采用 [MIT License](LICENSE)。
+

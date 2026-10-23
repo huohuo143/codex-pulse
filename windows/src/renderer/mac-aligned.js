@@ -32,16 +32,9 @@ $("#forecastSummary").after(forecastMetrics);
 
 const batchSettings = document.createElement("article");
 batchSettings.className = "card settings-card";
-batchSettings.innerHTML = '<h3>灵活额度批次</h3><p>分别记录发放数量、到期日期和来源；推算日期会明确标注，原有单笔记录继续保留。</p><div id="expiryBatches"></div><form id="batchForm" class="batch-form"><label>发放数量（credits）<input name="credits" type="number" min="0.01" step="any" required></label><label>发放日期<input name="grantedOn" type="date" required></label><label>到期日期<input name="expiresOn" type="date" required></label><label>日期依据<select name="kind"><option value="confirmed">已核实官方日期</option><option value="estimated">个人推算日期</option></select></label><label class="batch-evidence">来源依据<input name="evidence" minlength="5" maxlength="1000" placeholder="填写官方来源或推算依据" required></label><button type="submit" class="text-button">添加批次</button></form>';
+batchSettings.innerHTML = '<h3>灵活额度批次</h3><p>分别记录发放数量、到期日期和来源；推算日期会明确标注，原有单笔记录继续保留。</p><div id="expiryBatches"></div><form id="batchForm" class="batch-form"><label>发放数量（credits）<input name="credits" type="text" inputmode="decimal" required></label><label>发放日期<input name="grantedOn" type="date" required></label><label>到期日期<input name="expiresOn" type="date" required></label><label>日期依据<select name="kind"><option value="confirmed">已核实官方日期</option><option value="estimated">个人推算日期</option></select></label><label class="batch-evidence">来源依据<input name="evidence" minlength="5" maxlength="1000" placeholder="填写官方来源或推算依据" required></label><button type="submit" class="text-button">添加批次</button></form>';
 $("#newSettings").children[3].after(batchSettings);
-$("#batchForm").addEventListener("submit", async e => {
-  e.preventDefault();
-  const data = Object.fromEntries(new FormData(e.target));
-  try {
-    await window.suanli.setExpiryBatch({ ...data, credits: Number(data.credits) });
-    e.target.reset(); showToast("批次已保存");
-  } catch (error) { showToast(ErrorMessages.readable(error, "批次保存失败"), "error"); }
-});
+const expiryEditor = PulseExpiryEditor.mount({ document, api: window.suanli, notify: showToast });
 
 const historyCard = document.createElement("article");
 historyCard.className = "card chart-card quota-history-card";
@@ -181,19 +174,7 @@ function renderMacAligned(next) {
     line.title = row.evidence; $("#flexibleExpiry").append(line);
   }
   if (!dates.length) $("#flexibleExpiry").textContent = next.creditExpiry?.confirmed ? "已核实到期日：" + next.creditExpiry.date : "暂无已确认到期日";
-  const signature = JSON.stringify(batches);
-  if (signature !== batchesSignature) {
-    batchesSignature = signature; $("#expiryBatches").replaceChildren();
-    for (const row of batches) {
-      const item = document.createElement("div"); item.className = "batch-row";
-      const text = document.createElement("span");
-      text.textContent = `${row.credits.toLocaleString()} credits · ${row.grantedOn} 发放 · ${row.expiresOn} 到期 · ${row.kind === "confirmed" ? "已核实" : "个人推算"}\n${row.evidence}`;
-      const button = document.createElement("button"); button.className = "text-button"; button.textContent = "删除";
-      button.addEventListener("click", () => window.suanli.setExpiryBatch({ id: row.id, remove: true }));
-      item.append(text, button); $("#expiryBatches").append(item);
-    }
-    if (!batches.length) $("#expiryBatches").textContent = "当前账户暂无批次记录";
-  }
+  expiryEditor.sync(next);
   renderQuotaHistory(next);
 }
 setInterval(() => { if (status) renderMacAligned(status); }, 60000);

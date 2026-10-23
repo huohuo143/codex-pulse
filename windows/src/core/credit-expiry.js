@@ -17,7 +17,8 @@ function save(rows, value, scope) {
       value.expiresOn < value.grantedOn || !["confirmed", "estimated"].includes(value.kind) ||
       typeof value.evidence !== "string" || value.evidence.trim().length < 5 || value.evidence.length > 1000)
     throw new Error("请填写批次数量、有效发放/到期日期和至少 5 字的来源依据");
-  if (value.id && !rows.some(r => r.id === value.id && r.accountScope === scope)) throw new Error("批次不存在");
+  if (value.id && !rows.some(r => r.id === value.id && r.accountScope === scope) &&
+      !(value.recreate === true && /^[a-f0-9-]{36}$/i.test(value.id) && !rows.some(r => r.id === value.id))) throw new Error("批次不存在");
   const row = { id: value.id || randomUUID(), accountScope: scope, credits: value.credits, grantedOn: value.grantedOn,
     expiresOn: value.expiresOn, kind: value.kind, evidence: value.evidence.trim() };
   return [...rows.filter(r => r.id !== row.id), row];
