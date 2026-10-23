@@ -111,7 +111,7 @@ function compactSize() {
     badgeQuad: [mini ? 320 : 385, mini ? 70 : 85],
   };
   const [width, height] = sizes[settings.compactStyle] || sizes.rings;
-  return { width, height };
+  return { width, height: height + (settings.showRadar ? 72 : 0) };
 }
 function newWindow(key) {
   if (windows.has(key)) return windows.get(key);
@@ -355,6 +355,7 @@ function updateTray() {
         label: "立即刷新",
         click: () => runtime.refresh({ force: true, forceRadar: true }),
       },
+      { label: '打开重置日历', click: () => showMain('calendar') },
       { label: "复制用量摘要", click: copySummary },
       { label: "提醒设置", click: () => showMain("settings") },
       { type: "separator" },
@@ -435,6 +436,10 @@ function openExternal(target) {
       "codexradar.com",
       "x.com",
       "www.x.com",
+      'codex-reset.com',
+      'resetcue.com',
+      'tibo.modelyard.dev',
+      'creativecommons.org',
       "developers.openai.com",
       "help.openai.com",
       "frankfurter.dev",
@@ -454,6 +459,7 @@ function register() {
     settings: windowSettings(key),
     platform: process.platform,
     version: app.getVersion(),
+    build: 2153,
     status: runtime.state,
     radar: runtime.state.radar,
     exchangeRate: runtime.state.exchangeRate,
@@ -500,13 +506,15 @@ function register() {
   );
   handle("open-external", (_, url) => openExternal(url));
   handle("show-section", (_, section) => {
-    if (!["overview", "trends", "insights", "settings"].includes(section))
+    if (!["overview", "trends", "insights", 'calendar', "settings"].includes(section))
       throw new Error("未知页面");
     showMain(section);
   });
   handle("set-budget", (_, value) => runtime.setBudget(value));
   handle("set-expiry", (_, value) => runtime.setExpiry(value));
   handle("set-expiry-batch", (_, value) => runtime.setExpiryBatch(value));
+  handle('record-action', (_, value) => runtime.recordAction(value));
+  handle('open-records', () => shell.openPath(dataRoot));
   handle("network-online", () => { runtime.radar.networkRestored(); return runtime.refreshRadar(); });
   handle("mark-radar", (_, value) => {
     const result = runtime.radar.mark(value);
@@ -613,6 +621,7 @@ function restoreWindows() {
   }
 }
 async function start() {
+  require('./core/upgrade-backup').backupBeforeUpgrade(dataRoot, app.getVersion(), 2153);
   store = new Store(dataRoot);
   const old = store.read("settings", {});
   if (old.schemaVersion !== 2118 && fs.existsSync(store.file("settings"))) {

@@ -11,6 +11,8 @@ for (const [name, channel] of Object.entries({
   exportCSV: "export-csv",
   exportQuotaHistory: "export-quota-history",
   setExpiryBatch: "set-expiry-batch",
+  recordAction: 'record-action',
+  openRecords: 'open-records',
   networkOnline: "network-online",
   windowAction: "window-action",
   openPath: "open-path",
