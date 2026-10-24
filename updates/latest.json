@@ -1,82 +1,42 @@
 {
-  "schemaVersion": 1,
-  "tag_name": "v2.12.29",
-  "name": "Codex 脉动 2.12.29 · Mac / Windows · Build 2157",
-  "html_url": "https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.29",
-  "published_at": "2026-10-23T13:03:37Z",
+  "tag_name": "v2.12.31",
+  "name": "Codex 脉动 2.12.31 · macOS · 重置到账与倒计时修复",
+  "body": "# Codex 脉动 2.12.31 / Build 2159\n\n修复官方周额度已恢复，重置提示却被后续普通动态留在“重置已预告”的问题。\n\n- 重置预告使用独立的原帖依据；分析引用中的普通产品更新和历史完成声明不再推进预告周期。升级时自动校正旧缓存中的错误边界。\n- 当前账号确认到账后，主界面、悬浮框和雷达/总览小组件统一显示“重置已落地”，并沿用首次检测到账起算的 24 小时倒计时。刷新、重启及同轮稍后的公开确认不延长；真正的新预告优先，到期等待下一轮。\n- 来源刷新状态与到账事实分别显示；暂时断网或模型失败不抹去已核实到账，也不伪造刷新成功。\n- Mac 移动快照在重置状态变化后立即发布，稳定数据继续合并写入。发布时刻不会替换原始数据采样时刻；移动界面仍受 iCloud 与系统调度影响。\n- 安装器先核对并退出旧主程序与扩展，保留应用、设置及记录备份，并提供恢复入口。安装后报告系统接受小组件刷新的情况。\n- 常用构建入口增加重置相关回归检查，覆盖旧缓存、新预告、重启、未来时间、倒计时边界及同步限流。\n\n安装包：Apple Silicon arm64。主应用 macOS 13+；桌面小组件 macOS 14+。ad-hoc 签名，未公证。\n\n本次仅发布 Mac 安装包。Windows 继续使用 [2.12.29 / Build 2157](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.29)。移动端尚未通过本仓库公开分发安装包。\n\n[安装与升级](https://github.com/huohuo143/codex-pulse/blob/v2.12.31/docs/INSTALL_UPGRADE_2.12.31.md) · [验证范围](https://github.com/huohuo143/codex-pulse/blob/v2.12.31/docs/VALIDATION_2.12.31.md)\n",
+  "html_url": "https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.31",
+  "published_at": "2026-10-24T02:40:27Z",
   "draft": false,
   "prerelease": false,
-  "body": "# Codex 脉动 2.12.29 / Build 2157\r\n\r\n修复公开线程缓存长期不更新的问题：即使 Tibo 原帖内容没有变化，也会定期重新读取线程，避免后来追加的回复一直停留在旧缓存之外。\r\n\r\n- 最新动态仍每十分钟读取一次；线程补充读取每轮最多三次，当前预告和截止时间的证据优先，其他近期线程轮换检查。\r\n- 公开线程读取使用 Reader 的缓存刷新选项；每条线程保存最近尝试与成功时间，重启不绕过检查间隔。读取失败保留原有已核验上下文及其时间，模型能区分历史上下文和新读取。\r\n- 继续使用默认公开源，无需 X 登录；预告、北京时间截止时间及刷新健康状态继续共用主 App、悬浮框和小组件的数据。\r\n- 预告或截止时间更新后立即请求小组件重载，不再排队等待普通额度变化的合并刷新，减少新数据已到而旧画面短暂过期的现象。实际绘制仍由 macOS WidgetKit 调度。\r\n- 本次比对中，公开源最近七天的 53 条动态均已收录，包括本轮预告和时间回复；七天以外的七条记录按既有规则清理。此结论仅覆盖公开源实际收录的内容，不代表 X 全量动态没有遗漏。\r\n\r\n本机账号、模型、主题、小组件布局及个人权益数据保持原有配置。提供上一版本和数据备份，可回滚。\r\n\r\nApple Silicon macOS 13+；桌面小组件要求 macOS 14+。ad-hoc 签名，未公证。X 登录来源未完成真人登录验收。\r\n\r\nmacOS 验证：80 项相关测试通过，已完成本机安装、正常退出重启及悬浮框/桌面小组件自然刷新观察。X 登录后的真实读取未完成实测。\r\n\r\n[完整验收记录](https://github.com/huohuo143/codex-pulse/blob/v2.12.29/docs/VALIDATION_2.12.29.md) · [安装与升级](https://github.com/huohuo143/codex-pulse/blob/v2.12.28/docs/INSTALL_UPGRADE_2.12.28.md)\r\n\r\n## Windows 2.12.29 · Build 2157\r\n\r\nWindows x64 安装版与免安装版已同步。已有旧版用户可在设置中检查更新；安装版保留原设置和历史。\r\n\r\n- 本机登录与模型检测、模型及推理强度选择；新用户默认不调用模型。\r\n- 公开线程每十分钟定期复查，最多三个，优先预告与期限证据；失败保留此前成功时间。\r\n- 区分公共确认与本账号实际到账，保留三色状态与24小时倒计时；包含离线历史月度统计。\r\n- 修复较新 Mac 专用发布遮住 Windows 更新入口的问题。\r\n- Windows 原生验证：158项测试通过；真实额度、Token、五个页面、八种悬浮样式、七张桌面卡片及打包后模型分析通过。已安装验证 build 2157。\r\n\r\n下载 Installer.exe 安装版或 Portable.exe 免安装版。完整 Windows 源码为附件 Codex-Pulse-Windows-2.12.29-build2157-Source.zip；GitHub 自动生成 Source code 对应该标签原有 macOS 提交。\r\n\r\n校验见 WINDOWS-SHA256SUMS-2.12.29.txt；升级与测试范围见 WINDOWS-UPGRADE-2.12.29.md、WINDOWS-VALIDATION-2.12.29.md。\r\n\r\nWindows 10 x64 已实机验证；Windows 11、ARM和32位未实机验证。X独立沙箱窗口已验证，登录后的完整读取未完成人工登录实测。无商业代码签名。\r\n",
+  "schemaVersion": 1,
   "assets": [
     {
-      "name": "Codex-Pulse-v2.12.29-build2157-20261023-arm64.dmg",
-      "state": "uploaded",
-      "size": 7854840,
-      "digest": "sha256:7f446c8422f4081270535823d8afdd73f4e29c2dde62dd5a5f5d42f316ecb9f8",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.29/Codex-Pulse-v2.12.29-build2157-20261023-arm64.dmg"
+      "name": "Codex-Pulse-v2.12.31-build2159-20261024-arm64.dmg",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.31/Codex-Pulse-v2.12.31-build2159-20261024-arm64.dmg",
+      "size": 7924568,
+      "state": "uploaded"
     },
     {
-      "name": "Codex-Pulse-v2.12.29-build2157-20261023-arm64.dmg.sha256",
-      "state": "uploaded",
+      "name": "Codex-Pulse-v2.12.31-build2159-20261024-arm64.dmg.sha256",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.31/Codex-Pulse-v2.12.31-build2159-20261024-arm64.dmg.sha256",
       "size": 116,
-      "digest": "sha256:da2b80f0290cd2c2c6fab61b4c309a0b0d95441c82a349c712914eb06bbd34f4",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.29/Codex-Pulse-v2.12.29-build2157-20261023-arm64.dmg.sha256"
+      "state": "uploaded"
     },
     {
-      "name": "Codex-Pulse-Windows-2.12.29-build2157-Source.zip",
-      "state": "uploaded",
-      "size": 1605120,
-      "digest": "sha256:99d487d799f15c2cd6d7befd319eb2e94cfafd69b5fc63824b276b3e9d3f6ab2",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.29/Codex-Pulse-Windows-2.12.29-build2157-Source.zip"
+      "name": "INSTALL_UPGRADE_2.12.31.md",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.31/INSTALL_UPGRADE_2.12.31.md",
+      "size": 1214,
+      "state": "uploaded"
     },
     {
-      "name": "Codex-Pulse-Windows-2.12.29-build2157-x64-Installer.exe",
-      "state": "uploaded",
-      "size": 101211550,
-      "digest": "sha256:7440afb21ec15cc6e131084db8a647f044c7b70239eb220df21769dab851c371",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.29/Codex-Pulse-Windows-2.12.29-build2157-x64-Installer.exe"
+      "name": "RELEASE_2.12.31.md",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.31/RELEASE_2.12.31.md",
+      "size": 1764,
+      "state": "uploaded"
     },
     {
-      "name": "Codex-Pulse-Windows-2.12.29-build2157-x64-Portable.exe",
-      "state": "uploaded",
-      "size": 100885331,
-      "digest": "sha256:43d8d58bbad052d95141a9674f9f7dabb00fc5f89de75b633ae919c928cb6e1d",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.29/Codex-Pulse-Windows-2.12.29-build2157-x64-Portable.exe"
-    },
-    {
-      "name": "RELEASE_2.12.29.md",
-      "state": "uploaded",
-      "size": 1554,
-      "digest": "sha256:69af982f2b0ca0ef372db32c2f2f4f27cdafc41c9912ba3c6d291080878cab33",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.29/RELEASE_2.12.29.md"
-    },
-    {
-      "name": "VALIDATION_2.12.29.md",
-      "state": "uploaded",
-      "size": 3716,
-      "digest": "sha256:d799ccdfbfb114d83db72a29ad2131ea64d9b47639254061231f5cd0d93d6267",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.29/VALIDATION_2.12.29.md"
-    },
-    {
-      "name": "WINDOWS-SHA256SUMS-2.12.29.txt",
-      "state": "uploaded",
-      "size": 361,
-      "digest": "sha256:cbf90a913e897b61d53fa5a34073ffdf24d110c7d9f7697fe79ef140a111ddac",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.29/WINDOWS-SHA256SUMS-2.12.29.txt"
-    },
-    {
-      "name": "WINDOWS-UPGRADE-2.12.29.md",
-      "state": "uploaded",
-      "size": 1530,
-      "digest": "sha256:590324fbf00425cf7128966a43479b305d63683dd991c7eda51922ff56cc7c72",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.29/WINDOWS-UPGRADE-2.12.29.md"
-    },
-    {
-      "name": "WINDOWS-VALIDATION-2.12.29.md",
-      "state": "uploaded",
-      "size": 1208,
-      "digest": "sha256:aecf106f35d7d3e813f3cd4a91fe3643a8a419e6d71386cf2950d0e18fe1000c",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.29/WINDOWS-VALIDATION-2.12.29.md"
+      "name": "VALIDATION_2.12.31.md",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.31/VALIDATION_2.12.31.md",
+      "size": 1565,
+      "state": "uploaded"
     }
   ]
 }
