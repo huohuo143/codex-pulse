@@ -426,7 +426,8 @@ public actor CodexRadarService {
     // Preserve the shared ten-minute request budget across source changes.
     // Never present cached public-source results as a successful X page read.
     history = CodexRadarTiboHistory(resetAt: history.resetAt, posts: [],
-      lastAttemptAt: history.lastAttemptAt, latestAnnouncementAt: history.latestAnnouncementAt, sourceID: source)
+      lastAttemptAt: history.lastAttemptAt, latestAnnouncementAt: history.latestAnnouncementAt,
+      announcementBoundaryVersion: history.announcementBoundaryVersion, sourceID: source)
     cachedSnapshot = nil; cachedAt = nil
     persistTiboHistory(history)
   }

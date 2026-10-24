@@ -10,6 +10,7 @@ extension DashboardStore {
   func updateTouchBar() {
     writeLiveBalanceFile()
     writeWidgetSnapshotFile()
+    publishMobileSnapshots()
     guard touchBarEnabled else { return }
     TouchBarStripController.shared.update(codex: .init(
       color24h: NSColor(palette.usage24h),
@@ -22,6 +23,33 @@ extension DashboardStore {
       costText: hasUsageData ? tokenStats.cost24Hours.displayUSD : "统计中…"
     ))
     pushSessionsToTouchBar()
+  }
+
+  func publishMobileSnapshots() {
+    if var mobileStatus = status {
+      // This is publication time; quotaRead/usageAt retain their source times.
+      // A radar-only update must not wait for another quota polling result.
+      mobileStatus.generatedAt = Date()
+      let usageAt = lastFullRefresh
+      let history = quotaAlertAccountScope == mobileStatus.accountScope ? quotaHistory : []
+      let forecast = quotaAlertAccountScope == mobileStatus.accountScope ? quotaForecast : nil
+      let budgets = projectBudgets; let radar = codexRadarSnapshot
+      let rate = exchangeRate; let health = reliabilitySnapshot
+      Task { [mobileStatus] in
+        do {
+          if try await mobileSnapshotPublisher.publish(mobileStatus) != nil {
+            mobileSyncStatus = "移动快照已导出 · " + mobileStatus.generatedAt.formatted(date: .omitted, time: .shortened)
+          } else if MobileSnapshotPublisher.defaultRoot() == nil {
+            mobileSyncStatus = "未找到 iCloud Drive，请在系统设置中启用"
+          }
+          try await mobileSnapshotPublisher.publishDetails(status: mobileStatus, usageAt: usageAt,
+            history: history, forecast: forecast, budgets: budgets, radar: radar, rate: rate, health: health)
+        } catch {
+          mobileSyncStatus = "移动快照写入失败，已保留上次有效文件"
+          dashboardLogger.error("Mobile snapshot write failed; retained previous snapshot.")
+        }
+      }
+    }
   }
 
   func pushSessionsToTouchBar() {

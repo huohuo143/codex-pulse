@@ -7,6 +7,16 @@ struct DashboardSettingsView: View {
   var body: some View {
     VStack(spacing: 14) {
       settingsSection("本机账号、模型与 Tibo 来源") { LocalCodexSetupView() }
+      settingsSection("iPhone 与 iPad") {
+        Text(store.mobileSyncStatus).font(.subheadline)
+        Text("移动版选择 iCloud Drive 中的“算力码表 / 移动快照”文件夹，即可查看本机账号额度。同步额度、用量聚合与匿名项目摘要，不包含对话、真实项目名或路径。")
+          .font(.caption).foregroundStyle(DashboardColors.subtleText)
+        Button("打开移动快照文件夹") {
+          if let root = MobileSnapshotPublisher.defaultRoot(), FileManager.default.fileExists(atPath: root.path) {
+            NSWorkspace.shared.open(root)
+          } else { store.mobileSyncStatus = "请先启用 iCloud Drive，并等待一次额度刷新" }
+        }
+      }
       settingsSection("全局外观") {
         Picker("背景模式", selection: $store.themeMode) {
           ForEach(DashboardThemeMode.allCases) { mode in

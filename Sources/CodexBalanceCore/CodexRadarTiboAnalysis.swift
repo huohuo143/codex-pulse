@@ -12,6 +12,7 @@ public struct CodexRadarTiboAnalysis: Codable, Equatable, Sendable {
   public var model: String?
   public var reasoningEffort: String?
   public var deadline: CodexRadarTiboDeadline? = nil
+  public var announcementEvidenceID: String? = nil
   public var completionEvidenceID: String? = nil
   public var completedAt: Date? = nil
 
@@ -27,7 +28,20 @@ public struct CodexRadarTiboAnalysis: Codable, Equatable, Sendable {
   func announcementPublishedAt(in posts: [CodexRadarTiboPost], at now: Date) -> Date? {
     guard state == .announced, let analyzedAt, analyzedAt <= now else { return nil }
     let cutoff = now.addingTimeInterval(-CodexRadarTiboAnalyzer.retention)
-    return posts.filter { evidenceIDs.contains($0.id) }.compactMap(\.publishedAt)
+    // evidenceIDs also includes historical completions and unrelated updates
+    // discussed by the model. Only the actual announcement starts a new cycle.
+    // Older cached analyses can be anchored to a grounded deadline or a single
+    // unambiguous evidence item without running the model again.
+    let anchor: String?
+    if let announcementEvidenceID {
+      anchor = announcementEvidenceID
+    } else if let deadline, posts.contains(where: { deadline.isGrounded(in: $0) }) {
+      anchor = deadline.evidenceID
+    } else {
+      anchor = Set(evidenceIDs).count == 1 ? evidenceIDs.first : nil
+    }
+    guard let anchor, evidenceIDs.contains(anchor) else { return nil }
+    return posts.filter { $0.id == anchor }.compactMap(\.publishedAt)
       .filter { $0 >= cutoff && $0 <= now }.max()
   }
 }
@@ -62,7 +76,7 @@ public extension CodexRadarSnapshot {
   func tiboStatusTitle(at now: Date) -> String {
     if let completed = resetCompletion(at: now) {
       return now < completed.date.addingTimeInterval(86400)
-        ? (completed.isLocal ? "重置已落实"
+        ? (completed.isLocal ? "重置已落地"
           : tiboAnalysis?.kind == .reset_card ? "Tibo确认发卡" : "Tibo确认重置") : "等待新重置"
     }
     guard syncState?.lastSuccessAt != nil else { return "等待动态" }
@@ -144,7 +158,7 @@ enum CodexRadarTiboAnalyzer {
   static let model = "gpt-6-astra"
   static let effort = "high"
   static let retention: TimeInterval = 7 * 24 * 60 * 60
-  static let schema = #"{"type":"object","properties":{"state":{"type":"string","enum":["announced","completed","not_found","uncertain"]},"kind":{"type":"string","enum":["hard_reset","reset_card","none","uncertain"]},"summaryZh":{"type":"string"},"timingZh":{"type":"string"},"evidenceIDs":{"type":"array","items":{"type":"string"}},"deadline":{"anyOf":[{"type":"null"},{"type":"object","properties":{"localDateTime":{"type":"string"},"sourceTimeZone":{"type":"string"},"evidenceID":{"type":"string"},"sourceQuote":{"type":"string"}},"required":["localDateTime","sourceTimeZone","evidenceID","sourceQuote"],"additionalProperties":false}]},"completionEvidenceID":{"type":["string","null"]}},"required":["state","kind","summaryZh","timingZh","evidenceIDs","deadline","completionEvidenceID"],"additionalProperties":false}"#
+  static let schema = #"{"type":"object","properties":{"state":{"type":"string","enum":["announced","completed","not_found","uncertain"]},"kind":{"type":"string","enum":["hard_reset","reset_card","none","uncertain"]},"summaryZh":{"type":"string"},"timingZh":{"type":"string"},"evidenceIDs":{"type":"array","items":{"type":"string"}},"deadline":{"anyOf":[{"type":"null"},{"type":"object","properties":{"localDateTime":{"type":"string"},"sourceTimeZone":{"type":"string"},"evidenceID":{"type":"string"},"sourceQuote":{"type":"string"}},"required":["localDateTime","sourceTimeZone","evidenceID","sourceQuote"],"additionalProperties":false}]},"completionEvidenceID":{"type":["string","null"]},"announcementEvidenceID":{"type":["string","null"]}},"required":["state","kind","summaryZh","timingZh","evidenceIDs","deadline","completionEvidenceID","announcementEvidenceID"],"additionalProperties":false}"#
 
   static func retained(_ posts: [CodexRadarTiboPost], at now: Date) -> [CodexRadarTiboPost] {
     posts.filter { post in
@@ -181,6 +195,7 @@ enum CodexRadarTiboAnalyzer {
     today/tomorrow 等相对日期按该原帖发布时间在原文明示时区的日期解释，不能按当前检查时间解释。PST 是固定 UTC−8，PDT 是固定 UTC−7；PT 按该日期太平洋时区的夏令时规则。夏令时切换造成重复或不存在的当地时刻且无明确偏移时，不给确定期限。
     不要换算北京时间或 UTC，APP 会负责换算。没有可核验父帖关系的孤立时间回复必须返回 deadline:null，不能借用相邻重置帖补出语义。
     completed 必须提供 completionEvidenceID：输入中明确确认本轮已执行完成/已到账的那一条原帖 ID，且同时列入 evidenceIDs。不能使用预告、预计或只是提到历史重置的帖充当确认；其他 state 必须为 null。
+    announced 必须提供 announcementEvidenceID：明确提出最新一轮待执行重置/发卡预告的原帖 ID，且同时列入 evidenceIDs。其他 state 必须为 null。evidenceIDs 可包含用于对比的历史完成声明和普通产品更新，但这些上下文不能作为 announcementEvidenceID，不能用最新无关动态的时间推进预告周期。明确与重置父帖相关的期限回复也可作为本轮预告依据。
     新预告优先：如果完成确认之后又出现新的待执行重置预告，立即用 announced 替代 completed，completionEvidenceID 为 null；不能因上一轮 24 小时展示期尚未结束而忽略新预告。
     最近一次重置若已完成且没有更新的待执行预告，保持 completed 并引用同一完成原帖；不要因为刷新时间变化而改变完成依据。APP 从该原帖发布时间计算 24 小时展示期，到期进入等待新预告。
     当前时间：\(ISO8601DateFormatter().string(from: now))
@@ -217,6 +232,12 @@ enum CodexRadarTiboAnalyzer {
       throw CodexRadarTiboAnalysisError.invalidResult
     }
     result.analyzedAt = now; result.model = model; result.reasoningEffort = effort
+    if result.state == .announced {
+      guard result.announcementPublishedAt(in: retained(posts, at: now), at: now) != nil
+      else { throw CodexRadarTiboAnalysisError.invalidResult }
+    } else if result.announcementEvidenceID != nil {
+      throw CodexRadarTiboAnalysisError.invalidResult
+    }
     return result
   }
 

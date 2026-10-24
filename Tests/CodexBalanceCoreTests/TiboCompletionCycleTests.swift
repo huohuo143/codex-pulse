@@ -27,7 +27,7 @@ struct TiboCompletionCycleTests {
     publicOnly.tiboAnalysis?.kind = .reset_card
     #expect(publicOnly.tiboStatusTitle(at: now) == "Tibo确认发卡")
     publicOnly.quotaResetConfirmedAt = confirmed
-    #expect(publicOnly.tiboStatusTitle(at: now) == "重置已落实")
+    #expect(publicOnly.tiboStatusTitle(at: now) == "重置已落地")
     #expect(publicOnly.tiboStatusSummary(at: now).contains("本账号官方额度已恢复"))
     #expect(publicOnly.tiboCompletionUntil(at: now) == confirmed.addingTimeInterval(86400))
   }
@@ -84,10 +84,10 @@ struct TiboCompletionCycleTests {
   @Test func widgetSchedulesCountdownEndAndDoesNotRestartItWhenRepublished() {
     let now = confirmed.addingTimeInterval(86300), until = confirmed.addingTimeInterval(86400)
     var widget = CodexWidgetSnapshot.preview
-    widget.radarLevel = "重置已落实"; widget.radarCompletionUntil = until
+    widget.radarLevel = "重置已落地"; widget.radarCompletionUntil = until
     widget.radarLastSuccessAt = now; widget.radarValidUntil = now.addingTimeInterval(660)
     #expect(widget.timelineDates(after: now).contains(until))
-    #expect(widget.effective(at: until.addingTimeInterval(-1)).radarLevel == "重置已落实")
+    #expect(widget.effective(at: until.addingTimeInterval(-1)).radarLevel == "重置已落地")
     #expect(widget.effective(at: until).radarLevel == "等待新重置")
     #expect(widget.effective(at: until).radarCompletionUntil == nil)
     widget.updatedAt = now.addingTimeInterval(50)

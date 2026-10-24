@@ -7,8 +7,8 @@ EXECUTABLE_NAME="CodexSuanliMeter"
 WIDGET_EXECUTABLE_NAME="CodexSuanliWidgets"
 BUNDLE_ID="${CODEX_PULSE_BUNDLE_ID:-dev.codex.balance-dashboard.codex}"
 WIDGET_BUNDLE_ID="$BUNDLE_ID.widgets"
-VERSION="${VERSION:-2.12.29}"
-BUILD_NUMBER="${BUILD_NUMBER:-2157}"
+VERSION="${VERSION:-2.12.31}"
+BUILD_NUMBER="${BUILD_NUMBER:-2159}"
 ARCH="${ARCH:-$(uname -m)}"
 # macOS 13 可运行主应用；桌面小组件只在 macOS 14 及以后提供。发布完整
 # 小组件扩展的独立部署目标保持 macOS 14，不抬高主应用要求。
@@ -76,6 +76,7 @@ if [[ "${OPEN_APP:-1}" != "0" ]]; then
 fi
 
 cd "$ROOT_DIR"
+"$ROOT_DIR/script/verify_reset_behavior.sh" mac
 swift build --build-system "$SWIFT_BUILD_SYSTEM" -j 1 --disable-index-store -c "$CONFIGURATION" --arch "$ARCH" --scratch-path "$SWIFT_SCRATCH_PATH" --product "$EXECUTABLE_NAME"
 BUILD_DIR="$(swift build --build-system "$SWIFT_BUILD_SYSTEM" -c "$CONFIGURATION" --arch "$ARCH" --scratch-path "$SWIFT_SCRATCH_PATH" --show-bin-path)"
 BUILD_BINARY="$BUILD_DIR/$EXECUTABLE_NAME"

@@ -44,6 +44,7 @@ extension DashboardStore {
       updateCodexRadarStatusMessage(snapshot)
       if servicesEnabled {
         writeWidgetSnapshotFile()
+        publishMobileSnapshots()
       }
     }
   }
@@ -60,6 +61,7 @@ extension DashboardStore {
     updateCodexRadarStatusMessage(snapshot)
     if servicesEnabled {
       writeWidgetSnapshotFile()
+      publishMobileSnapshots()
     }
 
     if let sync = snapshot.syncState, sync.isUsingCachedFeed {
@@ -86,7 +88,7 @@ extension DashboardStore {
   func updateRadarQuotaConfirmation(now: Date = Date()) {
     guard let snapshot = codexRadarSnapshot else { return }
     codexRadarSnapshot = radarWithQuotaConfirmation(snapshot, now: now)
-    if servicesEnabled { writeWidgetSnapshotFile() }
+    if servicesEnabled { writeWidgetSnapshotFile(); publishMobileSnapshots() }
   }
 
   func archiveRadarEvaluation(_ snapshot: CodexRadarSnapshot) {

@@ -4,8 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP_NAME="Codex 脉动"
 EXECUTABLE_NAME="CodexSuanliMeter"
-VERSION="${VERSION:-2.12.29}"
-BUILD_NUMBER="${BUILD_NUMBER:-2157}"
+VERSION="${VERSION:-2.12.31}"
+BUILD_NUMBER="${BUILD_NUMBER:-2159}"
 DATE_TAG="${DATE_TAG:-$(/bin/date +%Y%m%d)}"
 ARCH="${ARCH:-$(uname -m)}"
 
@@ -32,6 +32,10 @@ NOTES_PATH="$DIST_DIR/$RELEASE_NAME-$ARCH-改版说明.md"
 STAGE_DIR="$ROOT_DIR/.build/dmg-stage-$VERSION-build$BUILD_NUMBER-$ARCH"
 
 cd "$ROOT_DIR"
+
+# Fail packaging before distributing an installer with broken lifecycle guards.
+/bin/zsh -n "$ROOT_DIR/script/install_preserving_settings.command"
+python3 -m unittest discover -s "$ROOT_DIR/script/tests" -p 'test_installer*.py'
 
 if [[ -e "$DMG_PATH" || -e "$SHA_PATH" || -e "$NOTES_PATH" ]]; then
   echo "Refusing to overwrite an existing $VERSION release artifact." >&2

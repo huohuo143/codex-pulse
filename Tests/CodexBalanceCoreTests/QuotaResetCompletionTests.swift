@@ -28,7 +28,7 @@ struct QuotaResetCompletionTests {
     var value = try snapshot(now)
     value.tiboAnalysis?.deadline = .init(localDateTime: "2026-10-22T10:00:00", sourceTimeZone: "PST", evidenceID: "announcement", sourceQuote: "before 10am PST")
     #expect(value.quotaResetConfirmedAt == arrival)
-    #expect(value.tiboStatusTitle(at: now) == "重置已落实")
+    #expect(value.tiboStatusTitle(at: now) == "重置已落地")
     #expect(value.tiboCompletionUntil(at: now) == arrival.addingTimeInterval(86400))
     #expect(!value.tiboHasAnnouncement(at: now))
     #expect(value.tiboDeadline(at: now) == nil)
@@ -42,14 +42,14 @@ struct QuotaResetCompletionTests {
       var value = try snapshot(now)
       value.quotaResetConfirmedAt = CodexQuotaResetDetection.latestConfirmedAt(in: stored, now: now)
       #expect(value.tiboCompletionUntil(at: now) == (age < 86400 ? arrival.addingTimeInterval(86400) : nil))
-      #expect(value.tiboStatusTitle(at: now) == (age < 86400 ? "重置已落实" : "等待新重置"))
+      #expect(value.tiboStatusTitle(at: now) == (age < 86400 ? "重置已落地" : "等待新重置"))
     }
   }
 
   @Test func newAnnouncementPreemptsLocalCompletionButOldReanalysisDoesNot() throws {
     let now = arrival.addingTimeInterval(900)
     let old = try snapshot(now)
-    #expect(old.tiboStatusTitle(at: now) == "重置已落实")
+    #expect(old.tiboStatusTitle(at: now) == "重置已落地")
     let next = try snapshot(now, postDate: arrival.addingTimeInterval(600))
     #expect(next.tiboStatusTitle(at: now) == "重置已预告")
     #expect(next.tiboCompletionUntil(at: now) == nil)
@@ -64,14 +64,14 @@ struct QuotaResetCompletionTests {
     value.syncState?.isStale = true
     value.tiboAnalysisFailure = "模型失败"
     #expect(!value.tiboRefreshIsHealthy(at: now))
-    #expect(value.tiboStatusTitle(at: now) == "重置已落实")
+    #expect(value.tiboStatusTitle(at: now) == "重置已落地")
     #expect(value.tiboCompletionUntil(at: now) == arrival.addingTimeInterval(86400))
     var widget = CodexWidgetSnapshot(updatedAt: now, radarLevel: value.tiboStatusTitle(at: now),
       radarSummary: value.tiboStatusSummary(at: now), radarLastSuccessAt: arrival.addingTimeInterval(-7200),
       radarValidUntil: arrival, radarSyncStatus: "等待刷新", radarIsStale: true)
     widget.radarCompletionUntil = value.tiboCompletionUntil(at: now)
     let restored = try JSONDecoder().decode(CodexWidgetSnapshot.self, from: JSONEncoder().encode(widget))
-    #expect(restored.effective(at: now).radarLevel == "重置已落实")
+    #expect(restored.effective(at: now).radarLevel == "重置已落地")
     #expect(restored.effective(at: now).radarCompletionUntil == arrival.addingTimeInterval(86400))
     #expect(restored.effective(at: arrival.addingTimeInterval(86400)).radarLevel == "等待新重置")
   }

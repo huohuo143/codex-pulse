@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-2.12.28-8b7cff">
+  <img alt="Version" src="https://img.shields.io/badge/version-2.12.31-8b7cff">
   <img alt="macOS" src="https://img.shields.io/badge/macOS-14%2B-111827?logo=apple">
   <img alt="Mac architectures" src="https://img.shields.io/badge/Mac-arm64%20%7C%20x86__64-111827">
   <img alt="Swift" src="https://img.shields.io/badge/Swift-6.0-f05138?logo=swift&logoColor=white">
@@ -18,9 +18,15 @@
 
 `Codex 脉动` 将 Codex 的额度、Token 消耗、重置节奏和 Full reset 权益集中到一套原生 macOS 界面中。它既可以作为常驻悬浮框，也可以完全隐藏悬浮框，仅使用主窗口或 7 款桌面小组件。
 
-> macOS 版本：`2.12.28` build 2155，提供 Apple Silicon（arm64）安装包。主应用兼容 macOS 13；桌面小组件要求 macOS 14 或更高版本；安装包为 ad-hoc 签名、未公证版本。Windows x64 已同步为 [2.12.29 build 2157](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.29)，包含安装版、免安装版与完整源码。
+> macOS 版本：`2.12.31` build 2159，提供 Apple Silicon（arm64）安装包。主应用兼容 macOS 13；桌面小组件要求 macOS 14 或更高版本；安装包为 ad-hoc 签名、未公证版本。Windows x64 已同步为 [2.12.29 build 2157](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.29)，包含安装版、免安装版与完整源码。
 
 公共重置历史为随包分发的公共事件记录；最近三个完整月份（2026 年 7—9 月）提供 20 条可定位日期的记录及原始月度总数，未声称完整覆盖。安装后的新预告继续读取 Tibo 在 X 上的发帖与回复。个人灵活额度、Full reset 数量/到期时间和实际到账以当前账号本机数据为准。详见 [历史依据及缺口](docs/RESET_HISTORY_SOURCES.md)。
+
+## 2.12.31 重置到账与倒计时修复
+
+修复实际额度已恢复，后续普通动态却把状态留在“重置已预告”的问题。预告依据独立保存并迁移旧缓存；主界面、悬浮框与小组件沿用首次到账起算的 24 小时倒计时。新预告优先，到期等待下一轮。移动快照中的状态变化立即发布，构建前自动检查这些场景。
+
+[下载 Mac 2.12.31](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.31) · [安装与升级](docs/INSTALL_UPGRADE_2.12.31.md) · [验证范围](docs/VALIDATION_2.12.31.md) · [状态维护规则](docs/RESET_STATE_INVARIANTS.md)
 
 ## 2.12.28 面向个人账号的本地分发版
 
@@ -237,7 +243,7 @@ flowchart LR
 
 ## 安装
 
-在 [v2.12.28 发布页](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.28) 下载 Apple Silicon Mac 安装包。完整步骤见 [安装与升级](docs/INSTALL_UPGRADE_2.12.28.md)，测试范围见 [验证说明](docs/VALIDATION_2.12.28.md)。Windows x64 安装版、免安装版与源码包已同步至 [v2.12.29 发布页](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.29)。Windows 升级与验证范围见 [Windows 说明](windows/README.md) 和 [验收文档](windows/docs/VALIDATION_2.12.29.md)。
+在 [v2.12.31 发布页](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.31) 下载 Apple Silicon Mac 安装包。完整步骤见 [安装与升级](docs/INSTALL_UPGRADE_2.12.31.md)，测试范围见 [验证说明](docs/VALIDATION_2.12.31.md)。Windows x64 安装版、免安装版与源码包已同步至 [v2.12.29 发布页](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.29)。Windows 升级与验证范围见 [Windows 说明](windows/README.md) 和 [验收文档](windows/docs/VALIDATION_2.12.29.md)。
 
 在 [Releases](https://github.com/huohuo143/codex-pulse/releases) 下载：
 

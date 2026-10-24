@@ -249,6 +249,8 @@ final class DashboardStore: ObservableObject {
   var lastHeartbeatAt: Date?
   var previousAutomaticTick: Date?
   let snapshotPublisher = WidgetSnapshotPublisher()
+  let mobileSnapshotPublisher = MobileSnapshotPublisher()
+  @Published var mobileSyncStatus = "额度更新后自动写入 iCloud 移动快照"
   var pendingSnapshotTask: Task<Void, Never>?
   let projectBudgetStore: ProjectBudgetStore
   let reliabilityEventStore: ReliabilityEventStore

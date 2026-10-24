@@ -132,7 +132,7 @@ struct PortableLocalSourceTests {
     #expect(snapshot.tiboAnalysis == nil)
     #expect(!snapshot.tiboDisplayRefreshIsHealthy(at: now.addingTimeInterval(661)))
     var completed = snapshot; completed.quotaResetConfirmedAt = now
-    #expect(completed.tiboStatusTitle(at: now) == "重置已落实")
+    #expect(completed.tiboStatusTitle(at: now) == "重置已落地")
     #expect(completed.tiboCompletionUntil(at: now) == now.addingTimeInterval(86400))
   }
 

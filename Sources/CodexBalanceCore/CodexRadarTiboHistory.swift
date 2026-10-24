@@ -18,6 +18,7 @@ struct CodexRadarTiboHistory: Codable, Sendable {
   var analysisLastAttemptAt: Date? = nil
   var analysisFailureMessage: String? = nil
   var latestAnnouncementAt: Date? = nil
+  var announcementBoundaryVersion: Int? = nil
   var sourceID: String? = nil
 
   mutating func retainRecent(at now: Date) {
@@ -36,8 +37,15 @@ struct CodexRadarTiboHistory: Codable, Sendable {
 
   mutating func recordAnnouncement(at now: Date) {
     let cutoff = now.addingTimeInterval(-CodexRadarTiboAnalyzer.retention)
-    latestAnnouncementAt = [latestAnnouncementAt,
-      analysis?.announcementPublishedAt(in: posts + (latestPosts ?? []), at: now)]
+    let anchoredDate = analysis?.announcementPublishedAt(in: posts + (latestPosts ?? []), at: now)
+    if announcementBoundaryVersion != 1, let anchoredDate {
+      // Previous releases took the latest timestamp from all model evidence.
+      // Rebuild that boundary once from the actual announcement. If the source
+      // is uncertain or unavailable, retain its boundary until it can be checked.
+      latestAnnouncementAt = anchoredDate
+      announcementBoundaryVersion = 1
+    }
+    latestAnnouncementAt = [latestAnnouncementAt, anchoredDate]
       .compactMap { $0 }.filter { $0 >= cutoff && $0 <= now }.max()
   }
 }
