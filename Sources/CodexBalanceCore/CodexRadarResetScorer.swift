@@ -359,7 +359,7 @@ enum CodexRadarResetScorer {
       && hasResetButtonMetaphor
       && hasDeferredNextCycleSignal == false
     let hasExplicitReset = hasBankedReset == false && (
-      isResetDayAnnouncement(post.originalText)
+      CodexRadarTiboAttention.isResetDayAnnouncement(post.originalText)
         || text.contains("usage reset")
         || text.contains("reset usage")
         || text.contains("reset the limit")
@@ -391,19 +391,6 @@ enum CodexRadarResetScorer {
       deferredLifetime: hasDeferredNextCycleSignal ? timingLifetime : inactiveLifetime,
       explicitLifetime: hasExplicitReset ? timingLifetime : inactiveLifetime
     )
-  }
-
-  // Match an affirmative announcement, not a question, a wish, or an
-  // editorial translation. A timing-only reply needs verified thread context
-  // and must not acquire reset meaning merely by appearing next to a post.
-  private static func isResetDayAnnouncement(_ original: String) -> Bool {
-    let text = original.lowercased().replacingOccurrences(of: "’", with: "'")
-    let affirmative = #"\b(?:it's|it is|today is)\s+(?:a\s+)?reset day\b"#
-    let negated = #"\b(?:not|never|isn't|won't|don't)\b[^.!?]{0,60}\breset day\b"#
-    let question = #"\breset day\b[^.!?]*\?"#
-    return text.range(of: affirmative, options: .regularExpression) != nil
-      && text.range(of: negated, options: .regularExpression) == nil
-      && text.range(of: question, options: .regularExpression) == nil
   }
 
   private static let inactiveLifetime = Lifetime(factor: 0, validUntil: nil)

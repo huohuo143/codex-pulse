@@ -1,4 +1,6 @@
 import Foundation
+import CodexMobileCore
+import CryptoKit
 
 public struct CodexRadarPublicJudgement: Equatable, Decodable, Sendable {
   public var updatedAt: Date
@@ -43,10 +45,41 @@ struct CodexRadarPublicPageSnapshot: Equatable, Sendable {
   var resetAt: Date?
   var tiboFeed: CodexRadarTiboFeed
   var feedFingerprint: String? = nil
+  var sourceChecks: [TiboSourceCheck]? = nil
+  var readRoute: TiboReadRoute? = nil
 }
 
 enum CodexRadarPublicPageParser {
   static func decode(_ data: Data, now: Date) throws -> CodexRadarPublicPageSnapshot {
+    if let routed = TiboRoutedPage.decode(data) {
+      guard routed.route.usedBackup ? routed.route.backupSucceeded : routed.route.xState == .success else { throw CodexRadarError.invalidPayload }
+      let selected = routed.route.usedBackup ? routed.backupData : routed.directData
+      guard let selected else { throw CodexRadarError.invalidPayload }
+      var page = try decode(selected, now: now)
+      if routed.route.usedBackup, let direct = routed.directData, let xPage = try? decode(direct, now: now) {
+        page.tiboFeed.posts = CodexRadarTiboTimeline.mergedPosts(current: xPage.tiboFeed.posts, previous: page.tiboFeed.posts, now: now)
+        page.tiboFeed.updatedAt = page.tiboFeed.posts.compactMap(\.publishedAt).max()
+      }
+      page.readRoute = routed.route
+      return page
+    }
+    if let bundle = try? JSONDecoder().decode(TiboPublicFeedBundle.self, from: data),
+       bundle.format == "codex-pulse-tibo-multisource-v1" {
+      guard bundle.feed.succeeded, let latest = bundle.feed.latestPostAt else { throw CodexRadarError.invalidPayload }
+      var page = bundle.primaryHTML.flatMap { try? decode(Data($0.utf8), now: now) }
+        ?? CodexRadarPublicPageSnapshot(judgement: .init(updatedAt: latest, kind: "Tibo 动态", level: nil,
+          headline: "多来源公开动态", summary: bundle.feed.statusText), tiboFeed: .init(updatedAt: latest, posts: []))
+      let additions = bundle.feed.posts.map { post in
+        CodexRadarTiboPost(id: post.id, url: URL(string: post.url), publishedAt: post.publishedAt,
+          relevance: "unknown", relevanceLabel: "公开原帖", originalText: post.originalText,
+          translationZh: nil, analysisZh: nil)
+      }
+      page.tiboFeed.posts = CodexRadarTiboTimeline.mergedPosts(current: page.tiboFeed.posts, previous: additions, now: now)
+      page.tiboFeed.updatedAt = page.tiboFeed.posts.compactMap(\.publishedAt).max()
+      page.sourceChecks = bundle.feed.checks
+      page.feedFingerprint = SHA256.hash(data: Data(page.tiboFeed.posts.map { $0.id + $0.originalText }.joined(separator: "\n").utf8)).map { String(format: "%02x", $0) }.joined()
+      return page
+    }
     guard let html = String(data: data, encoding: .utf8) else {
       throw CodexRadarError.invalidPayload
     }
@@ -60,6 +93,14 @@ enum CodexRadarPublicPageParser {
       throw CodexRadarError.invalidPayload
     }
     return includeChallengeUpdates(in: html, page: page, now: now)
+  }
+
+  static func calendarData(_ data: Data) -> Data? {
+    if let routed = TiboRoutedPage.decode(data) { return routed.backupData.flatMap { calendarData($0) } }
+    if let bundle = try? JSONDecoder().decode(TiboPublicFeedBundle.self, from: data), bundle.format == "codex-pulse-tibo-multisource-v1" {
+      return bundle.primaryHTML.map { Data($0.utf8) }
+    }
+    return data
   }
 
   private static func includeChallengeUpdates(

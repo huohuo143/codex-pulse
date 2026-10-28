@@ -2,8 +2,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VERSION="${VERSION:-2.12.29}"
-BUILD_NUMBER="${BUILD_NUMBER:-2157}"
+VERSION="${VERSION:-2.12.37}"
+BUILD_NUMBER="${BUILD_NUMBER:-2165}"
 ARCH="${ARCH:-$(uname -m)}"
 BUNDLE_ID="${CODEX_PULSE_BUNDLE_ID:-dev.codex.balance-dashboard.codex}"
 APP_BUNDLE="${1:-$ROOT_DIR/dist/build-v$VERSION-build$BUILD_NUMBER-$ARCH/Codex 脉动.app}"
@@ -61,7 +61,7 @@ assert_equal "$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$APP
 assert_equal "$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$WIDGET_INFO")" "14.0" "Widget minimum OS"
 
 WIDGET_COUNT="$(/usr/bin/grep -c 'configurationDisplayName' "$WIDGET_SOURCE")"
-assert_equal "$WIDGET_COUNT" "7" "Widget configuration count"
+assert_equal "$WIDGET_COUNT" "8" "Widget configuration count"
 
 LINKED_FRAMEWORKS="$(/usr/bin/otool -L "$WIDGET_BINARY")"
 [[ "$LINKED_FRAMEWORKS" == *"WidgetKit.framework"* ]] || fail "WidgetKit.framework is not linked"
@@ -80,4 +80,4 @@ assert_equal "$(/usr/bin/lipo -archs "$WIDGET_BINARY")" "$ARCH" "Widget architec
 
 echo "Verified App: $APP_BUNDLE"
 echo "Verified Widget: $WIDGET_BUNDLE"
-echo "Verified $ARCH architecture, 7 widget configurations, icons, standard sandbox, frameworks and signatures."
+echo "Verified $ARCH architecture, 8 widget configurations, icons, standard sandbox, frameworks and signatures."

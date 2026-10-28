@@ -159,6 +159,8 @@ extension DashboardStore {
         .map { CodexWidgetMetric(label: $0.category.label, tokens: $0.totalTokens) }
     )
 
+    snapshot.quotaHistory = QuotaHistoryTrend.widgetHistory(
+      snapshots: quotaAlertAccountScope == status?.accountScope ? quotaHistory : [], now: snapshot.updatedAt)
     snapshot.quotaRead = status?.quotaRead
     snapshot.flexibleCreditRead = status?.flexibleCreditRead
     snapshot.resetCreditsRead = status?.resetCreditsRead
@@ -173,6 +175,7 @@ extension DashboardStore {
     snapshot.usageUpdatedAt = lastFullRefresh
     snapshot.usageValidUntil = status?.usageValidUntil
     snapshot.confirmedCreditExpiry = creditExpiry.nextExplicitExpiry(for: status?.accountScope)
+    eInk.ingest(snapshot, accountScope: status?.accountScope)
     pendingSnapshotTask?.cancel()
     pendingSnapshotTask = Task { [weak self, snapshot] in
       try? await Task.sleep(for: .seconds(1))

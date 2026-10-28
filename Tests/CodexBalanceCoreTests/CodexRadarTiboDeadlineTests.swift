@@ -79,7 +79,7 @@ struct CodexRadarTiboDeadlineTests {
     snapshot.syncState = .init(lastAttemptAt: now, lastSuccessAt: now)
     snapshot.tiboAnalysis = try CodexRadarTiboAnalyzer.validate(output(deadline()), posts: [post()], at: now)
     #expect(snapshot.tiboDeadline(at: now) != nil)
-    #expect(snapshot.tiboDeadline(at: now.addingTimeInterval(660)) == nil)
+    #expect(snapshot.tiboDeadline(at: now.addingTimeInterval(1260)) == nil)
     snapshot.tiboAnalysisFailure = "failure"
     #expect(snapshot.tiboDeadline(at: now) == nil)
     snapshot.tiboAnalysisFailure = nil

@@ -12,8 +12,8 @@ struct CodexRadarView: View {
   @AppStorage("radarCommunityExpanded") private var communityExpanded = false
   @State private var allTiboPostsExpanded = false
 
-  private var sourceLabel: String { snapshot?.tiboSourceID == "x" ? "X 官网 · Tibo 发帖与回复" : CodexRadarService.attributionText }
-  private var sourceURL: URL { snapshot?.tiboSourceID == "x" ? XTiboTimeline.profileURL : CodexRadarService.siteURL }
+  private var sourceLabel: String { snapshot?.tiboSourceID == "x-first" ? "X 官网优先 · 三个网站备用" : (snapshot?.tiboSourceID == "x" ? "X 官网 · Tibo 发帖与回复" : CodexRadarService.attributionText) }
+  private var sourceURL: URL { ["x", "x-first"].contains(snapshot?.tiboSourceID ?? "") ? XTiboTimeline.profileURL : CodexRadarService.siteURL }
 
   var body: some View {
     VStack(spacing: 14) {
@@ -87,7 +87,12 @@ struct CodexRadarView: View {
                 .foregroundStyle(DashboardColors.subtleText)
                 .fixedSize(horizontal: false, vertical: true)
             }
-            ForEach((snapshot.tiboFeed?.posts ?? []).filter { analysis.evidenceIDs.contains($0.id) }) { post in
+            ForEach((snapshot.tiboFeed?.posts ?? []).filter { analysis.evidenceIDs.contains($0.id) }.sorted {
+              if ($0.id == analysis.announcementEvidenceID) != ($1.id == analysis.announcementEvidenceID) {
+                return $0.id == analysis.announcementEvidenceID
+              }
+              return ($0.publishedAt ?? .distantPast) > ($1.publishedAt ?? .distantPast)
+            }) { post in
               VStack(alignment: .leading, spacing: 5) {
                 Text(post.originalText)
                   .font(.system(size: 12, weight: .semibold))
@@ -102,7 +107,7 @@ struct CodexRadarView: View {
               .background(DashboardColors.faintFill, in: RoundedRectangle(cornerRadius: 10))
             }
             if let date = analysis.analyzedAt {
-              Text("分析完成 · \(radarUpdateTime(date)) · 每 10 分钟检查新动态")
+              Text("分析完成 · \(radarUpdateTime(date)) · \(CodexRadarRefreshPolicy.tiboPollingSummary(at: Date()))")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(DashboardColors.subtleText)
             }
@@ -111,7 +116,7 @@ struct CodexRadarView: View {
           unavailableOverview
         }
         Divider().overlay(DashboardColors.separator)
-        Text("每 10 分钟检查一次发帖与回复 · 仅保留最近 7 天 · 不预测概率")
+        Text("\(CodexRadarRefreshPolicy.tiboPollingSummary(at: Date())) · 仅保留最近 7 天 · 不预测概率")
           .font(.system(size: 12, weight: .semibold))
           .foregroundStyle(DashboardColors.subtleText)
         Link(sourceLabel, destination: sourceURL)
@@ -121,14 +126,16 @@ struct CodexRadarView: View {
   }
 
   private func refreshStatus(at now: Date) -> some View {
+    let paused = CodexRadarRefreshPolicy.isTiboPollingPaused(at: now)
     let healthy = snapshot?.tiboDisplayRefreshIsHealthy(at: now) == true
     let hasFailure = (snapshot?.tiboAnalysisEnabled != false && snapshot?.tiboAnalysisFailure != nil) || (snapshot?.syncState?.consecutiveFailures ?? 0) > 0
-    let title = isLoading ? "正在检查与分析" : (healthy ? "刷新正常" : (hasFailure ? "刷新或分析未成功" : "等待刷新与分析"))
-    let color: Color = isLoading ? palette.weekly : (healthy ? .green : .orange)
+    let route = snapshot?.tiboReadRoute
+    let title = paused ? "Tibo 定时暂停 · 北京时间 21:00 恢复" : isLoading ? "正在检查与分析" : (route?.xState == .notChecked ? "等待 X 检查" : healthy ? (route?.usedBackup == true ? "备用来源读取成功" : route?.xState == .success ? "X 官网读取成功" : "来源读取成功") : (hasFailure ? "刷新或分析未成功" : "等待刷新与分析"))
+    let color: Color = paused ? palette.weekly : isLoading ? palette.weekly : (healthy && route?.xState != .notChecked ? .green : .orange)
     return VStack(alignment: .leading, spacing: 10) {
       HStack(spacing: 9) {
         if isLoading { ProgressView().controlSize(.small) }
-        else { Image(systemName: healthy ? "checkmark.circle.fill" : "exclamationmark.circle.fill") }
+        else { Image(systemName: paused ? "moon.fill" : healthy && route?.xState != .notChecked ? "checkmark.circle.fill" : "exclamationmark.circle.fill") }
         Text(title)
         Spacer()
       }
@@ -136,7 +143,7 @@ struct CodexRadarView: View {
       .foregroundStyle(color)
       HStack(alignment: .top, spacing: 25) {
         VStack(alignment: .leading, spacing: 4) {
-          Text("动态成功刷新").font(.system(size: 12, weight: .semibold))
+          Text("最近成功检查").font(.system(size: 12, weight: .semibold))
           Text(snapshot?.syncState?.lastSuccessAt.map { radarUpdateTime($0) } ?? "尚未成功")
             .font(.system(size: 22, weight: .heavy, design: .rounded)).monospacedDigit()
         }
@@ -147,9 +154,19 @@ struct CodexRadarView: View {
         }
         Spacer(minLength: 0)
       }
-      if let failure = snapshot?.syncState?.failureMessage {
+      if !paused, let failure = snapshot?.syncState?.failureMessage {
         Text(failure).font(.system(size: 12, weight: .medium)).foregroundStyle(.orange)
       }
+      if let latest = snapshot?.tiboFeed?.posts.compactMap(\.publishedAt).max() {
+        Text("最新原帖 · \(radarUpdateTime(latest))").font(.system(size: 12, weight: .semibold))
+      }
+      if let route { Text(route.message).font(.system(size: 12, weight: .medium)).foregroundStyle(route.xState == .success ? Color.secondary : Color.orange) }
+      if let checks = snapshot?.tiboSourceChecks, !checks.isEmpty {
+        Text(checks.map { "\($0.source.label)：\($0.succeeded ? "已读取" : "暂不可用")" }.joined(separator: " · "))
+          .font(.system(size: 11)).fixedSize(horizontal: false, vertical: true)
+      }
+      Text("检查成功表示来源可读；公开来源收录仍可能延迟或遗漏。")
+        .font(.system(size: 11)).foregroundStyle(DashboardColors.subtleText)
     }
     .padding(13)
     .background(color.opacity(0.10), in: RoundedRectangle(cornerRadius: 12))
@@ -216,7 +233,7 @@ struct CodexRadarView: View {
             Text(presence == nil ? "等待公开摘要" : "公开推测时区")
               .font(.system(size: 12, weight: .semibold))
               .foregroundStyle(DashboardColors.subtleText)
-            Text(presence?.evidenceSummaryZh ?? "公开摘要尚未返回时区依据；未获取数据时不推测实时状态。")
+            Text(snapshot?.tiboSourceID == "x-first" ? "优先读取 Tibo 的 X 发帖与回复，受限时自动使用备用来源。此时钟不表示在线状态。" : presence?.evidenceSummaryZh ?? "公开摘要尚未返回时区依据；未获取数据时不推测实时状态。")
               .font(.system(size: 11, weight: .medium))
               .foregroundStyle(DashboardColors.subtleText)
               .lineSpacing(2)
@@ -238,7 +255,7 @@ struct CodexRadarView: View {
         HStack {
           Link(sourceLabel, destination: sourceURL)
           Spacer()
-          Text(snapshot?.tiboSourceID == "x" ? "X 页面实际加载的动态" : "公开源收录的动态")
+          Text(snapshot?.tiboReadRoute?.usedBackup == true ? "本轮使用备用网站" : snapshot?.tiboSourceID == "x-first" || snapshot?.tiboSourceID == "x" ? "X 页面实际加载的动态" : "公开源收录的动态")
         }
         .font(.system(size: 9, weight: .medium))
         .foregroundStyle(DashboardColors.subtleText)
@@ -266,6 +283,11 @@ struct CodexRadarView: View {
               .padding(.horizontal, 7)
               .padding(.vertical, 3)
               .background(palette.weekly.opacity(0.12), in: Capsule())
+            if let label = CodexRadarTiboAttention.label(for: post) {
+              Text(label)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(.orange)
+            }
             Spacer()
             if let date = post.publishedAt {
               Text(radarUpdateTime(date))
@@ -305,7 +327,7 @@ struct CodexRadarView: View {
   }
 
   private func displayPosts(from posts: [CodexRadarTiboPost]) -> [CodexRadarTiboPost] {
-    allTiboPostsExpanded ? posts : Array(posts.prefix(3))
+    allTiboPostsExpanded ? posts : CodexRadarTiboAttention.previewPosts(posts, at: Date())
   }
 
   private func relevanceTint(_ relevance: String) -> Color {

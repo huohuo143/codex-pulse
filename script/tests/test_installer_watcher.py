@@ -67,6 +67,8 @@ watcher_launchctl() {
 watcher_retry_delay() { delay_calls=$((delay_calls + 1)); }
 report_widget_refresh() { :; }
 verify_running_app() { return 0; }
+verify_installed_bundle() { return 0; }
+cleanup_old_installations() { return 0; }
 record_open() {
   [[ $# == 2 && "$1" == '-n' && "$2" == "$DEST_APP" ]] || exit 99
   open_calls=$((open_calls + 1))

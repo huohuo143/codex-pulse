@@ -36,6 +36,7 @@ public struct CodexWidgetResetCredit: Codable, Equatable, Sendable {
 public struct CodexWidgetSnapshot: Codable, Equatable, Sendable {
   public var schemaVersion: Int
   public var updatedAt: Date
+  public var quotaHistory: [CodexWidgetQuotaHistory]? = nil
   public var usageUpdatedAt: Date? = nil
   public var usageValidUntil: Date? = nil
   public var confirmedCreditExpiry: Date? = nil
@@ -207,7 +208,7 @@ public struct CodexWidgetSnapshot: Codable, Equatable, Sendable {
     if let until = result.radarCompletionUntil, until <= now {
       result.radarCompletionUntil = nil
       result.radarLevel = "等待新重置"
-      result.radarSummary = "上一轮确认已展示 24 小时，继续每 10 分钟检查新预告。"
+      result.radarSummary = "上一轮确认已展示 24 小时，继续按北京时间分时段检查新预告。"
     }
     if !usageState(at: now).canDisplayValue {
       result.hourly24 = []; result.daily14 = []; result.topProjects = []; result.topCategories = []
@@ -290,6 +291,7 @@ public struct CodexWidgetSnapshot: Codable, Equatable, Sendable {
     )
     let sample = SourceReadMetadata(source: "示例数据", sampledAt: now, lastAttemptAt: now, lastSuccessAt: now)
     result.quotaRead = sample; result.resetCreditsRead = sample; result.flexibleCreditRead = sample
+    result.quotaHistory = CodexWidgetQuotaHistory.preview(at: now)
     result.usageUpdatedAt = now; result.radarLastSuccessAt = now
     result.cost24Coverage = 100; result.cost7Coverage = 100; result.costMonthCoverage = 100
     return result
@@ -441,7 +443,7 @@ public enum CodexWidgetSnapshotFreshness {
 }
 
 public enum CodexWidgetKind: String, CaseIterable, Sendable {
-  case overview, quota, radar, resetCredits = "reset-credits", tokenSummary = "token-summary", tokenTrend = "token-trend", workload
+  case overview, quota, quotaHistory = "quota-history", radar, resetCredits = "reset-credits", tokenSummary = "token-summary", tokenTrend = "token-trend", workload
   public var identifier: String { "dev.codex.balance-dashboard.codex." + rawValue }
 }
 
@@ -455,6 +457,7 @@ public extension CodexWidgetSnapshot {
       kinds.formUnion([.overview, .tokenSummary, .tokenTrend, .workload])
     }
     if remainingPercent != previous.remainingPercent || usedPercent != previous.usedPercent || resetsAt != previous.resetsAt || fiveHourRemainingPercent != previous.fiveHourRemainingPercent || fiveHourUsedPercent != previous.fiveHourUsedPercent || fiveHourResetsAt != previous.fiveHourResetsAt || showsFiveHourQuota != previous.showsFiveHourQuota || quotaRead != previous.quotaRead { kinds.formUnion([.quota, .overview]) }
+    if quotaHistory != previous.quotaHistory { kinds.insert(.quotaHistory) }
     if radarCompletionUntil != previous.radarCompletionUntil || radarAnnouncementActive != previous.radarAnnouncementActive || radarDeadlineAt != previous.radarDeadlineAt || resetProbability24h != previous.resetProbability24h || radarLevel != previous.radarLevel || radarSummary != previous.radarSummary || radarLastSuccessAt != previous.radarLastSuccessAt || radarEvidenceUpdatedAt != previous.radarEvidenceUpdatedAt || radarEvaluatedAt != previous.radarEvaluatedAt || radarValidUntil != previous.radarValidUntil || radarSyncStatus != previous.radarSyncStatus || radarConsecutiveFailures != previous.radarConsecutiveFailures || radarIsStale != previous.radarIsStale || radarIsUsingCachedFeed != previous.radarIsUsingCachedFeed { kinds.formUnion([.radar, .overview]) }
     if resetCreditsAvailable != previous.resetCreditsAvailable || resetCredits != previous.resetCredits || resetCreditsRead != previous.resetCreditsRead || confirmedCreditExpiry != previous.confirmedCreditExpiry { kinds.formUnion([.resetCredits, .overview]) }
     if rolling24HoursTokens != previous.rolling24HoursTokens || todayTokens != previous.todayTokens || last7DaysTokens != previous.last7DaysTokens || monthTokens != previous.monthTokens || cost24HoursUSD != previous.cost24HoursUSD || cost7DaysUSD != previous.cost7DaysUSD || costMonthUSD != previous.costMonthUSD || cost24Coverage != previous.cost24Coverage || cost7Coverage != previous.cost7Coverage || costMonthCoverage != previous.costMonthCoverage || unpricedModels != previous.unpricedModels || cnyRate != previous.cnyRate { kinds.formUnion([.tokenSummary, .overview]) }

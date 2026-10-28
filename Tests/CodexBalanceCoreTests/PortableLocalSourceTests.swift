@@ -93,7 +93,7 @@ struct PortableLocalSourceTests {
     #expect(Set(decoded.tiboFeed.posts.map(\.id)) == ["123", "124"])
     #expect(decoded.tiboFeed.posts.first(where: { $0.id == "123" })?.originalText == posts[0].text)
     #expect(decoded.tiboFeed.posts.first?.publishedAt == now.addingTimeInterval(-60))
-    #expect(decoded.tiboFeed.updatedAt == now)
+    #expect(decoded.tiboFeed.updatedAt == now.addingTimeInterval(-60))
   }
 
   @Test func xRejectsOtherAuthorsDuplicateLinksStaleFutureAndCredentialURLs() throws {

@@ -49,6 +49,19 @@ public enum QuotaHistoryTrend {
     }
   }
 
+  /// Publish only chart coordinates and segment IDs, scoped by the host to the
+  /// active account. Raw observations and account identifiers stay in the app.
+  public static func widgetHistory(snapshots: [QuotaSnapshot], now: Date = Date()) -> [CodexWidgetQuotaHistory] {
+    QuotaHistoryPeriod.allCases.map { period in
+      let samples = points(snapshots: snapshots, period: period, now: now)
+      return CodexWidgetQuotaHistory(days: period.rawValue, sampleCount: samples.count,
+        points: displayPoints(samples).map {
+          CodexWidgetQuotaPoint(recordedAt: $0.snapshot.recordedAt,
+            remainingPercent: $0.snapshot.remainingPercent, segment: $0.segment)
+        })
+    }
+  }
+
   public static func makeCSV(points: [QuotaHistoryPoint], generatedAt: Date = Date()) -> String {
     let formatter = ISO8601DateFormatter()
     let locale = Locale(identifier: "en_US_POSIX")

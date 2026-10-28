@@ -7,8 +7,8 @@ EXECUTABLE_NAME="CodexSuanliMeter"
 WIDGET_EXECUTABLE_NAME="CodexSuanliWidgets"
 BUNDLE_ID="${CODEX_PULSE_BUNDLE_ID:-dev.codex.balance-dashboard.codex}"
 WIDGET_BUNDLE_ID="$BUNDLE_ID.widgets"
-VERSION="${VERSION:-2.12.31}"
-BUILD_NUMBER="${BUILD_NUMBER:-2159}"
+VERSION="${VERSION:-2.12.41}"
+BUILD_NUMBER="${BUILD_NUMBER:-2169}"
 ARCH="${ARCH:-$(uname -m)}"
 # macOS 13 可运行主应用；桌面小组件只在 macOS 14 及以后提供。发布完整
 # 小组件扩展的独立部署目标保持 macOS 14，不抬高主应用要求。
@@ -177,6 +177,10 @@ cat >"$INFO_PLIST" <<PLIST
 </plist>
 PLIST
 
+if [[ "${CODEX_PULSE_S3_CANDIDATE:-0}" == "1" ]]; then
+  /usr/libexec/PlistBuddy -c "Add :CodexS3SandboxCandidate bool true" "$INFO_PLIST"
+fi
+
 if [[ "$INCLUDE_WIDGETS" == "1" ]]; then
   plutil -lint "$INFO_PLIST" "$WIDGET_CONTENTS/Info.plist" >/dev/null
 else
@@ -209,9 +213,21 @@ if ! /usr/bin/codesign "${codesign_args[@]}" "$APP_BUNDLE" >/dev/null 2>&1 \
   INFO_PLIST="$APP_CONTENTS/Info.plist"
 fi
 
-CODEX_PULSE_BUNDLE_ID="$BUNDLE_ID" VERSION="$VERSION" BUILD_NUMBER="$BUILD_NUMBER" ARCH="$ARCH" \
-  MIN_SYSTEM_VERSION="$MIN_SYSTEM_VERSION" INCLUDE_WIDGETS="$INCLUDE_WIDGETS" \
-  "$ROOT_DIR/script/verify_widget_bundle.sh" "$APP_BUNDLE"
+if [[ "$INCLUDE_WIDGETS" == "1" ]]; then
+  CODEX_PULSE_BUNDLE_ID="$BUNDLE_ID" VERSION="$VERSION" BUILD_NUMBER="$BUILD_NUMBER" ARCH="$ARCH" \
+    MIN_SYSTEM_VERSION="$MIN_SYSTEM_VERSION" INCLUDE_WIDGETS="$INCLUDE_WIDGETS" \
+    "$ROOT_DIR/script/verify_widget_bundle.sh" "$APP_BUNDLE"
+else
+  /usr/bin/plutil -lint "$INFO_PLIST" >/dev/null
+  /usr/bin/codesign --verify --deep --strict "$APP_BUNDLE"
+  [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$INFO_PLIST")" == "$BUNDLE_ID" ]]
+  [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$INFO_PLIST")" == "$VERSION" ]]
+  [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$INFO_PLIST")" == "$BUILD_NUMBER" ]]
+  [[ "$(/usr/bin/lipo -archs "$APP_BINARY")" == "$ARCH" ]]
+  [[ -f "$APP_CONTENTS/Resources/AppIcon.icns" && -f "$APP_CONTENTS/Resources/Zstandard-LICENSE.txt" ]]
+  [[ ! -d "$APP_CONTENTS/PlugIns/CodexSuanliWidgets.appex" ]]
+  echo "Verified main-app-only bundle, version, architecture, resources and signature: $APP_BUNDLE"
+fi
 
 open_app() {
   /usr/bin/open -n "$APP_BUNDLE"

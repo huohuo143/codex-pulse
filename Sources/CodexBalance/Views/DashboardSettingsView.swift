@@ -7,6 +7,8 @@ struct DashboardSettingsView: View {
   var body: some View {
     VStack(spacing: 14) {
       settingsSection("本机账号、模型与 Tibo 来源") { LocalCodexSetupView() }
+      settingsSection("墨水屏 · 小悟 S3 双屏沙箱") { S3SandboxSettingsView() }
+      settingsSection("墨水屏 · 小悟云") { EInkSettingsView(model: store.eInk) }
       settingsSection("iPhone 与 iPad") {
         Text(store.mobileSyncStatus).font(.subheadline)
         Text("移动版选择 iCloud Drive 中的“算力码表 / 移动快照”文件夹，即可查看本机账号额度。同步额度、用量聚合与匿名项目摘要，不包含对话、真实项目名或路径。")
@@ -106,7 +108,7 @@ struct DashboardSettingsView: View {
         Picker("本地额度刷新间隔", selection: $store.refreshIntervalOption) {
           ForEach(RefreshIntervalOption.allCases) { Text($0.title).tag($0) }
         }
-        Text("额度独立刷新，会话用量随新活动更新。窗口隐藏且连续 5 分钟无会话活动时，额度检查自动降至 120 秒；恢复活动或手动刷新后立即检查。Tibo 动态每 10 分钟检查一次，模型分析可在上方启用。")
+        Text("额度独立刷新，会话用量随新活动更新。窗口隐藏且连续 5 分钟无会话活动时，额度检查自动降至 120 秒；恢复活动或手动刷新后立即检查。Tibo 按北京时间分时段每 3–20 分钟检查；12:00–15:00 每 3 分钟；北京时间 16:00–21:00 暂停，21:00 后恢复。模型分析可在上方启用。")
           .font(.caption)
           .foregroundStyle(DashboardColors.subtleText)
         HStack {
@@ -171,7 +173,7 @@ struct DashboardSettingsView: View {
       AppUpdateSettingsView()
 
       settingsSection("macOS 桌面小组件") {
-        Text("共 7 款：Codex 总览、7 天额度、重置雷达、Full reset 权益、Token 汇总、Token 趋势、项目与用途。")
+        Text("共 8 款：Codex 总览、7 天额度、官方额度历史、重置雷达、Full reset 权益、Token 汇总、Token 趋势、项目与用途。")
           .font(.caption)
           .foregroundStyle(DashboardColors.subtleText)
         Toggle("显示 5 小时额度内环", isOn: $store.widgetShowsFiveHourQuota)
@@ -187,7 +189,7 @@ struct DashboardSettingsView: View {
       }
 
       settingsSection("Codex 重置雷达") {
-        Text("每 10 分钟读取 Tibo 发帖与回复，默认无需 X 登录。启用分析后使用当前账号可用模型判断是否有明确重置预告，不预测概率。只保留最近 7 天；区分预告、完成确认和重置卡。")
+        Text("按北京时间分时段每 3–20 分钟读取 Tibo 发帖与回复；北京时间 16:00–21:00 暂停检测。默认无需 X 登录。启用分析后使用当前账号可用模型判断是否有明确重置预告，不预测概率。只保留最近 7 天；区分预告、完成确认和重置卡。")
           .font(.caption)
           .foregroundStyle(DashboardColors.subtleText)
         HStack {
@@ -201,7 +203,7 @@ struct DashboardSettingsView: View {
         Label(store.codexRadarStatusMessage, systemImage: "network")
           .font(.caption)
           .foregroundStyle(DashboardColors.subtleText)
-        Text("每 10 分钟检查；数据源和模型可在上方设置。")
+        Text("按北京时间分时段每 3–20 分钟检查；数据源和模型可在上方设置。")
           .font(.system(size: 10, weight: .medium))
           .foregroundStyle(DashboardColors.subtleText)
       }

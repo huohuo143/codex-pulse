@@ -1,4 +1,5 @@
 import Foundation
+import CodexMobileCore
 #if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif
@@ -29,14 +30,15 @@ public enum CodexRadarError: Error, Equatable, LocalizedError, Sendable {
 public actor CodexRadarService {
   public typealias Fetcher = @Sendable () async throws -> Data
 
-  public static let attributionText = "Codex Radar 公开动态 · 可选本机 Codex 模型分析"
+  public static let attributionText = "公开源：Codex Radar · Tibo Reset · Did Codex Reset；可选本机 Codex 模型分析"
+  private static let publicFeedClient = TiboPublicFeedClient()
   public static let endpointURL = URL(string: "https://codexradar.com/")!
   public static let siteURL = endpointURL
   public static let legacyPublicJSONURL = URL(string: "https://codexradar.com/current.json")!
   public static let fullAPIURL = URL(string: "https://codexradar.com/api/v1/current")!
   public static let stationInsightsURL = URL(string: "https://codexradar.com/api/radar-insights")!
   public static let efficiencyURL = URL(string: "https://codexradar.com/data/intelligence-efficiency.json")!
-  public static let refreshInterval: TimeInterval = 10 * 60
+  public static let refreshInterval: TimeInterval = 3 * 60
   public static let localEvaluationInterval: TimeInterval = 10 * 60
   public static let sourceStaleInterval: TimeInterval = 90 * 60
   public static let publicSummaryModeText = "Codex Radar 公开只读源，无需 API Key 或 X Cookie"
@@ -53,6 +55,7 @@ public actor CodexRadarService {
   public typealias ThreadFetcher = @Sendable (CodexRadarTiboPost) async throws -> String
   private let threadFetcher: ThreadFetcher?
   private let minimumFetchInterval: TimeInterval
+  private let usesAdaptivePolling: Bool
   private let cacheDuration: TimeInterval
   private let historyURL: URL?
   private let usesLegacyPublicSummary: Bool
@@ -73,6 +76,7 @@ public actor CodexRadarService {
     calendarHistoryURL: URL? = nil,
     analyzer: Analyzer? = nil,
     minimumFetchInterval: TimeInterval? = nil,
+    adaptivePolling: Bool? = nil,
     threadFetcher: ThreadFetcher? = nil,
     sourceIdentifier: @escaping @Sendable () -> String = { "public" },
     analysisPreferences: (@Sendable () -> TiboAnalysisPreferences)? = nil
@@ -92,6 +96,7 @@ public actor CodexRadarService {
     self.now = now
     self.cacheDuration = cacheDuration
     self.minimumFetchInterval = minimumFetchInterval ?? (fetcher == nil ? Self.refreshInterval : 0)
+    self.usesAdaptivePolling = adaptivePolling ?? (fetcher == nil && minimumFetchInterval == nil)
     if let analyzer { self.analyzer = analyzer }
     else if fetcher == nil {
       self.analyzer = { posts, date in
@@ -119,12 +124,7 @@ public actor CodexRadarService {
         )
       }
       self.publicPageFetcher = publicPageFetcher ?? {
-        try await CodexRadarService.fetch(
-          url: CodexRadarService.endpointURL,
-          accept: "text/html",
-          cacheBust: true,
-          options: .singleCheck
-        )
+        try await CodexRadarService.fetchPublicTiboPage()
       }
       self.stationInsightsFetcher = stationInsightsFetcher ?? {
         try await CodexRadarService.fetch(
@@ -145,6 +145,9 @@ public actor CodexRadarService {
 
   public func current(force: Bool = false) async throws -> CodexRadarSnapshot {
     let checkedAt = now()
+    let minimumFetchInterval = usesAdaptivePolling
+      ? CodexRadarRefreshPolicy.tiboPollingInterval(at: checkedAt) : self.minimumFetchInterval
+    let effectiveCacheDuration = usesAdaptivePolling ? minimumFetchInterval : cacheDuration
     let requestedSource = sourceIdentifier()
     var storedHistory = loadTiboHistory()
     synchronizeSource(in: &storedHistory)
@@ -152,6 +155,15 @@ public actor CodexRadarService {
     let previousThreadPosts = storedHistory.latestPosts ?? []
     persistTiboHistory(storedHistory)
     resetCalendarArchive.load()
+    // Quiet hours apply to every entry point, including force/retry/resume.
+    // Loading cached state must not reserve a request or freshen its timestamp.
+    if CodexRadarRefreshPolicy.isTiboPollingPaused(at: checkedAt) {
+      var snapshot = cachedSnapshot
+        ?? cachedPage(base: nil, cached: nil, history: storedHistory, at: checkedAt).map(makePublicSnapshot)
+        ?? makeUnavailableSnapshot()
+      snapshot.resetCalendar = resetCalendarArchive.snapshot
+      return reevaluate(snapshot: snapshot, at: checkedAt)
+    }
     if minimumFetchInterval > 0, let attempted = storedHistory.lastAttemptAt,
        checkedAt < attempted.addingTimeInterval(minimumFetchInterval) {
       var snapshot = cachedSnapshot
@@ -181,12 +193,12 @@ public actor CodexRadarService {
     if !force,
        let cachedSnapshot,
        let cachedAt,
-       checkedAt.timeIntervalSince(cachedAt) < cacheDuration {
+       checkedAt.timeIntervalSince(cachedAt) < effectiveCacheDuration {
       return reevaluate(snapshot: cachedSnapshot, at: checkedAt)
     }
 
     // Reserve before the first suspension; manual refresh, resume, overlapping
-    // callers and process restarts share the same persisted ten-minute budget.
+    // callers and process restarts share the persisted time-of-day budget.
     if minimumFetchInterval > 0 {
       storedHistory.lastAttemptAt = checkedAt
       persistTiboHistory(storedHistory)
@@ -221,9 +233,14 @@ public actor CodexRadarService {
     if publicPageFetcher != nil {
       do {
         guard let pageData = try await publicPageData else { throw CodexRadarError.invalidPayload }
-        calendarHTML = pageData
+        let routed = TiboRoutedPage.decode(pageData)
+        storedHistory.readRoute = routed?.route
+        if routed != nil { storedHistory.sourceChecks = nil }
+        let backupOrPage = routed?.backupData ?? pageData
+        if let bundle = try? JSONDecoder().decode(TiboPublicFeedBundle.self, from: backupOrPage), bundle.format == "codex-pulse-tibo-multisource-v1" { storedHistory.sourceChecks = bundle.feed.checks }
+        calendarHTML = CodexRadarPublicPageParser.calendarData(pageData)
         let decoded = try CodexRadarPublicPageParser.decode(pageData, now: checkedAt)
-        if let incomingUpdate = decoded.tiboFeed.updatedAt,
+        if decoded.sourceChecks == nil, decoded.readRoute == nil, let incomingUpdate = decoded.tiboFeed.updatedAt,
            let storedUpdate = storedHistory.feedUpdatedAt,
            incomingUpdate < storedUpdate.addingTimeInterval(-60) {
           calendarHTML = nil
@@ -273,6 +290,8 @@ public actor CodexRadarService {
       storedHistory.lastSuccessAt = completedAt
       storedHistory.feedUpdatedAt = maxDate(storedHistory.feedUpdatedAt, enrichedPage.tiboFeed.updatedAt)
       storedHistory.feedFingerprint = enrichedPage.feedFingerprint ?? storedHistory.feedFingerprint
+      storedHistory.sourceChecks = enrichedPage.sourceChecks
+      storedHistory.readRoute = enrichedPage.readRoute
       storedHistory.consecutiveFailures = 0
       storedHistory.latestPosts = latestPosts
       enrichedPage.tiboFeed.posts = CodexRadarTiboAnalyzer.retained(enrichedPage.tiboFeed.posts, at: checkedAt)
@@ -348,7 +367,7 @@ public actor CodexRadarService {
     guard sourceIdentifier() == requestedSource else {
       return reevaluate(snapshot: makeUnavailableSnapshot(), at: now())
     }
-    if let analyzer, analysisPreferences?().enabled != false,
+    if let analyzer, !CodexRadarRefreshPolicy.isTiboPollingPaused(at: now()), analysisPreferences?().enabled != false,
        pageError == nil, var posts = page?.tiboFeed.posts {
       if let threadFetcher {
         posts = await CodexRadarTiboThread.enrich(posts, previous: previousThreadPosts,
@@ -381,6 +400,8 @@ public actor CodexRadarService {
       persistTiboHistory(storedHistory)
     }
     snapshot.tiboAnalysis = storedHistory.analysis
+    snapshot.tiboSourceChecks = storedHistory.sourceChecks
+    snapshot.tiboReadRoute = storedHistory.readRoute
     snapshot.tiboAnalysisAttemptAt = storedHistory.analysisLastAttemptAt
     snapshot.tiboAnalysisFailure = storedHistory.analysisFailureMessage
     snapshot.tiboAnalysisEnabled = analysisPreferences?().enabled
@@ -397,13 +418,14 @@ public actor CodexRadarService {
     return reevaluate(snapshot: cachedSnapshot, at: now())
   }
 
-  public static func retryDelay(afterConsecutiveFailures failures: Int) -> TimeInterval {
-    refreshInterval
+  public static func retryDelay(afterConsecutiveFailures failures: Int, at now: Date = Date()) -> TimeInterval {
+    CodexRadarRefreshPolicy.tiboResumeDate(at: now)?.timeIntervalSince(now)
+      ?? CodexRadarRefreshPolicy.tiboPollingInterval(at: now)
   }
 
   public static func retryDelay(for sync: CodexRadarSyncState, at now: Date = Date()) -> TimeInterval {
     max(
-      retryDelay(afterConsecutiveFailures: sync.consecutiveFailures),
+      retryDelay(afterConsecutiveFailures: sync.consecutiveFailures, at: now),
       sync.retryNotBefore?.timeIntervalSince(now) ?? 0
     )
   }
@@ -418,11 +440,30 @@ public actor CodexRadarService {
     return try? await fetcher()
   }
   public static func fetchPublicTiboPage() async throws -> Data {
-    try await fetch(url: endpointURL, accept: "text/html", cacheBust: true, options: .singleCheck)
+    let bundle = await publicFeedClient.refresh()
+    return try JSONEncoder().encode(bundle)
+  }
+  public static func fetchXFirstTiboPage(xFetcher: @escaping @Sendable ([String]) async throws -> Data) async throws -> Data {
+    let history = CodexRadarTiboHistoryStore.defaultURL.flatMap { CodexRadarTiboHistoryStore.load(from: $0) }
+    let now = Date()
+    let recent = CodexRadarTiboTimeline.mergedPosts(current: history?.latestPosts ?? [], previous: history?.posts ?? [], now: now)
+      .filter { $0.publishedAt.map { $0 >= now.addingTimeInterval(-86400) } == true }
+      .prefix(10).map(\.id)
+    return try await CodexRadarXFirstSource.fetch(x: { try await xFetcher(recent) }, backup: { try await fetchPublicTiboPage() }, now: now,
+      knownLatest: history?.feedUpdatedAt, knownRecentPostIDs: recent)
   }
   private func synchronizeSource(in history: inout CodexRadarTiboHistory) {
     let source = sourceIdentifier()
     guard (history.sourceID ?? "public") != source else { history.sourceID = source; return }
+    if source == "x-first", ["public", "x"].contains(history.sourceID ?? "public") {
+      // These remain Tibo originals. Retain history and analysis, but explicitly
+      // mark the new route as unchecked until its next budgeted network request.
+      history.sourceID = source
+      history.readRoute = .init(xState: .notChecked, usedBackup: false, backupSucceeded: false)
+      cachedSnapshot = nil; cachedAt = nil
+      persistTiboHistory(history)
+      return
+    }
     // Preserve the shared ten-minute request budget across source changes.
     // Never present cached public-source results as a successful X page read.
     history = CodexRadarTiboHistory(resetAt: history.resetAt, posts: [],
@@ -502,6 +543,8 @@ public actor CodexRadarService {
     history.retainRecent(at: date)
     persistTiboHistory(history)
     snapshot.tiboAnalysis = history.analysis
+    snapshot.tiboSourceChecks = history.sourceChecks
+    snapshot.tiboReadRoute = history.readRoute
     snapshot.tiboAnalysisAttemptAt = history.analysisLastAttemptAt
     snapshot.tiboAnalysisFailure = history.analysisFailureMessage
     snapshot.tiboLatestAnnouncementAt = history.latestAnnouncementAt

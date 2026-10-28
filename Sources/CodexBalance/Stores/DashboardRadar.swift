@@ -71,8 +71,8 @@ extension DashboardStore {
     } else {
       codexRadarRetryTask?.cancel()
       codexRadarRetryTask = nil
-      codexRadarNextSyncAt = snapshot.syncState?.lastAttemptAt?.addingTimeInterval(CodexRadarService.refreshInterval)
-        ?? Date().addingTimeInterval(CodexRadarService.refreshInterval)
+      codexRadarNextSyncAt = CodexRadarRefreshPolicy.nextTiboPollDate(
+        lastAttemptAt: snapshot.syncState?.lastAttemptAt, now: Date())
       if let next = codexRadarNextSyncAt {
         codexRadarRefreshTimer?.fireDate = max(next, Date().addingTimeInterval(1))
       }
@@ -108,6 +108,10 @@ extension DashboardStore {
   }
 
   func updateCodexRadarStatusMessage(_ snapshot: CodexRadarSnapshot) {
+    if CodexRadarRefreshPolicy.isTiboPollingPaused(at: Date()) {
+      codexRadarStatusMessage = CodexRadarRefreshPolicy.tiboPauseMessage
+      return
+    }
     guard let sync = snapshot.syncState else {
       codexRadarStatusMessage = snapshot.probabilityUpdate.map {
         "雷达更新于 \($0.formatted(date: .abbreviated, time: .shortened))"
@@ -121,9 +125,12 @@ extension DashboardStore {
 
   func scheduleCodexRadarRetry(after delay: TimeInterval) {
     codexRadarRetryTask?.cancel()
-    codexRadarNextSyncAt = Date().addingTimeInterval(delay)
+    let next = CodexRadarRefreshPolicy.nextTiboFetchDate(after: Date().addingTimeInterval(delay))
+    codexRadarNextSyncAt = next
+    codexRadarRefreshTimer?.fireDate = next
+    let wait = max(0, next.timeIntervalSinceNow)
     codexRadarRetryTask = Task { [weak self] in
-      try? await Task.sleep(for: .seconds(delay))
+      try? await Task.sleep(for: .seconds(wait))
       guard !Task.isCancelled, let self else { return }
       self.codexRadarRetryTask = nil
       self.refreshCodexRadar(force: true)

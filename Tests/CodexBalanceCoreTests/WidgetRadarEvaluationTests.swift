@@ -34,7 +34,7 @@ struct WidgetRadarEvaluationTests {
     #expect(next.affectedKinds(comparedTo: original) == [.overview, .quota])
     next = original; next.topProjects = [.init(label: "Project", tokens: 4)]
     #expect(next.affectedKinds(comparedTo: original) == [.workload])
-    #expect(original.affectedKinds(comparedTo: nil).count == 7)
+    #expect(original.affectedKinds(comparedTo: nil).count == CodexWidgetKind.allCases.count)
     var restored = original
     restored.usageUpdatedAt = original.updatedAt
     #expect(restored.affectedKinds(comparedTo: original) == [.overview, .tokenSummary, .tokenTrend, .workload])
@@ -76,7 +76,7 @@ struct WidgetRadarEvaluationTests {
     // Snapshot JSON uses millisecond dates; compare deterministic whole seconds.
     let date = Date(timeIntervalSince1970: 1_800_000_000)
     var value = CodexWidgetSnapshot(updatedAt: date)
-    #expect(try await publisher.publish(value).count == 7)
+    #expect(try await publisher.publish(value).count == CodexWidgetKind.allCases.count)
     value.updatedAt = date.addingTimeInterval(20)
     #expect(try await publisher.publish(value).isEmpty)
     #expect(try CodexWidgetSnapshotStore.load(from: file).updatedAt == date)

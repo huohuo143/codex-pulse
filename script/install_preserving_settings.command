@@ -167,15 +167,92 @@ report_widget_refresh() {
 }
 # END APP_QUIESCENCE
 
+# BEGIN OLD_INSTALL_CLEANUP
+# Keep deletion behind the successful install/runtime checks. Only standard
+# installation locations are candidates; data and rollback backups stay intact.
+verify_installed_bundle() {
+  local key expected actual digest
+  /usr/bin/codesign --verify --deep --strict "$DEST_APP" || return 1
+  for key in CFBundleIdentifier CFBundleShortVersionString CFBundleVersion CFBundleExecutable; do
+    case "$key" in
+      CFBundleIdentifier) expected="$BUNDLE_ID" ;;
+      CFBundleShortVersionString) expected="$SOURCE_VERSION" ;;
+      CFBundleVersion) expected="$SOURCE_BUILD" ;;
+      CFBundleExecutable) expected=CodexSuanliMeter ;;
+    esac
+    actual="$(/usr/libexec/PlistBuddy -c "Print :$key" "$DEST_APP/Contents/Info.plist")" || return 1
+    [[ "$actual" == "$expected" ]] || { print -u2 "安装后的应用信息不匹配：$key；未清理旧版。"; return 1; }
+  done
+  digest="$(/usr/bin/shasum -a 256 "$DEST_APP/Contents/MacOS/CodexSuanliMeter")" || return 1
+  [[ "${digest%% *}" == "$SOURCE_SHA256" ]] || { print -u2 '安装后的程序与安装源不一致；未清理旧版。'; return 1; }
+}
+old_install_candidates() {
+  print -rl -- "/Applications/$APP_NAME.app" "$HOME/Applications/$APP_NAME.app"
+}
+unregister_installation() {
+  local app="$1"
+  if [[ -d "$app/Contents/PlugIns/CodexSuanliWidgets.appex" ]]; then
+    /usr/bin/pluginkit -r "$app/Contents/PlugIns/CodexSuanliWidgets.appex" >/dev/null 2>&1 || true
+  fi
+  "$LSREGISTER" -u "$app" >/dev/null 2>&1 || true
+}
+trash_installation() {
+  local app="$1" trash_dir="$HOME/.Trash" trashed
+  [[ ! -L "$trash_dir" ]] || { print -u2 '废纸篓路径为符号链接，未移动旧版。'; return 1; }
+  /bin/mkdir -p -m 700 "$trash_dir" || return 1
+  trashed="$trash_dir/$APP_NAME-旧版-$STAMP-$(/usr/bin/uuidgen).app"
+  /bin/mv -n "$app" "$trashed" || return 1
+  [[ ! -e "$app" && -d "$trashed" ]] || return 1
+  print -r -- "$trashed"
+}
+cleanup_old_installations() {
+  local candidate identifier build trashed
+  [[ "$SOURCE_BUILD" == <-> ]] || { print -u2 '新版 Build 无法比较，未清理旧版。'; return 1; }
+  while IFS= read -r candidate; do
+    [[ -d "$candidate" ]] || continue
+    [[ "${candidate:A}" != "${DEST_APP:A}" ]] || continue
+    [[ ! -L "$candidate" ]] || { print -u2 "旧副本为符号链接，未移动：$candidate"; return 1; }
+    identifier="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$candidate/Contents/Info.plist")" || return 1
+    # A same-named app with a different identifier is a separate product.
+    [[ "$identifier" == "$BUNDLE_ID" ]] || continue
+    build="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$candidate/Contents/Info.plist")" || return 1
+    if [[ "$build" != <-> ]] || (( 10#$build > 10#$SOURCE_BUILD )); then
+      print -u2 "另一路径的版本更高或 Build 无法比较，未卸载：$candidate"
+      return 1
+    fi
+    unregister_installation "$candidate"
+    if ! trashed="$(trash_installation "$candidate")"; then
+      "$LSREGISTER" -f "$candidate" >/dev/null 2>&1 || true
+      print -u2 "新版已运行，但旧版未能移入废纸篓：$candidate；请检查该目录的写入权限。"
+      return 1
+    fi
+    # Moving a bundle can update its registration to the Trash path.
+    unregister_installation "$trashed"
+    print "已卸载旧副本（Build $build）：$candidate"
+    print "旧副本已移入废纸篓：$trashed"
+  done < <(old_install_candidates)
+  # The prior app remains available for explicit rollback, without a second
+  # registered installation competing with the verified new app.
+  [[ ! -d "$PREVIOUS_APP" ]] || unregister_installation "$PREVIOUS_APP"
+  "$LSREGISTER" -f "$DEST_APP" >/dev/null 2>&1 || return 1
+  if [[ -d "$DEST_APP/Contents/PlugIns/CodexSuanliWidgets.appex" ]]; then
+    /usr/bin/pluginkit -a "$DEST_APP/Contents/PlugIns/CodexSuanliWidgets.appex" >/dev/null 2>&1 || return 1
+  fi
+}
+# END OLD_INSTALL_CLEANUP
+
 [[ -d "$SOURCE_APP" ]] || { print -u2 "找不到安装源：$SOURCE_APP"; exit 1; }
 [[ "${SOURCE_APP:A}" != "${DEST_APP:A}" ]] || { print -u2 "安装源与目标不能相同"; exit 1; }
 [[ ! -e "$BACKUP_DIR" ]] || { print -u2 "备份目录已存在，请使用新的目录"; exit 1; }
 /usr/bin/codesign --verify --deep --strict "$SOURCE_APP"
 SOURCE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$SOURCE_APP/Contents/Info.plist")"
 [[ "$SOURCE_ID" == "$BUNDLE_ID" ]] || { print -u2 "安装源不是正式版应用"; exit 1; }
+SOURCE_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$SOURCE_APP/Contents/Info.plist")"
+SOURCE_BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$SOURCE_APP/Contents/Info.plist")"
+[[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$SOURCE_APP/Contents/Info.plist")" == CodexSuanliMeter ]] || { print -u2 '安装源的可执行文件不匹配'; exit 1; }
+SOURCE_SHA256="$(/usr/bin/shasum -a 256 "$SOURCE_APP/Contents/MacOS/CodexSuanliMeter")"
+SOURCE_SHA256="${SOURCE_SHA256%% *}"
 if [[ "${1:-}" == "--check" ]]; then
-  SOURCE_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$SOURCE_APP/Contents/Info.plist")"
-  SOURCE_BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$SOURCE_APP/Contents/Info.plist")"
   print "检查通过：$SOURCE_VERSION / Build $SOURCE_BUILD；签名有效，正式应用标识匹配。"
   print "目标：$DEST_APP"
   print "备份：$BACKUP_DIR"
@@ -284,6 +361,8 @@ if [[ "$WATCHER_RESTORE_FAILED" == 1 ]]; then
   print -u2 "应用已更新并启动，但自动启动服务需要重试。原应用、配置与回滚入口：$BACKUP_DIR"
   exit 1
 fi
+verify_installed_bundle || exit 1
+cleanup_old_installations || exit 1
 report_widget_refresh
 print "安装完成：$DEST_APP"
 print "原应用、配置与回滚入口：$BACKUP_DIR"

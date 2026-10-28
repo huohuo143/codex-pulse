@@ -8,6 +8,7 @@ struct CodexWidgetEntry: TimelineEntry {
   let date: Date
   let snapshot: CodexWidgetSnapshot
   let hasLiveData: Bool
+  var quotaHistoryDays: Int = 7
 }
 
 struct CodexTimelineProvider: TimelineProvider {
@@ -29,7 +30,7 @@ struct CodexTimelineProvider: TimelineProvider {
     completion(Timeline(entries: entries, policy: .after(now.addingTimeInterval(entry.hasLiveData ? 300 : 60))))
   }
 
-  private func loadEntry(usePreviewWhenMissing: Bool) -> CodexWidgetEntry {
+  func loadEntry(usePreviewWhenMissing: Bool) -> CodexWidgetEntry {
     if let snapshot = try? CodexWidgetSnapshotStore.load(
       from: CodexWidgetSnapshotStore.sandboxedWidgetURL()
     ) {

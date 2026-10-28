@@ -14,6 +14,7 @@ let dashboardLogger = Logger(
 
 @MainActor
 final class DashboardStore: ObservableObject {
+  let eInk: EInkDashboardStore
   @Published var status: CodexStatus?
   @Published var exchangeRate: ExchangeRateSnapshot?
   @Published var lastRefresh: Date?
@@ -295,13 +296,14 @@ final class DashboardStore: ObservableObject {
        expiryStore: CreditExpiryLedgerStore = CreditExpiryLedgerStore(),
        budgetStore: ProjectBudgetStore = ProjectBudgetStore(),
        eventStore: ReliabilityEventStore = ReliabilityEventStore()) {
+    eInk = EInkDashboardStore(allowAutomaticSync: startServices)
     if startServices { TiboAnalysisPreferences.migrate() }
     let xSource = LocalXTiboSource()
     xTiboSource = xSource
     codexRadarService = radarService ?? CodexRadarService(publicPageFetcher: {
-      if TiboAnalysisPreferences.load().usesX { return try await xSource.fetch() }
+      if TiboAnalysisPreferences.load().usesX { return try await CodexRadarService.fetchXFirstTiboPage(xFetcher: { ids in try await xSource.fetch(knownPostIDs: ids) }) }
       return try await CodexRadarService.fetchPublicTiboPage()
-    }, sourceIdentifier: { TiboAnalysisPreferences.load().usesX ? "x" : "public" })
+    }, sourceIdentifier: { TiboAnalysisPreferences.load().usesX ? "x-first" : "public" })
     creditExpiryStore = expiryStore
     projectBudgetStore = budgetStore
     reliabilityEventStore = eventStore
@@ -431,11 +433,12 @@ final class DashboardStore: ObservableObject {
       ) { [weak self] _ in
         Task { @MainActor in
           self?.recordRuntimeEvent("radar-auto-cycle")
-          self?.codexRadarNextSyncAt = Date().addingTimeInterval(CodexRadarService.refreshInterval)
           self?.refreshCodexRadar(force: true)
         }
       }
       timer.tolerance = 2
+      timer.fireDate = max(Date().addingTimeInterval(1), CodexRadarRefreshPolicy.nextTiboPollDate(
+        lastAttemptAt: codexRadarSnapshot?.syncState?.lastAttemptAt, now: Date()))
       RunLoop.main.add(timer, forMode: .common)
       codexRadarRefreshTimer = timer
       codexRadarNextSyncAt = timer.fireDate
@@ -473,6 +476,7 @@ final class DashboardStore: ObservableObject {
   }
 
   func stopAutoRefresh() {
+    eInk.suspend()
     codexRadarNetworkMonitor?.cancel()
     codexRadarNetworkMonitor = nil
     codexRadarNetworkRecoveryGate = CodexRadarNetworkRecoveryGate()

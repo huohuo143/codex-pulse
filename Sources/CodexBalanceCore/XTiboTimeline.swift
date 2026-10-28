@@ -3,9 +3,11 @@ import Foundation
 public enum XTiboTimeline {
   public static let profileURL = URL(string: "https://x.com/thsottiaux/with_replies")!
   public struct Post: Codable, Equatable, Sendable {
+    public enum MediaKind: String, Codable, Sendable { case image, video }
     public var url: String
     public var date: String
     public var text: String
+    public var mediaKind: MediaKind? = nil
   }
   public struct Page: Codable, Sendable {
     public var pageURL: String
@@ -33,7 +35,13 @@ public enum XTiboTimeline {
     guard data.count <= 1_000_000 else { throw ReadError.unavailable }
     let page = try JSONDecoder().decode(Page.self, from: data)
     if page.requiresLogin { throw ReadError.loginRequired }
-    guard isProfileURL(URL(string: page.pageURL)), page.posts.count <= 200 else { throw ReadError.wrongPage }
+    let pageURL = URL(string: page.pageURL)
+    let originalPage = pageURL.map { url in
+      url.scheme == "https" && url.host?.lowercased() == "x.com" && url.user == nil && url.password == nil
+        && url.port == nil && url.query == nil && url.fragment == nil
+        && url.path.range(of: #"^/thsottiaux/status/[0-9]+$"#, options: .regularExpression) != nil
+    } ?? false
+    guard isProfileURL(pageURL) || originalPage, page.posts.count <= 200 else { throw ReadError.wrongPage }
     var seen = Set<String>()
     let formatter = ISO8601DateFormatter()
     let fractional = ISO8601DateFormatter(); fractional.formatOptions.insert(.withFractionalSeconds)
@@ -43,7 +51,7 @@ public enum XTiboTimeline {
             url.path.range(of: #"^/thsottiaux/status/[0-9]+$"#, options: .regularExpression) != nil,
             let date = fractional.date(from: item.date) ?? formatter.date(from: item.date),
             date <= now, date >= now.addingTimeInterval(-7 * 86400),
-            !item.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, item.text.count <= 30_000
+            (!item.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || item.mediaKind != nil), item.text.count <= 30_000
       else { return false }
       return seen.insert(url.path).inserted
     }
@@ -60,16 +68,29 @@ public enum XTiboTimeline {
         .replacingOccurrences(of: "<", with: "&lt;").replacingOccurrences(of: ">", with: "&gt;")
         .replacingOccurrences(of: "\"", with: "&quot;").replacingOccurrences(of: "'", with: "&#39;")
     }
-    let rows = valid.map { post in
+    let formatter = ISO8601DateFormatter()
+    let fractional = ISO8601DateFormatter(); fractional.formatOptions.insert(.withFractionalSeconds)
+    let latest = valid.compactMap { fractional.date(from: $0.date) ?? formatter.date(from: $0.date) }.max()!
+    let ordered = valid.sorted { left, right in
+      (fractional.date(from: left.date) ?? formatter.date(from: left.date) ?? .distantPast)
+        > (fractional.date(from: right.date) ?? formatter.date(from: right.date) ?? .distantPast)
+    }
+    let rows = ordered.map { post in
       let id = URL(string: post.url)!.lastPathComponent
+      // Describe the observed absence of a body; never infer what media depicts.
+      let body = post.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        ? (post.mediaKind == .video ? "【仅视频帖：X 无文字正文；视频内容未读取】" : "【仅图片帖：X 无文字正文；图片内容未读取】")
+        : post.text
+      let relevance = CodexRadarTiboAttention.isResetDayAnnouncement(post.text) ? "direct"
+        : CodexRadarTiboAttention.containsResetKeyword(post.text) ? "medium" : "unknown"
       return """
-      <li class="reset-tibo-post" data-tibo-post-id="\(id)" data-reset-relevance="unknown">
+      <li class="reset-tibo-post" data-tibo-post-id="\(id)" data-reset-relevance="\(relevance)">
       <a href="\(escaped(post.url))">Tibo</a><time datetime="\(escaped(post.date))"></time>
-      <p class="reset-tibo-post-original">\(escaped(post.text))</p></li>
+      <p class="reset-tibo-post-original">\(escaped(body))</p></li>
       """
     }.joined()
     return Data("""
-    <section class="desktop-tibo-radar" data-tibo-posts-updated-at="\(ISO8601DateFormatter().string(from: checkedAt))">\(rows)</section>
+    <section class="desktop-tibo-radar" data-tibo-posts-updated-at="\(formatter.string(from: latest))">\(rows)</section>
     """.utf8)
   }
 }

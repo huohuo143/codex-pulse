@@ -56,14 +56,14 @@ struct CodexRadarTests {
   @Test
   func injectedServiceCachesForTenMinutesAndForceBypassesCache() async throws {
     let counter = RadarFetchCounter()
-    let fixedNow = try #require(ISO8601DateFormatter().date(from: "2026-07-15T08:00:00Z"))
+    let fixedNow = try #require(ISO8601DateFormatter().date(from: "2026-07-15T06:00:00Z"))
     let clock = RadarTestClock(fixedNow)
     let service = CodexRadarService(
       fetcher: {
         await counter.increment()
         return Self.fixture
       },
-      now: { clock.now() }
+      now: { clock.now() }, cacheDuration: 10 * 60
     )
 
     _ = try await service.current()
@@ -75,12 +75,12 @@ struct CodexRadarTests {
     #expect(await counter.value == 2)
     _ = try await service.current(force: true)
     #expect(await counter.value == 3)
-    #expect(CodexRadarService.refreshInterval == 10 * 60)
+    #expect(CodexRadarService.refreshInterval == 3 * 60)
   }
 
   @Test
   func serviceUsesPublicSummaryWithoutCredentials() async throws {
-    let service = CodexRadarService(fetcher: { Self.miniProgramDashboardFixture })
+    let service = CodexRadarService(fetcher: { Self.miniProgramDashboardFixture }, now: { Date(timeIntervalSince1970: 0) })
     let snapshot = try await service.current()
     #expect(snapshot.probability24hPercent == 82)
     #expect(CodexRadarService.endpointURL.absoluteString == "https://codexradar.com/")
@@ -97,7 +97,7 @@ struct CodexRadarTests {
     ])
     let service = CodexRadarService(
       fetcher: { await sequence.next() },
-      cacheDuration: 0
+      now: { Date(timeIntervalSince1970: 0) }, cacheDuration: 0
     )
 
     let first = try await service.current()
@@ -110,7 +110,7 @@ struct CodexRadarTests {
 
   @Test
   func serviceMergesNewerHomepageJudgementWithoutChangingOlderProbability() async throws {
-    let now = try #require(ISO8601DateFormatter().date(from: "2026-07-15T12:00:00Z"))
+    let now = try #require(ISO8601DateFormatter().date(from: "2026-07-15T13:00:00Z"))
     let service = CodexRadarService(
       fetcher: { Self.fixture },
       publicPageFetcher: { Self.publicPageFixture },
@@ -144,7 +144,7 @@ struct CodexRadarTests {
   func serviceReportsPublicSummaryAccessFailure() async {
     let denied = CodexRadarService(fetcher: {
       throw CodexRadarError.accessDenied
-    })
+    }, now: { Date(timeIntervalSince1970: 0) })
     await #expect(throws: CodexRadarError.accessDenied) {
       _ = try await denied.current()
     }
@@ -502,11 +502,11 @@ struct CodexRadarTests {
 
   @Test
   func retryBackoffIsBoundedAtNormalRefreshInterval() {
-    #expect(CodexRadarService.retryDelay(afterConsecutiveFailures: 1) == 10 * 60)
-    #expect(CodexRadarService.retryDelay(afterConsecutiveFailures: 2) == 10 * 60)
-    #expect(CodexRadarService.retryDelay(afterConsecutiveFailures: 3) == 10 * 60)
-    #expect(CodexRadarService.retryDelay(afterConsecutiveFailures: 4) == 10 * 60)
-    #expect(CodexRadarService.retryDelay(afterConsecutiveFailures: 20) == 10 * 60)
+    #expect(CodexRadarService.retryDelay(afterConsecutiveFailures: 1, at: ISO8601DateFormatter().date(from: "2026-10-26T03:00:00Z")!) == 10 * 60)
+    #expect(CodexRadarService.retryDelay(afterConsecutiveFailures: 2, at: ISO8601DateFormatter().date(from: "2026-10-26T03:00:00Z")!) == 10 * 60)
+    #expect(CodexRadarService.retryDelay(afterConsecutiveFailures: 3, at: ISO8601DateFormatter().date(from: "2026-10-26T03:00:00Z")!) == 10 * 60)
+    #expect(CodexRadarService.retryDelay(afterConsecutiveFailures: 4, at: ISO8601DateFormatter().date(from: "2026-10-26T03:00:00Z")!) == 10 * 60)
+    #expect(CodexRadarService.retryDelay(afterConsecutiveFailures: 20, at: ISO8601DateFormatter().date(from: "2026-10-26T03:00:00Z")!) == 10 * 60)
   }
 
   @Test
@@ -524,7 +524,7 @@ struct CodexRadarTests {
 
   @Test
   func resumeFetchesOnlyWhenLastSuccessfulTiboCheckIsOlderThanTenMinutes() throws {
-    let now = try #require(ISO8601DateFormatter().date(from: "2026-09-04T08:00:00Z"))
+    let now = try #require(ISO8601DateFormatter().date(from: "2026-09-04T03:00:00Z"))
 
     #expect(CodexRadarRefreshPolicy.shouldFetchAfterResume(lastSuccessAt: nil, now: now))
     #expect(CodexRadarRefreshPolicy.shouldFetchAfterResume(
@@ -742,7 +742,7 @@ struct CodexRadarTests {
   func publicSummaryKeepsSourceAttribution() {
     #expect(CodexRadarService.attributionText.contains("Codex Radar"))
     #expect(CodexRadarService.attributionText.contains("可选本机 Codex 模型"))
-    #expect(CodexRadarService.refreshInterval == 10 * 60)
+    #expect(CodexRadarService.refreshInterval == 3 * 60)
   }
 
   private static let miniProgramDashboardFixture = Data(#"""

@@ -48,6 +48,7 @@ extension DashboardStore {
       quotaHistory = result.history
       quotaForecast = result.forecast
       quotaHistoryStorageMessage = result.storageMessage
+      if servicesEnabled { writeWidgetSnapshotFile() }
       updateRadarQuotaConfirmation(now: now)
       evaluateQuotaAlerts(now: now)
     }

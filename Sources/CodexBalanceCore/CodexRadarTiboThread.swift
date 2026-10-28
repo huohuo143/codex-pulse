@@ -32,10 +32,18 @@ enum CodexRadarTiboThread {
     // Recheck the pending announcement and its deadline even after unrelated
     // posts arrive. Two priority slots leave room for other recent threads.
     var seen = Set<String>()
-    let priorityIDs = ([activeDeadlineID].compactMap { $0 } + activeEvidenceIDs)
+    let resetIDs = CodexRadarTiboAttention.previewPosts(posts, at: now, limit: 1)
+      .filter { CodexRadarTiboAttention.isResetDayAnnouncement($0.originalText)
+        && $0.publishedAt.map { $0 <= now && $0 > now.addingTimeInterval(-86400) } == true }.map(\.id)
+    let priorityIDs = ([activeDeadlineID].compactMap { $0 } + resetIDs + activeEvidenceIDs)
       .filter { seen.insert($0).inserted }.prefix(2)
     let priority = priorityIDs.compactMap { id in posts.firstIndex { $0.id == id } }
-    let candidates = priority + latest.filter { !priority.contains($0) }
+    let focused = CodexRadarTiboAttention.previewPosts(posts, at: now, limit: posts.count)
+      .filter { CodexRadarTiboAttention.label(for: $0) != nil
+        && $0.publishedAt.map { $0 <= now && $0 > now.addingTimeInterval(-86400) } == true }
+      .compactMap { post in posts.firstIndex { $0.id == post.id } }
+    var candidateSet = Set<Int>()
+    let candidates = (priority + focused + latest).filter { candidateSet.insert($0).inserted }
     for i in candidates {
       if let cached = previous.first(where: { $0.id == posts[i].id && $0.originalText == posts[i].originalText }) {
         result[i].threadContext = cached.threadContext
@@ -47,6 +55,8 @@ enum CodexRadarTiboThread {
     // Rotate non-priority threads by their last attempt so one failure cannot
     // starve the remaining replies. Legacy caches have no timestamp and are due.
     let rotated = candidates.filter { !priority.contains($0) }.sorted {
+      let leftFocused = focused.contains($0), rightFocused = focused.contains($1)
+      if leftFocused != rightFocused { return leftFocused }
       let left = result[$0].threadContextAttemptedAt ?? .distantPast
       let right = result[$1].threadContextAttemptedAt ?? .distantPast
       return left == right ? candidates.firstIndex(of: $0)! < candidates.firstIndex(of: $1)! : left < right
@@ -55,7 +65,7 @@ enum CodexRadarTiboThread {
     for i in priority + rotated {
       guard readerURL(for: posts[i]) != nil else { continue }
       if let attempted = result[i].threadContextAttemptedAt,
-         attempted <= now, now.timeIntervalSince(attempted) < CodexRadarService.refreshInterval { continue }
+         attempted <= now, now.timeIntervalSince(attempted) < CodexRadarRefreshPolicy.tiboPollingInterval(at: now) { continue }
       guard requests < 3 else { break }
       requests += 1
       result[i].threadContextAttemptedAt = now

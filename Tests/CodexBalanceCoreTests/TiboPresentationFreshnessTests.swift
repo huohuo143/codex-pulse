@@ -15,21 +15,21 @@ struct TiboPresentationFreshnessTests {
   }
 
   @Test func expiredStatusCannotRemainAnnouncedWhenWidgetHasExpired() throws {
-    let now = Date()
+    let now = ISO8601DateFormatter().date(from: "2026-10-26T11:30:00+08:00")!
     let value = try snapshot(at: now, age: 12 * 60)
     var widget = CodexWidgetSnapshot.preview
-    widget.radarLevel = value.tiboStatusTitle
-    widget.radarSummary = value.tiboStatusSummary
+    widget.radarLevel = value.tiboStatusTitle(at: now)
+    widget.radarSummary = value.tiboStatusSummary(at: now)
     widget.radarLastSuccessAt = value.syncState?.lastSuccessAt
     widget.radarValidUntil = now.addingTimeInterval(-60)
     #expect(!value.tiboRefreshIsHealthy(at: now))
     #expect(widget.effective(at: now).radarLevel != "重置已预告")
-    #expect(value.tiboStatusTitle == "动态已过期")
-    #expect(!value.tiboStatusSummary.contains("OLD_ANNOUNCEMENT"))
+    #expect(value.tiboStatusTitle(at: now) == "动态已过期")
+    #expect(!value.tiboStatusSummary(at: now).contains("OLD_ANNOUNCEMENT"))
   }
   @Test(arguments: [659.999, 660.0, 661.0])
   func mainAndWidgetExpireAtTheSameBoundary(age: TimeInterval) throws {
-    let now = Date(timeIntervalSince1970: 1_800_000_000)
+    let now = ISO8601DateFormatter().date(from: "2026-10-26T11:30:00+08:00")!
     let value = try snapshot(at: now, age: age)
     var widget = CodexWidgetSnapshot.preview
     widget.radarLevel = "重置已预告"

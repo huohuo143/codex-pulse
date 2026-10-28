@@ -35,7 +35,7 @@ struct LocalCodexSetupView: View {
         .font(.caption).foregroundStyle(.secondary)
       Divider()
       Toggle("启用 Tibo 模型分析", isOn: $preferences.enabled)
-      Text("启用后，每十分钟将读取到的 Tibo 公开帖子与回复提交给所选模型，会消耗当前账号额度；API Key 登录按 API 计费。关闭后仍读取动态，不推断是否存在预告。")
+      Text("启用后，按北京时间分时段（3–20 分钟）将读取到的 Tibo 公开帖子与回复提交给所选模型，会消耗当前账号额度；API Key 登录按 API 计费。关闭后仍读取动态，不推断是否存在预告。")
         .font(.caption).foregroundStyle(.secondary)
       Picker("分析模型", selection: $preferences.model) {
         Text("自动使用当前账号默认模型").tag("")
@@ -69,12 +69,12 @@ struct LocalCodexSetupView: View {
       }
       Divider()
       Picker("Tibo 动态来源", selection: $preferences.usesX) {
-        Text("公开源（默认，无需 X 登录）").tag(false)
-        Text("X 官网页面（可选）").tag(true)
+        Text("多公开源（默认，无需 X 登录）").tag(false)
+        Text("X 官网优先，三个网站备用").tag(true)
       }
       Text(preferences.usesX
-        ? "读取 Tibo 的“发帖与回复”页面；X 要求登录时由使用者自行登录。只采集页面实际加载的近期动态，受限或读取失败时明确提示。"
-        : "持续获取公开源收录的 Tibo X 发帖与回复；内置月历只提供旧记录。公开源可能延迟或遗漏，可打开 X 核验原帖，无需默认登录 X。")
+        ? "按北京时间分时段（3–20 分钟）优先读取 X 的发帖与回复。X 要求登录、访问失败或未加载出已知较新动态时，自动启用三个备用网站；下一轮继续尝试 X。界面显示本轮实际来源。"
+        : "北京时间 16:00–21:00 暂停，其余时段按 3–20 分钟间隔交叉读取 Codex Radar、Tibo Reset、Did Codex Reset，按原帖去重。仅使用原文和发布时间，预告由所选模型分析。公开源仍可能延迟或遗漏。")
         .font(.caption).foregroundStyle(.secondary)
       Button("打开 X / 登录并查看 Tibo") { store.xTiboSource.show() }
       Text("X 登录状态仅由本机浏览器组件保存，不从其他浏览器提取 Cookie，不随安装包分发。模型分析不接触 X 登录凭据。")

@@ -47,9 +47,11 @@ public struct CodexRadarTiboAnalysis: Codable, Equatable, Sendable {
 }
 
 public extension CodexRadarSnapshot {
-  static var tiboStatusMaxAge: TimeInterval { 11 * 60 }
+  static var tiboStatusMaxAge: TimeInterval { 21 * 60 }
   var tiboStatusValidUntil: Date? {
-    syncState?.lastSuccessAt?.addingTimeInterval(Self.tiboStatusMaxAge)
+    syncState?.lastSuccessAt.map {
+      CodexRadarRefreshPolicy.nextTiboPollDate(lastAttemptAt: $0, now: $0).addingTimeInterval(60)
+    }
   }
   var tiboStatusTitle: String { tiboStatusTitle(at: Date()) }
   var tiboStatusSummary: String { tiboStatusSummary(at: Date()) }
@@ -90,7 +92,7 @@ public extension CodexRadarSnapshot {
   func tiboStatusSummary(at now: Date) -> String {
     if let completed = resetCompletion(at: now) {
       if now >= completed.date.addingTimeInterval(86400) {
-        return "上一轮确认已展示 24 小时，继续每 10 分钟读取 Tibo 在 X 上的新发帖与回复。"
+        return "上一轮确认已展示 24 小时，继续按北京时间分时段读取 Tibo 在 X 上的新发帖与回复。"
       }
       if completed.isLocal {
         return "本账号官方额度已恢复，周额度周期已重新开始。首次检测到账：北京时间 \(BalanceFormatters.beijingDeadline(completed.date))；从此时展示 24 小时，新预告优先。"
@@ -172,6 +174,8 @@ enum CodexRadarTiboAnalyzer {
     let items: [[String: String]] = originals.map {
       ["id": $0.id, "publishedAt": ISO8601DateFormatter().string(from: $0.publishedAt!),
        "originalText": $0.originalText, "url": $0.url?.absoluteString ?? "",
+       "resetKeyword": CodexRadarTiboAttention.containsResetKeyword($0.originalText) ? "matched" : "absent",
+       "attentionReason": CodexRadarTiboAttention.label(for: $0) ?? "普通动态",
        "threadContext": $0.threadContext ?? "",
        "threadContextCheckedAt": $0.threadContextCheckedAt.map { ISO8601DateFormatter().string(from: $0) } ?? ""]
     }
@@ -180,8 +184,14 @@ enum CodexRadarTiboAnalyzer {
     return """
     你是只读的 Tibo 公开动态分析器。只判断是否有 Codex 重置预告，不预测概率，不给分数。
     同时阅读 Tibo 自己发表的帖子和对别人的回复。输入是最近七天公开源收录的动态，可能不完整。
+    本人原帖、自回复续帖以及对他人的回复具有同等证据地位；不能因为是短回复、回复了别人或没有第三方重点标签就略过。attentionReason 是复核优先级提示，不能代替语义判断。
+    先重点复核所有含 reset/resets/resetting、full reset、banked reset、reset card 的本人原文，再核对 quota、usage/rate limits、refill 和 landing/propagated、by midnight、EOD 等额度、发放及时间线索；这些线索自身不构成重置承诺。
+    对短回复逐项核对：谁在说话、在回复哪条父帖、是承诺/时间补充/完成声明还是抱怨/疑问/否定、指本轮还是历史、指全局重置还是重置卡或一般额度。必须结合可核验的父帖和后续回复理解指代，不能只做关键词匹配；父帖缺失时明确说明无法确认。
+    “Not enough resets”需要重点关注并在结论中解释为提及重置的讨论；若没有进一步明确承诺，不能据此推进预告或完成时间。只有产品发布的 propagated/landing 同样不能借用重置含义。
     按时间顺序区分最近的预告、执行完成、发放重置卡以及无关产品发布。历史预告若已有后续完成确认，不再称为新的待执行预告。
     明确的重置日或将执行重置的肯定表态可以算预告；疑问、愿望、玩笑和含糊暗示不能当成承诺。
+    reset（含大小写变体、resets、resetting）是重点复核关键词。必须读完每条 originalText，尤其末句或 But 后的转折；不能因为开头在谈产品、挑战天数或未来七天就漏掉重置声明。resetKeyword 仅是检索提示，不是承诺或完成依据。
+    “Day 21/ Wonder what happens the remaining seven days. But today is a reset.”、“Rest and reset”、“that's a reset”都是明确重置表态，通常为 announced，不能遗漏；第三方把它们标为 Improvement 也不能覆盖原文。“Not enough resets”等抱怨、否定句、疑问和引用他人观点须结合语境，不能仅凭关键词判定预告或 completed。
     时间回复若缺少可核验的父帖关系，不能单凭相邻或同一时刻发布就补出重置含义。保留 PST/PT 等原文时区的歧义，不捏造确定截止点。
     threadContext 是该帖公开 X 线程的原始页面文本，可据其中链接和回复层级核验父帖关系；第三方回复不是 Tibo 的承诺。若时间回复的父帖明确属于本轮重置，可结合父帖判定语义，但 sourceQuote 和时区仍须逐字来自该时间回复 originalText。线程中的其他产品名不应掩盖父帖明确的 reset day 表态。
     threadContextCheckedAt 是该线程最近一次成功读取时间；为空或较旧时属于历史上下文，只可辅助核验关系，不代表本轮重新读取，也不能据此断言不存在后续回复。公开源及线程都可能不完整。

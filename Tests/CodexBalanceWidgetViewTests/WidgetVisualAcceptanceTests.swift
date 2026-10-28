@@ -5,15 +5,15 @@ import Testing
 import CodexBalanceCore
 @testable import CodexSuanliWidgets
 
-@Suite("Seven widget visual acceptance", .serialized)
+@Suite("Widget visual acceptance", .serialized)
 struct WidgetVisualAcceptanceTests {
   @Test(.enabled(if: ProcessInfo.processInfo.environment["CODEX_PULSE_RENDER_DIR"] != nil))
-  @MainActor func renderSevenKindsWithFreshAndExpiredData() throws {
+  @MainActor func renderAllKindsWithFreshAndExpiredData() throws {
     let folder = URL(fileURLWithPath: ProcessInfo.processInfo.environment["CODEX_PULSE_RENDER_DIR"]!)
     try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
     for scheme in [ColorScheme.light, .dark] {
       for kind in CodexWidgetKind.allCases {
-        let families: [WidgetFamily] = [.overview, .tokenTrend, .workload].contains(kind) ? [.systemMedium, .systemLarge] : [.systemSmall, .systemMedium]
+        let families: [WidgetFamily] = [.overview, .quotaHistory, .tokenTrend, .workload].contains(kind) ? [.systemMedium, .systemLarge] : [.systemSmall, .systemMedium]
         for family in families {
           let now = Date(); let snapshot = CodexWidgetSnapshot.preview.effective(at: now)
           let entry = CodexWidgetEntry(date: now, snapshot: snapshot, hasLiveData: true)
@@ -37,7 +37,7 @@ struct WidgetVisualAcceptanceTests {
       try render(view(.overview, entry), family: .systemLarge, scheme: scheme,
         file: folder.appendingPathComponent("widget-overview-partial-\(scheme).png"))
     }
-    print("VISUAL_WIDGET rendered=46 output=\(folder.path)")
+    print("VISUAL_WIDGET rendered=52 output=\(folder.path)")
   }
   @Test(.enabled(if: ProcessInfo.processInfo.environment["CODEX_PULSE_RENDER_DIR"] != nil))
   @MainActor func renderProminentAnnouncementDeadlineAndCompletion() throws {
@@ -70,6 +70,7 @@ struct WidgetVisualAcceptanceTests {
     switch kind {
     case .overview: AnyView(CodexOverviewWidgetView(entry: entry))
     case .quota: AnyView(QuotaWidgetView(entry: entry))
+    case .quotaHistory: AnyView(QuotaHistoryWidgetView(entry: entry))
     case .radar: AnyView(RadarWidgetView(entry: entry))
     case .resetCredits: AnyView(ResetCreditsWidgetView(entry: entry))
     case .tokenSummary: AnyView(TokenSummaryWidgetView(entry: entry))

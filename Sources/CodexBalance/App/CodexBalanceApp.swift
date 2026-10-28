@@ -4,13 +4,22 @@ import SwiftUI
 @main
 struct CodexBalanceApp: App {
   @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-  @StateObject private var store = DashboardStore()
+  @StateObject private var store = DashboardStore(startServices: !S3DualScreenContract.isCandidateBuild)
 
   var body: some Scene {
     WindowGroup(AppInfo.appName, id: "main") {
-      ContentView()
+      if S3DualScreenContract.isCandidateBuild {
+        ScrollView {
+          VStack(alignment: .leading, spacing: 14) {
+            Text("小悟 S3 双屏 · 沙箱候选版").font(.title2).bold()
+            S3SandboxSettingsView()
+          }.padding(24)
+        }.frame(width: 880, height: 880)
+      } else {
+        ContentView()
         .environmentObject(store)
         .defaultAppStorage(PulsePreferences.shared)
+      }
     }
     .windowResizability(.contentSize)
     .commands {

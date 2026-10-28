@@ -1,4 +1,5 @@
 import Foundation
+import CodexMobileCore
 
 struct CodexRadarTiboHistory: Codable, Sendable {
   var resetAt: Date?
@@ -20,6 +21,8 @@ struct CodexRadarTiboHistory: Codable, Sendable {
   var latestAnnouncementAt: Date? = nil
   var announcementBoundaryVersion: Int? = nil
   var sourceID: String? = nil
+  var readRoute: TiboReadRoute? = nil
+  var sourceChecks: [TiboSourceCheck]? = nil
 
   mutating func retainRecent(at now: Date) {
     posts = CodexRadarTiboAnalyzer.retained(posts, at: now)

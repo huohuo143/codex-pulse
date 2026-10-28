@@ -6,6 +6,7 @@ import Testing
 @Suite("Dashboard radar reconnection")
 @MainActor
 struct DashboardRadarRecoveryTests {
+  private var testNow: Date { ISO8601DateFormatter().date(from: "2026-10-07T03:02:01Z")! }
   @Test
   func quotaArrivalUpdatesFloatingStateAndSurvivesOldRadarRefreshUntilAccountChanges() throws {
     let now = Date(), arrival = now.addingTimeInterval(-600)
@@ -48,8 +49,8 @@ struct DashboardRadarRecoveryTests {
     #expect(store.codexRadarNextSyncAt != nil)
 
     await source.recover()
-    store.handleCodexRadarNetworkUpdate(isAvailable: false)
-    store.handleCodexRadarNetworkUpdate(isAvailable: true)
+    store.handleCodexRadarNetworkUpdate(isAvailable: false, now: testNow)
+    store.handleCodexRadarNetworkUpdate(isAvailable: true, now: testNow)
     await waitForRadar(store)
     #expect(await source.fetchCount == 3)
     #expect(store.codexRadarSnapshot?.syncState?.consecutiveFailures == 0)
@@ -65,8 +66,8 @@ struct DashboardRadarRecoveryTests {
     defer { store.stopAutoRefresh() }
     store.refreshCodexRadar(force: true)
     await waitForRadar(store)
-    store.handleCodexRadarNetworkUpdate(isAvailable: true)
-    store.handleCodexRadarNetworkUpdate(isAvailable: true)
+    store.handleCodexRadarNetworkUpdate(isAvailable: true, now: testNow)
+    store.handleCodexRadarNetworkUpdate(isAvailable: true, now: testNow)
     await waitForRadar(store)
     #expect(await source.fetchCount == 1)
   }
@@ -84,8 +85,8 @@ struct DashboardRadarRecoveryTests {
     let heldUntil = try #require(store.codexRadarSnapshot?.syncState?.retryNotBefore)
     #expect(store.codexRadarNextSyncAt.map { $0 >= heldUntil.addingTimeInterval(-1) } == true)
     await source.recover()
-    store.handleCodexRadarNetworkUpdate(isAvailable: false)
-    store.handleCodexRadarNetworkUpdate(isAvailable: true)
+    store.handleCodexRadarNetworkUpdate(isAvailable: false, now: testNow)
+    store.handleCodexRadarNetworkUpdate(isAvailable: true, now: testNow)
     store.refreshCodexRadar(force: true)
     await waitForRadar(store)
     #expect(await source.fetchCount == 2)
@@ -95,7 +96,8 @@ struct DashboardRadarRecoveryTests {
   private func makeStore(source: DashboardRadarTestSource) -> DashboardStore {
     DashboardStore(startServices: false, radarService: CodexRadarService(
       fetcher: { throw CodexRadarError.server(503) },
-      publicPageFetcher: { try await source.fetch() }
+      publicPageFetcher: { try await source.fetch() },
+      now: { ISO8601DateFormatter().date(from: "2026-10-07T03:02:01Z")! }
     ))
   }
 

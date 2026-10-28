@@ -172,7 +172,8 @@ struct CodexRadarConnectionTests {
   func coldStartFailuresReturnHonestStatusAndIncreasingBackoff() async throws {
     let service = CodexRadarService(
       fetcher: { throw CodexRadarError.server(503) },
-      publicPageFetcher: { throw URLError(.notConnectedToInternet) }
+      publicPageFetcher: { throw URLError(.notConnectedToInternet) },
+      now: { Date(timeIntervalSince1970: 0) }
     )
     for failureCount in 1...3 {
       let snapshot = try await service.current(force: true)
@@ -198,7 +199,8 @@ struct CodexRadarConnectionTests {
       publicPageFetcher: {
         await probe.pageStarted()
         return data
-      }
+      },
+      now: { ISO8601DateFormatter().date(from: "2026-10-07T03:02:01Z")! }
     )
     _ = try await service.current(force: true)
     #expect(await probe.pageWasConcurrent)

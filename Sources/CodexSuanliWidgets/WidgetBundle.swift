@@ -2,10 +2,12 @@ import SwiftUI
 import WidgetKit
 
 @main
+@available(macOS 14.0, *)
 struct CodexSuanliWidgetBundle: WidgetBundle {
   var body: some Widget {
     CodexOverviewWidget()
     QuotaWidget()
+    QuotaHistoryWidget()
     RadarWidget()
     ResetCreditsWidget()
     TokenSummaryWidget()
@@ -38,6 +40,22 @@ private struct QuotaWidget: Widget {
     .configurationDisplayName("Codex 额度")
     .description("显示 7 天额度外环；可在主 App 中开启 5 小时橙色内环。")
     .supportedFamilies([.systemSmall, .systemMedium])
+    .contentMarginsDisabled()
+  }
+}
+
+@available(macOS 14.0, *)
+private struct QuotaHistoryWidget: Widget {
+  let kind = "dev.codex.balance-dashboard.codex.quota-history"
+
+  var body: some WidgetConfiguration {
+    AppIntentConfiguration(kind: kind, intent: QuotaHistoryWidgetConfiguration.self,
+      provider: QuotaHistoryTimelineProvider()) { entry in
+      QuotaHistoryWidgetView(entry: entry)
+    }
+    .configurationDisplayName("趋势（官方额度历史）")
+    .description("查看官方 7 天剩余额度历史；编辑小组件可选择 24 小时、7 天或 30 天。")
+    .supportedFamilies([.systemMedium, .systemLarge])
     .contentMarginsDisabled()
   }
 }

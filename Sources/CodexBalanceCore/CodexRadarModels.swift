@@ -1,6 +1,9 @@
 import Foundation
+import CodexMobileCore
 
 public struct CodexRadarSnapshot: Equatable, Decodable, Sendable {
+  public var tiboReadRoute: TiboReadRoute? = nil
+  public var tiboSourceChecks: [TiboSourceCheck]? = nil
   public var schemaVersion: String?
   public var service: String?
   public var type: String?

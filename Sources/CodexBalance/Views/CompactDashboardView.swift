@@ -747,7 +747,7 @@ private struct CompactDashboardContent: View {
         Text(BalanceFormatters.beijingDeadline(deadline, compact: true))
           .font(.system(size: mini ? 22 : 26, weight: .heavy, design: .rounded)).monospacedDigit()
       } else {
-        Text(radarAnnounced ? "等待到账确认 · 尚无明确期限" : "每 10 分钟检查新预告")
+        Text(radarAnnounced ? "等待到账确认 · 尚无明确期限" : CodexRadarRefreshPolicy.tiboPollingSummary(at: now))
           .font(.system(size: mini ? 10 : 11, weight: .bold))
       }
     }

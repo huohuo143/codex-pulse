@@ -81,11 +81,15 @@ public enum MobileFreshness: String, Sendable {
     switch self {
     case .fresh: return "数据已更新"
     case .cached: return "上次采样 · 等待更新"
-    case .expired: return "数据已过期"
+    case .expired: return "上次记录 · 等待同步"
     case .waitingForReset: return "等待新周期数据"
     case .unavailable: return "暂无额度数据"
     }
   }
+
+  /// A source record remains useful after an idle period, but its timestamp and
+  /// stale status must remain visible. Reset boundaries are handled separately.
+  public var canDisplayValue: Bool { self == .fresh || self == .cached || self == .expired }
 }
 
 public struct MobileSourceRead: Codable, Equatable, Sendable {
@@ -127,7 +131,7 @@ public struct MobileQuotaWindow: Codable, Equatable, Sendable, Identifiable {
   }
   public func displayRemaining(read: MobileSourceRead, at now: Date) -> Double? {
     switch read.state(at: now, resetsAt: resetsAt) {
-    case .fresh, .cached: return remainingPercent
+    case .fresh, .cached, .expired: return remainingPercent
     default: return nil
     }
   }

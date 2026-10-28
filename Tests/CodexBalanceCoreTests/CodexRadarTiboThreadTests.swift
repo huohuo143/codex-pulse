@@ -5,7 +5,7 @@ import Testing
 @Suite("Tibo public reply context")
 struct CodexRadarTiboThreadTests {
   func post(_ id: String = "123") -> CodexRadarTiboPost {
-    .init(id: id, url: URL(string: "https://x.com/thsottiaux/status/\(id)"), publishedAt: Date(timeIntervalSince1970: 1792652154), relevance: "direct", relevanceLabel: "", originalText: "Lands tomorrow before 10am PST.", translationZh: nil, analysisZh: nil)
+    .init(id: id, url: URL(string: "https://x.com/thsottiaux/status/\(id)"), publishedAt: Date(timeIntervalSince1970: 1792637754), relevance: "direct", relevanceLabel: "", originalText: "Lands tomorrow before 10am PST.", translationZh: nil, analysisZh: nil)
   }
   @Test func validatesTargetAndKeepsParentRelationshipInModelInput() throws {
     var p = post()
@@ -41,7 +41,7 @@ struct CodexRadarTiboThreadTests {
   }
 
   @Test func unchangedOriginalStillRefreshesLaterRepliesAfterTenMinutes() async throws {
-    let now = Date(timeIntervalSince1970: 1792653000)
+    let now = Date(timeIntervalSince1970: 1792638600)
     let p = post()
     let first = await CodexRadarTiboThread.enrich([p], previous: [], at: now, fetcher: { _ in "Original announcement" })
     // Exercise persisted timestamps, including the ISO date strategy used by history.
@@ -62,7 +62,7 @@ struct CodexRadarTiboThreadTests {
   }
 
   @Test func failedRefreshPreservesDeadlineContextWithoutAdvancingSuccess() async {
-    let now = Date(timeIntervalSince1970: 1792653000)
+    let now = Date(timeIntervalSince1970: 1792638600)
     let first = await CodexRadarTiboThread.enrich([post()], previous: [], at: now, fetcher: { _ in "Verified reset parent and deadline" })
     let failed = await CodexRadarTiboThread.enrich([post()], previous: first, activeDeadlineID: "123", at: now.addingTimeInterval(600), fetcher: { _ in
       throw CodexRadarError.server(503)
@@ -73,23 +73,23 @@ struct CodexRadarTiboThreadTests {
   }
 
   @Test func pendingEvidenceIsRefreshedOutsideLatestSixAndOthersRotate() async {
-    let now = Date(timeIntervalSince1970: 1792653000)
+    let now = Date(timeIntervalSince1970: 1792638600)
     var old = post("90"); old.publishedAt = now.addingTimeInterval(-86400)
     var deadline = old; deadline.id = "91"; deadline.url = URL(string: "https://x.com/thsottiaux/status/91")
     let posts = (1...8).map { post(String($0)) } + [old, deadline]
     var previous: [CodexRadarTiboPost] = []
-    for round in 0..<6 {
+    for round in 0..<8 {
       let date = now.addingTimeInterval(Double(round) * 600)
       previous = await CodexRadarTiboThread.enrich(posts, previous: previous, activeDeadlineID: "91", activeEvidenceIDs: ["91", "90"], at: date, fetcher: { p in "Updated thread \(p.id)" })
       #expect(previous.filter { $0.threadContextCheckedAt == date }.count == 3)
       #expect(previous.first { $0.id == "90" }?.threadContextCheckedAt == date)
       #expect(previous.first { $0.id == "91" }?.threadContextCheckedAt == date)
     }
-    #expect(previous.filter { $0.threadContext != nil }.count == 8)
+    #expect(previous.filter { $0.threadContext != nil }.count == 10)
   }
 
   @Test func legacyContextWithoutTimestampIsRechecked() async {
-    let now = Date(timeIntervalSince1970: 1792653000)
+    let now = Date(timeIntervalSince1970: 1792638600)
     var cached = post(); cached.threadContext = "Old indefinitely cached context"
     let result = await CodexRadarTiboThread.enrich([post()], previous: [cached], at: now, fetcher: { _ in "New public reply" })
     #expect(result.first?.threadContext == "New public reply")
