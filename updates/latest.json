@@ -1,41 +1,41 @@
 {
-  "tag_name": "v2.12.31",
-  "name": "Codex 脉动 2.12.31 · macOS · 重置到账与倒计时修复",
-  "body": "# Codex 脉动 2.12.31 / Build 2159\n\n修复官方周额度已恢复，重置提示却被后续普通动态留在“重置已预告”的问题。\n\n- 重置预告使用独立的原帖依据；分析引用中的普通产品更新和历史完成声明不再推进预告周期。升级时自动校正旧缓存中的错误边界。\n- 当前账号确认到账后，主界面、悬浮框和雷达/总览小组件统一显示“重置已落地”，并沿用首次检测到账起算的 24 小时倒计时。刷新、重启及同轮稍后的公开确认不延长；真正的新预告优先，到期等待下一轮。\n- 来源刷新状态与到账事实分别显示；暂时断网或模型失败不抹去已核实到账，也不伪造刷新成功。\n- Mac 移动快照在重置状态变化后立即发布，稳定数据继续合并写入。发布时刻不会替换原始数据采样时刻；移动界面仍受 iCloud 与系统调度影响。\n- 安装器先核对并退出旧主程序与扩展，保留应用、设置及记录备份，并提供恢复入口。安装后报告系统接受小组件刷新的情况。\n- 常用构建入口增加重置相关回归检查，覆盖旧缓存、新预告、重启、未来时间、倒计时边界及同步限流。\n\n安装包：Apple Silicon arm64。主应用 macOS 13+；桌面小组件 macOS 14+。ad-hoc 签名，未公证。\n\n本次仅发布 Mac 安装包。Windows 继续使用 [2.12.29 / Build 2157](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.29)。移动端尚未通过本仓库公开分发安装包。\n\n[安装与升级](https://github.com/huohuo143/codex-pulse/blob/v2.12.31/docs/INSTALL_UPGRADE_2.12.31.md) · [验证范围](https://github.com/huohuo143/codex-pulse/blob/v2.12.31/docs/VALIDATION_2.12.31.md)\n",
-  "html_url": "https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.31",
-  "published_at": "2026-10-24T02:40:27Z",
+  "tag_name": "v2.12.41",
+  "name": "Codex 脉动 2.12.41 · macOS · 分时段检测",
+  "body": "# Codex 脉动 2.12.41 / build 2169\n\n此 Mac 版本在 2.12.31 的基础上改进 Tibo 公开动态读取、重置识别和额度历史小组件。\n\n- 优先读取 X 公开动态，必要时补读线程并使用备用来源；对纯媒体帖标明内容未读取。\n- 重置相关原帖和回复优先展示，并区分预告、实际到账与普通讨论；关键词本身不作为到账证据。\n- 北京时间 12:00–15:00 每 3 分钟检查，16:00–21:00 暂停，其余时段按固定表每 8–20 分钟检查。跨时段及重启保留请求预算。\n- 新增官方额度历史小组件，界面及小组件的数据新鲜度随检查时段调整。\n\n安装包适用于 Apple Silicon，主程序要求 macOS 13 或更高，小组件要求 macOS 14 或更高。安装包采用 ad-hoc 签名，未公证。X 登录、网络、休眠及页面覆盖范围可能影响动态读取。\n\n161 项相关回归及 26 项安装器检查通过；本机已验证 21 点的 20 分钟排程，连续 24 小时及长期休眠尚未验证。\n\n本次提供 Mac 安装包。Windows 继续使用 [2.12.29](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.29)；鸿蒙当前是本人设备测试包，未提供面向其他设备的通用安装包。\n\n[安装与升级](https://github.com/huohuo143/codex-pulse/blob/v2.12.41/docs/INSTALL_UPGRADE_2.12.41.md) · [验证范围](https://github.com/huohuo143/codex-pulse/blob/v2.12.41/docs/VALIDATION_2.12.41.md)\n",
+  "html_url": "https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.41",
+  "published_at": "2026-10-28T03:22:34Z",
   "draft": false,
   "prerelease": false,
   "schemaVersion": 1,
   "assets": [
     {
-      "name": "Codex-Pulse-v2.12.31-build2159-20261024-arm64.dmg",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.31/Codex-Pulse-v2.12.31-build2159-20261024-arm64.dmg",
-      "size": 7924568,
+      "name": "Codex-Pulse-v2.12.41-build2169-20261028-arm64.dmg",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.41/Codex-Pulse-v2.12.41-build2169-20261028-arm64.dmg",
+      "size": 8591147,
       "state": "uploaded"
     },
     {
-      "name": "Codex-Pulse-v2.12.31-build2159-20261024-arm64.dmg.sha256",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.31/Codex-Pulse-v2.12.31-build2159-20261024-arm64.dmg.sha256",
+      "name": "Codex-Pulse-v2.12.41-build2169-20261028-arm64.dmg.sha256",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.41/Codex-Pulse-v2.12.41-build2169-20261028-arm64.dmg.sha256",
       "size": 116,
       "state": "uploaded"
     },
     {
-      "name": "INSTALL_UPGRADE_2.12.31.md",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.31/INSTALL_UPGRADE_2.12.31.md",
+      "name": "INSTALL_UPGRADE_2.12.41.md",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.41/INSTALL_UPGRADE_2.12.41.md",
       "size": 1214,
       "state": "uploaded"
     },
     {
-      "name": "RELEASE_2.12.31.md",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.31/RELEASE_2.12.31.md",
-      "size": 1764,
+      "name": "RELEASE_2.12.41.md",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.41/RELEASE_2.12.41.md",
+      "size": 856,
       "state": "uploaded"
     },
     {
-      "name": "VALIDATION_2.12.31.md",
-      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.31/VALIDATION_2.12.31.md",
-      "size": 1565,
+      "name": "VALIDATION_2.12.41.md",
+      "browser_download_url": "https://github.com/huohuo143/codex-pulse/releases/download/v2.12.41/VALIDATION_2.12.41.md",
+      "size": 519,
       "state": "uploaded"
     }
   ]
