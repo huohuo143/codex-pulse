@@ -27,6 +27,10 @@ struct AppUpdateSettingsView: View {
           .font(.caption)
           .foregroundStyle(DashboardColors.subtleText)
 
+        Label("保留侧栏：请使用包含侧栏功能的更新包，并运行包内的保留设置安装器。直接替换应用时无法检查兼容性。", systemImage: "sidebar.left")
+          .font(.caption)
+          .foregroundStyle(DashboardColors.subtleText)
+
         Divider().overlay(DashboardColors.separator)
 
         HStack(spacing: 10) {

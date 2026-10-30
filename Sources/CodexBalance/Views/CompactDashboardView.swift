@@ -16,6 +16,7 @@ private struct CompactDashboardContent: View {
   let refreshTick: Date
   private var now: Date { Date() }
   @EnvironmentObject private var store: DashboardStore
+  @ObservedObject private var api = OpenAIAPIUsageStore.shared
   @Environment(\.dashboardAppearance) private var appearance
   @Environment(\.colorScheme) private var colorScheme
 
@@ -36,7 +37,7 @@ private struct CompactDashboardContent: View {
   }
   private var primaryQuotaMetric: FloatingPanelMetric? { activeQuotaMetrics.first }
   private var secondaryQuotaMetric: FloatingPanelMetric? { activeQuotaMetrics.dropFirst().first }
-  private var fiveHourTint: Color { .orange }
+  private var fiveHourTint: Color { QuotaRingStyle.color(for: store.fiveHour?.remainingPercent) }
   private var resetProbabilityText: String { store.codexRadarSnapshot?.tiboStatusTitle(at: now) ?? "等待动态" }
   private var resetProbabilityTint: Color { store.palette.weekly }
 
@@ -217,6 +218,7 @@ private struct CompactDashboardContent: View {
       }
       if shows(.resetRadar) { resetRadarRow }
       if shows(.resetCredits) { resetCreditsCard }
+      if shows(.apiUsage) { apiUsageRow }
     }
   }
 
@@ -228,22 +230,25 @@ private struct CompactDashboardContent: View {
       if shows(.rolling24Tokens) { verticalRollingUsage }
       if shows(.resetRadar) { resetRadarRow }
       if shows(.resetCredits) { resetCreditsCard }
+      if shows(.apiUsage) { apiUsageRow }
     }
   }
 
   private var circleLayout: some View {
-    let weeklyProgress = max(0.008, min(1, (store.weekly?.remainingPercent ?? 0) / 100))
-    let fiveHourProgress = max(0.008, min(1, (store.fiveHour?.remainingPercent ?? 0) / 100))
+    let weeklyProgress = QuotaRingStyle.progress(for: store.weekly?.remainingPercent)
+    let fiveHourProgress = QuotaRingStyle.progress(for: store.fiveHour?.remainingPercent)
+    let weeklyColor = QuotaRingStyle.color(for: store.weekly?.remainingPercent)
+    let fiveHourColor = QuotaRingStyle.color(for: store.fiveHour?.remainingPercent)
     let displaysBoth = shows(.weeklyQuota) && shows(.fiveHourQuota)
     let ringWidth: CGFloat = mini ? 10 : 13
-    let diameter: CGFloat = mini ? 116 : 148
+    let diameter: CGFloat = shows(.apiUsage) ? (mini ? 162 : 200) : (mini ? 116 : 148)
     return ZStack {
       if shows(.weeklyQuota) {
         Circle()
           .stroke(DashboardColors.track, lineWidth: ringWidth)
         Circle()
           .trim(from: 0, to: weeklyProgress)
-          .stroke(store.palette.weekly, style: StrokeStyle(lineWidth: ringWidth, lineCap: .round))
+          .stroke(weeklyColor, style: StrokeStyle(lineWidth: ringWidth, lineCap: .butt))
           .rotationEffect(.degrees(-90))
       }
       if shows(.fiveHourQuota) {
@@ -254,18 +259,18 @@ private struct CompactDashboardContent: View {
           .frame(width: innerDiameter, height: innerDiameter)
         Circle()
           .trim(from: 0, to: fiveHourProgress)
-          .stroke(fiveHourTint, style: StrokeStyle(lineWidth: innerWidth, lineCap: .round))
+          .stroke(fiveHourColor, style: StrokeStyle(lineWidth: innerWidth, lineCap: .butt))
           .rotationEffect(.degrees(-90))
           .frame(width: innerDiameter, height: innerDiameter)
       }
       VStack(spacing: activeMetrics.count >= 4 ? 1 : (mini ? 2 : 4)) {
         if displaysBoth {
-          circleMetric("7天", quotaPercentText(.weeklyQuota), tint: store.palette.weekly)
-          circleMetric("5h", quotaPercentText(.fiveHourQuota), tint: fiveHourTint)
+          circleMetric("7天", quotaPercentText(.weeklyQuota), tint: weeklyColor)
+          circleMetric("5h", quotaPercentText(.fiveHourQuota), tint: fiveHourColor)
         } else if let primaryQuotaMetric {
           Text(quotaPercentText(primaryQuotaMetric))
             .font(.system(size: activeMetrics.count >= 3 ? (mini ? 24 : 30) : (mini ? 30 : 38), weight: .heavy, design: .rounded))
-            .foregroundStyle(quotaTint(primaryQuotaMetric))
+            .foregroundStyle(primaryQuotaMetric == .weeklyQuota ? weeklyColor : fiveHourColor)
             .monospacedDigit()
             .contentTransition(.numericText())
           Text(quotaShortTitle(primaryQuotaMetric))
@@ -282,10 +287,15 @@ private struct CompactDashboardContent: View {
         if shows(.resetCredits) {
           circleMetric("Full reset", resetCreditsCountText, tint: store.palette.weekly)
         }
+        if shows(.apiUsage) {
+          circleMetric("API", api.costText, tint: store.palette.usage24h)
+          circleMetric("到期", api.grantExpiry?.shortDate ?? "待确认", tint: DashboardColors.subtleText)
+          if let expiry = api.grantExpiry { circleMetric("赠额", expiry.compactCountdown(at: now), tint: store.palette.usage24h) }
+        }
       }
       .padding(.horizontal, mini ? 15 : 20)
     }
-    .frame(width: mini ? 116 : 148, height: mini ? 116 : 148)
+    .frame(width: diameter, height: diameter)
     .animation(.smooth(duration: 0.32), value: weeklyProgress)
     .animation(.smooth(duration: 0.32), value: fiveHourProgress)
   }
@@ -348,6 +358,7 @@ private struct CompactDashboardContent: View {
         }
         .font(.system(size: mini ? 8.5 : 10.5, weight: .bold, design: .rounded))
       }
+      if shows(.apiUsage) { apiUsageRow }
     }
     .foregroundStyle(DashboardColors.subtleText)
     .animation(.snappy(duration: 0.24), value: store.weekly?.remainingPercent)
@@ -383,6 +394,28 @@ private struct CompactDashboardContent: View {
     }
   }
 
+  private var apiUsageRow: some View {
+    HStack(spacing: 4) {
+      Label("API", systemImage: "point.3.connected.trianglepath.dotted")
+      Spacer(minLength: 2)
+      VStack(alignment: .trailing, spacing: 2) {
+        Text("本月 \(api.costText)").foregroundStyle(store.palette.usage24h).monospacedDigit()
+        Text(api.grant == nil ? "赠额 待确认" : "赠额* \(api.grantText)").font(.system(size: mini ? 8 : 9, weight: .medium))
+        if let expiry = api.grantExpiry {
+          Text("到期 \(expiry.shortDate) · \(expiry.compactCountdown(at: now))")
+            .font(.system(size: mini ? 7.5 : 8.5, weight: .medium)).lineLimit(1).minimumScaleFactor(0.7)
+            .foregroundStyle(expiry.expiresAt.timeIntervalSince(now) <= 3 * 86400 ? Color.orange : DashboardColors.subtleText)
+        } else {
+          Text("到期待确认").font(.system(size: mini ? 7.5 : 8.5, weight: .medium))
+        }
+      }
+    }
+    .font(.system(size: mini ? 9 : 11, weight: .bold, design: .rounded))
+    .foregroundStyle(DashboardColors.subtleText)
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel("API 本月消费 \(api.costText)，赠额余额 \(api.grantText)，赠额为手动确认，" + (api.grantExpiry.map { "账单到期 \($0.longDate)，\($0.countdown(at: now))" } ?? "到期时间待确认"))
+  }
+
   @ViewBuilder
   private func pillMetric(_ metric: FloatingPanelMetric) -> some View {
     switch metric {
@@ -395,23 +428,26 @@ private struct CompactDashboardContent: View {
         )
         if shows(.fiveHourQuota) {
           VStack(alignment: .leading, spacing: 1) {
-            pillQuotaValue("7天", value: store.weekly?.remainingPercent, tint: store.palette.weekly)
+            pillQuotaValue("7天", value: store.weekly?.remainingPercent, tint: QuotaRingStyle.color(for: store.weekly?.remainingPercent))
             pillQuotaValue("5h", value: store.fiveHour?.remainingPercent, tint: fiveHourTint)
           }
         } else {
           pillValue(
             title: "7天剩余",
             value: store.weekly.map { "\(Int($0.remainingPercent.rounded()))%" } ?? "--",
-            tint: store.palette.weekly
+            tint: QuotaRingStyle.color(for: store.weekly?.remainingPercent)
           )
         }
       }
     case .fiveHourQuota:
       HStack(spacing: mini ? 5 : 7) {
-        Circle()
-          .trim(from: 0, to: max(0.008, min(1, (store.fiveHour?.remainingPercent ?? 0) / 100)))
-          .stroke(fiveHourTint, style: StrokeStyle(lineWidth: mini ? 4 : 5, lineCap: .round))
-          .rotationEffect(.degrees(-90))
+        ZStack {
+          Circle().stroke(DashboardColors.track, lineWidth: mini ? 4 : 5)
+          Circle()
+            .trim(from: 0, to: QuotaRingStyle.progress(for: store.fiveHour?.remainingPercent))
+            .stroke(fiveHourTint, style: StrokeStyle(lineWidth: mini ? 4 : 5, lineCap: .butt))
+            .rotationEffect(.degrees(-90))
+        }
           .frame(width: mini ? 28 : 34, height: mini ? 28 : 34)
           .overlay {
             Text(store.fiveHour.map { "\(Int($0.remainingPercent.rounded()))" } ?? "--")
@@ -437,6 +473,13 @@ private struct CompactDashboardContent: View {
       }
     case .resetCredits:
       pillValue(title: "Full reset", value: resetCreditsCountText, tint: store.palette.weekly)
+    case .apiUsage:
+      VStack(alignment: .leading, spacing: 1) {
+        pillValue(title: "API 本月", value: api.costText, tint: store.palette.usage24h)
+        Text(api.grant == nil ? "赠额 待确认" : "赠额* \(api.grantText)").font(.system(size: mini ? 7 : 8)).foregroundStyle(DashboardColors.subtleText)
+        Text(api.grantExpiry.map { "\($0.shortDate) \($0.compactCountdown(at: now))" } ?? "到期待确认")
+          .font(.system(size: mini ? 7 : 8)).foregroundStyle(DashboardColors.subtleText).lineLimit(1)
+      }
     }
   }
 
@@ -463,22 +506,22 @@ private struct CompactDashboardContent: View {
     return ZStack {
       Circle().stroke(DashboardColors.track, lineWidth: outerWidth)
       Circle()
-        .trim(from: 0, to: max(0.008, min(1, (weeklyValue ?? 0) / 100)))
-        .stroke(store.palette.weekly, style: StrokeStyle(lineWidth: outerWidth, lineCap: .round))
+        .trim(from: 0, to: QuotaRingStyle.progress(for: weeklyValue))
+        .stroke(QuotaRingStyle.color(for: weeklyValue), style: StrokeStyle(lineWidth: outerWidth, lineCap: .butt))
         .rotationEffect(.degrees(-90))
       if showsFiveHour {
         Circle()
           .stroke(DashboardColors.track, lineWidth: outerWidth * 0.65)
           .frame(width: size * 0.62, height: size * 0.62)
         Circle()
-          .trim(from: 0, to: max(0.008, min(1, (fiveHourValue ?? 0) / 100)))
-          .stroke(fiveHourTint, style: StrokeStyle(lineWidth: outerWidth * 0.65, lineCap: .round))
+          .trim(from: 0, to: QuotaRingStyle.progress(for: fiveHourValue))
+          .stroke(QuotaRingStyle.color(for: fiveHourValue), style: StrokeStyle(lineWidth: outerWidth * 0.65, lineCap: .butt))
           .rotationEffect(.degrees(-90))
           .frame(width: size * 0.62, height: size * 0.62)
       } else {
         Text(weeklyValue.map { "\(Int($0.rounded()))" } ?? "--")
           .font(.system(size: mini ? 8 : 10, weight: .heavy, design: .rounded))
-          .foregroundStyle(store.palette.weekly)
+          .foregroundStyle(QuotaRingStyle.color(for: weeklyValue))
       }
     }
     .frame(width: size, height: size)
@@ -504,6 +547,7 @@ private struct CompactDashboardContent: View {
     .foregroundStyle(DashboardColors.subtleText)
     .monospacedDigit()
     .lineLimit(1)
+    .minimumScaleFactor(0.75)
   }
 
   private var resetCreditsCountText: String {
@@ -611,6 +655,7 @@ private struct CompactDashboardContent: View {
         }
         .font(.system(size: mini ? 9 : 11, weight: .bold, design: .rounded))
       }
+      if shows(.apiUsage) { apiUsageRow }
     }
     .padding(.top, mini ? 19 : 23)
     .foregroundStyle(DashboardColors.text)
@@ -656,6 +701,12 @@ private struct CompactDashboardContent: View {
     case .resetCredits:
       Text("Reset \(resetCreditsCountText)")
         .foregroundStyle(store.palette.weekly)
+    case .apiUsage:
+      VStack(alignment: .leading, spacing: 2) {
+        Text("API \(api.costText)").foregroundStyle(store.palette.usage24h)
+        Text(api.grantExpiry.map { "\($0.shortDate) \($0.compactCountdown(at: now))" } ?? "到期待确认")
+          .font(.system(size: mini ? 7 : 8)).foregroundStyle(DashboardColors.subtleText).lineLimit(1)
+      }
     }
   }
 
@@ -695,7 +746,7 @@ private struct CompactDashboardContent: View {
     switch metric {
     case .weeklyQuota: store.weekly
     case .fiveHourQuota: store.fiveHour
-    case .rolling24Tokens, .resetRadar, .resetCredits, nil: nil
+    case .rolling24Tokens, .resetRadar, .resetCredits, .apiUsage, nil: nil
     }
   }
 

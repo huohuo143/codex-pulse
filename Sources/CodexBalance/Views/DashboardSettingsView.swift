@@ -7,6 +7,8 @@ struct DashboardSettingsView: View {
   var body: some View {
     VStack(spacing: 14) {
       settingsSection("本机账号、模型与 Tibo 来源") { LocalCodexSetupView() }
+      settingsSection("Codex 侧栏状态") { CodexSidebarSettingsView() }
+      settingsSection("OpenAI API 用量") { OpenAIAPIUsageSettingsView() }
       settingsSection("墨水屏 · 小悟 S3 双屏沙箱") { S3SandboxSettingsView() }
       settingsSection("墨水屏 · 小悟云") { EInkSettingsView(model: store.eInk) }
       settingsSection("iPhone 与 iPad") {
@@ -173,7 +175,7 @@ struct DashboardSettingsView: View {
       AppUpdateSettingsView()
 
       settingsSection("macOS 桌面小组件") {
-        Text("共 8 款：Codex 总览、7 天额度、官方额度历史、重置雷达、Full reset 权益、Token 汇总、Token 趋势、项目与用途。")
+        Text("共 9 款：Codex 总览、7 天额度、官方额度历史、重置雷达、Full reset 权益、Token 汇总、Token 趋势、项目与用途、OpenAI API 用量。")
           .font(.caption)
           .foregroundStyle(DashboardColors.subtleText)
         Toggle("显示 5 小时额度内环", isOn: $store.widgetShowsFiveHourQuota)

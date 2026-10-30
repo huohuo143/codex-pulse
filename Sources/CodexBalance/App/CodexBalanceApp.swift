@@ -4,7 +4,8 @@ import SwiftUI
 @main
 struct CodexBalanceApp: App {
   @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-  @StateObject private var store = DashboardStore(startServices: !S3DualScreenContract.isCandidateBuild)
+  @StateObject private var store = DashboardStore(startServices: !S3DualScreenContract.isCandidateBuild &&
+    !(PulsePreferences.isIsolated && CommandLine.arguments.contains("--sidebar-preview")))
 
   var body: some Scene {
     WindowGroup(AppInfo.appName, id: "main") {

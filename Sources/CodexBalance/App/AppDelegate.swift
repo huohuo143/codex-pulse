@@ -15,6 +15,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       return
     }
     NSApp.setActivationPolicy(.regular)
+    if !S3DualScreenContract.isCandidateBuild {
+      CodexSidebarController.shared.start()
+      OpenAIAPIUsageStore.shared.start()
+    }
     if !CommandLine.arguments.contains("--background") {
       NSApp.activate(ignoringOtherApps: true)
     }

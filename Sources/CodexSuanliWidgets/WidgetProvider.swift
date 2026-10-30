@@ -47,3 +47,26 @@ struct CodexTimelineProvider: TimelineProvider {
     )
   }
 }
+
+struct OpenAIAPIWidgetEntry: TimelineEntry {
+  let date: Date
+  let snapshot: OpenAIAPIWidgetSnapshot
+}
+
+struct OpenAIAPIWidgetProvider: TimelineProvider {
+  func placeholder(in context: Context) -> OpenAIAPIWidgetEntry {
+    OpenAIAPIWidgetEntry(date: Date(), snapshot: .empty)
+  }
+
+  func getSnapshot(in context: Context, completion: @escaping (OpenAIAPIWidgetEntry) -> Void) {
+    completion(OpenAIAPIWidgetEntry(date: Date(), snapshot: (try? OpenAIAPIWidgetSnapshotStore.load()) ?? .empty))
+  }
+
+  func getTimeline(in context: Context, completion: @escaping (Timeline<OpenAIAPIWidgetEntry>) -> Void) {
+    let now = Date()
+    let snapshot = (try? OpenAIAPIWidgetSnapshotStore.load()) ?? .empty
+    let entries = snapshot.timelineDates(after: now).map { OpenAIAPIWidgetEntry(date: $0, snapshot: snapshot) }
+    completion(Timeline(entries: entries,
+                        policy: .after(now.addingTimeInterval(300))))
+  }
+}

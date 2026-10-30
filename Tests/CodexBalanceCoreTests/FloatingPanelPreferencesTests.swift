@@ -7,7 +7,7 @@ struct FloatingPanelPreferencesTests {
   func defaultSelectionPreservesExistingModulesAndLeavesFiveHourOptional() {
     #expect(FloatingPanelMetric.defaults.count == 4)
     #expect(!FloatingPanelMetric.defaults.contains(.fiveHourQuota))
-    #expect(FloatingPanelMetric.allCases.count == 5)
+    #expect(FloatingPanelMetric.allCases.count == 6)
     #expect(FloatingPanelMetric.allCases.allSatisfy {
       !$0.title.isEmpty && !$0.subtitle.isEmpty && !$0.systemImage.isEmpty
     })

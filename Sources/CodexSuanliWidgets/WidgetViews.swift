@@ -1,5 +1,6 @@
 #if !XCODE_WIDGET_BUILD
 import CodexBalanceCore
+import SidebarCore
 #endif
 import SwiftUI
 import WidgetKit
@@ -349,35 +350,38 @@ private struct QuotaRing: View {
   let size: CGFloat
 
   private func progress(_ value: Double?) -> Double {
-    max(0.01, min(1, (value ?? 0) / 100))
+    guard let value, QuotaBand.classify(value) != .unavailable else { return 0 }
+    return value / 100
   }
 
   var body: some View {
+    let weeklyColor = CodexWidgetTheme.quotaColor(snapshot.remainingPercent)
+    let fiveHourColor = CodexWidgetTheme.quotaColor(snapshot.fiveHourRemainingPercent)
     ZStack {
       quotaCircle(
         value: snapshot.remainingPercent,
-        tint: CodexWidgetTheme.weekly,
+        tint: weeklyColor,
         diameter: size,
         width: size * 0.105
       )
       if snapshot.displaysFiveHourQuota {
         quotaCircle(
           value: snapshot.fiveHourRemainingPercent,
-          tint: CodexWidgetTheme.fiveHour,
+          tint: fiveHourColor,
           diameter: size * 0.70,
           width: size * 0.072
         )
       }
       if snapshot.displaysFiveHourQuota {
         VStack(spacing: max(1, size * 0.018)) {
-          quotaValue(label: "7天", value: snapshot.remainingPercent, tint: CodexWidgetTheme.weekly)
-          quotaValue(label: "5h", value: snapshot.fiveHourRemainingPercent, tint: CodexWidgetTheme.fiveHour)
+          quotaValue(label: "7天", value: snapshot.remainingPercent, tint: weeklyColor)
+          quotaValue(label: "5h", value: snapshot.fiveHourRemainingPercent, tint: fiveHourColor)
         }
       } else {
         VStack(spacing: 1) {
           Text(BalanceFormatters.percent(snapshot.remainingPercent))
             .font(.system(size: size * 0.27, weight: .heavy, design: .rounded))
-            .foregroundStyle(CodexWidgetTheme.weekly)
+            .foregroundStyle(weeklyColor)
             .monospacedDigit()
           Text(snapshot.quotaRead?.state(at: Date(), resetAt: snapshot.resetsAt) == .cached ? "7 天剩余 · 缓存" : "7 天剩余")
             .font(.system(size: size * 0.085, weight: .bold))
@@ -393,7 +397,7 @@ private struct QuotaRing: View {
       Circle().stroke(CodexWidgetTheme.track, lineWidth: width)
       Circle()
         .trim(from: 0, to: progress(value))
-        .stroke(tint, style: StrokeStyle(lineWidth: width, lineCap: .round))
+        .stroke(tint, style: StrokeStyle(lineWidth: width, lineCap: .butt))
         .rotationEffect(.degrees(-90))
     }
     .frame(width: diameter, height: diameter)
@@ -703,4 +707,56 @@ private func currencyText(_ usd: Double, cnyRate: Double?, coverage: Double? = n
 private func announcementTitle(_ snapshot: CodexWidgetSnapshot) -> String {
   guard snapshot.resetProbability24h == nil else { return "等待分析" }
   return snapshot.radarLevel ?? "等待动态"
+}
+
+struct OpenAIAPIWidgetView: View {
+  let entry: OpenAIAPIWidgetEntry
+  @Environment(\.widgetFamily) private var systemFamily
+  @Environment(\.codexWidgetFamilyOverride) private var familyOverride
+  private var family: WidgetFamily { familyOverride ?? systemFamily }
+  private var snapshot: OpenAIAPIWidgetSnapshot { entry.snapshot }
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 4) {
+      WidgetHeader(title: "OpenAI API", symbol: "point.3.connected.trianglepath.dotted", tint: CodexWidgetTheme.usage)
+      Text("本月消费 · UTC").font(.system(size: 10, weight: .semibold)).foregroundStyle(CodexWidgetTheme.subtle)
+      Text(snapshot.cost(at: entry.date).map(money) ?? "—")
+        .font(.system(size: family == .systemSmall ? 26 : 31, weight: .heavy, design: .rounded))
+        .foregroundStyle(CodexWidgetTheme.usage).monospacedDigit().lineLimit(1).minimumScaleFactor(0.7)
+      HStack {
+        Text(snapshot.grantCheckedAt == nil ? "赠额余额" : "赠额余额 · 手动")
+        Spacer(minLength: 2)
+        Text(snapshot.grantRemaining(at: entry.date).map(money) ??
+          (snapshot.grantCheckedAt != nil && snapshot.grantExpiresAt.map { $0 <= entry.date } == true ? "已过期" : "待确认")).monospacedDigit()
+      }
+      .font(.system(size: 10, weight: .bold)).foregroundStyle(CodexWidgetTheme.text)
+      if let expiry = snapshot.confirmedExpiry {
+        Text("账单到期 \(expiry.shortDate) · 手动")
+          .font(.system(size: 9, weight: .medium)).foregroundStyle(CodexWidgetTheme.subtle).lineLimit(1).minimumScaleFactor(0.8)
+        HStack(spacing: 3) {
+          Text(expiry.hasExpired(at: entry.date) ? "已到期 · 核对新周期" : "距到期")
+          if !expiry.hasExpired(at: entry.date) {
+            Text(timerInterval: entry.date...expiry.expiresAt, countsDown: true).monospacedDigit().lineLimit(1)
+          }
+        }.font(.system(size: 9, weight: .semibold))
+          .foregroundStyle(expiry.expiresAt.timeIntervalSince(entry.date) <= 3 * 86400 ? Color.orange : CodexWidgetTheme.subtle)
+      } else {
+        Text("赠额到期时间待确认").font(.system(size: 9)).foregroundStyle(CodexWidgetTheme.subtle)
+      }
+      Spacer(minLength: 0)
+      Text(detail)
+        .font(.system(size: 9)).foregroundStyle(CodexWidgetTheme.subtle).lineLimit(1)
+    }
+    .padding(12)
+    .codexWidgetBackground()
+  }
+
+  private var detail: String {
+    guard let sampled = snapshot.costSampledAt, snapshot.cost(at: entry.date) != nil else {
+      return snapshot.isConnected ? "等待用量更新" : "在脉动设置中连接"
+    }
+    return "上次读取 " + sampled.formatted(date: .omitted, time: .shortened)
+  }
+
+  private func money(_ amount: Double) -> String { OpenAIAPIAmountFormat.money(amount) }
 }

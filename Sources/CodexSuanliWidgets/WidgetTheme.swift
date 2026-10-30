@@ -1,5 +1,8 @@
 import SwiftUI
 import WidgetKit
+#if !XCODE_WIDGET_BUILD
+import SidebarCore
+#endif
 
 enum CodexWidgetTheme {
   static let weekly = Color(red: 0.18, green: 0.91, blue: 0.72)
@@ -10,6 +13,10 @@ enum CodexWidgetTheme {
   static let text = Color.primary
   static let subtle = Color.secondary
   static let track = Color.primary.opacity(0.11)
+  static func quotaColor(_ remaining: Double?) -> Color {
+    guard let components = QuotaBand.classify(remaining).colorComponents else { return .secondary }
+    return Color(red: components.red, green: components.green, blue: components.blue)
+  }
 }
 
 struct CodexWidgetBackground: View {

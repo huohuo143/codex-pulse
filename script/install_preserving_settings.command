@@ -241,6 +241,46 @@ cleanup_old_installations() {
 }
 # END OLD_INSTALL_CLEANUP
 
+# BEGIN SIDEBAR_COMPATIBILITY
+# Check declared feature compatibility before stopping the running app or
+# touching backups. 2.12.42 / 2170 is the first integrated version and
+# predates the explicit bundle marker.
+sidebar_declared_level() {
+  local app="$1" info="$1/Contents/Info.plist" identifier level version build
+  [[ -f "$info" ]] || { print 0; return 0; }
+  identifier="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$info" 2>/dev/null)" || { print 0; return 0; }
+  [[ "$identifier" == "$BUNDLE_ID" ]] || { print 0; return 0; }
+  if level="$(/usr/libexec/PlistBuddy -c 'Print :CodexSidebarIntegrationVersion' "$info" 2>/dev/null)"; then
+    [[ "$level" == <-> && ${#level} -le 3 ]] || { print -u2 '侧栏兼容性标记无效，已停止安装。'; return 1; }
+    print "$((10#$level))"
+    return 0
+  fi
+  version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$info" 2>/dev/null || true)"
+  build="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$info" 2>/dev/null || true)"
+  if [[ "$version" == '2.12.42' && "$build" == '2170' ]]; then print 1; else print 0; fi
+}
+
+verify_sidebar_compatibility() {
+  local source="$1" marker="$2" installed required=0 level stored
+  shift 2
+  if [[ -e "$marker" || -L "$marker" ]]; then
+    [[ ! -L "$marker" && -f "$marker" ]] || { print -u2 '侧栏保护标记不可安全读取，已停止安装。'; return 1; }
+    stored="$(<"$marker")"
+    [[ "$stored" == <-> && ${#stored} -le 3 ]] || { print -u2 '侧栏保护标记无效，已停止安装。'; return 1; }
+    required=$((10#$stored))
+  fi
+  for installed in "$@"; do
+    level="$(sidebar_declared_level "$installed")" || return 1
+    if (( level > required )); then required=$level; fi
+  done
+  level="$(sidebar_declared_level "$source")" || return 1
+  if (( level < required )); then
+    print -u2 '更新包未声明保留现有侧栏功能，已停止安装；原应用和设置未改动。'
+    return 1
+  fi
+}
+# END SIDEBAR_COMPATIBILITY
+
 [[ -d "$SOURCE_APP" ]] || { print -u2 "找不到安装源：$SOURCE_APP"; exit 1; }
 [[ "${SOURCE_APP:A}" != "${DEST_APP:A}" ]] || { print -u2 "安装源与目标不能相同"; exit 1; }
 [[ ! -e "$BACKUP_DIR" ]] || { print -u2 "备份目录已存在，请使用新的目录"; exit 1; }
@@ -250,6 +290,8 @@ SOURCE_ID="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$SOURCE_APP
 SOURCE_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$SOURCE_APP/Contents/Info.plist")"
 SOURCE_BUILD="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$SOURCE_APP/Contents/Info.plist")"
 [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$SOURCE_APP/Contents/Info.plist")" == CodexSuanliMeter ]] || { print -u2 '安装源的可执行文件不匹配'; exit 1; }
+verify_sidebar_compatibility "$SOURCE_APP" "$SUPPORT_DIR/sidebar-integration-required" \
+  "$DEST_APP" "/Applications/$APP_NAME.app" || exit 1
 SOURCE_SHA256="$(/usr/bin/shasum -a 256 "$SOURCE_APP/Contents/MacOS/CodexSuanliMeter")"
 SOURCE_SHA256="${SOURCE_SHA256%% *}"
 if [[ "${1:-}" == "--check" ]]; then
@@ -267,7 +309,8 @@ for item in "$SUPPORT_DIR"/quota-history*.json "$SUPPORT_DIR"/project-budgets-v1
   "$SUPPORT_DIR"/credit-expiry-v2.previous.json "$SUPPORT_DIR"/credit-expiry-v2.damaged-*.json "$SUPPORT_DIR"/model-prices*.json \
   "$SUPPORT_DIR"/radar-evaluation-v1 "$SUPPORT_DIR"/codex-radar-tibo-history.json "$SUPPORT_DIR"/codex-reset-calendar-v1.json \
   "$SUPPORT_DIR"/reliability-events-v1.json "$SUPPORT_DIR"/account-scope-salt.txt \
-  "$SUPPORT_DIR"/widget-snapshot.json "$SUPPORT_DIR"/live-balance.json \
+  "$SUPPORT_DIR"/widget-snapshot.json "$SUPPORT_DIR"/api-usage-snapshot.json "$SUPPORT_DIR"/live-balance.json \
+  "$SUPPORT_DIR"/sidebar-integration-required \
   "$SUPPORT_DIR"/session-event-cache-v*.plist "$SUPPORT_DIR"/watch-codex.sh; do
   [[ -e "$item" ]] && /usr/bin/ditto "$item" "$BACKUP_DIR/config/${item:t}"
 done

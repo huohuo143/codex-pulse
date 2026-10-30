@@ -31,7 +31,9 @@ struct CodexRadarTiboThreadTests {
     #expect(refreshed[0].threadContext == "replacement")
   }
   @Test func activeDeadlineContextSurvivesNewerUnrelatedPosts() async {
-    let now = Date()
+    // Use an active polling period so this cache test is independent of the
+    // machine's wall clock and the configured 16:00–21:00 quiet window.
+    let now = Date(timeIntervalSince1970: 1792638600)
     var older = post("99"); older.publishedAt = .distantPast; older.threadContext = "Verified reset parent"
     older.threadContextCheckedAt = now; older.threadContextAttemptedAt = now
     let posts = (1...8).map { post(String($0)) } + [older]

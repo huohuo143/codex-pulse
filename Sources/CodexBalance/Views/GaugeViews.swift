@@ -1,4 +1,5 @@
 import CodexBalanceCore
+import SidebarCore
 import SwiftUI
 
 enum DashboardPalette: String, CaseIterable, Identifiable {
@@ -88,6 +89,18 @@ enum DashboardColors {
   static var border: Color { Color.primary.opacity(0.09) }
 }
 
+enum QuotaRingStyle {
+  static func color(for remaining: Double?) -> Color {
+    guard let components = QuotaBand.classify(remaining).colorComponents else { return .secondary }
+    return Color(red: components.red, green: components.green, blue: components.blue)
+  }
+
+  static func progress(for remaining: Double?) -> Double {
+    guard let remaining, QuotaBand.classify(remaining) != .unavailable else { return 0 }
+    return remaining / 100
+  }
+}
+
 struct WeeklyGaugeView: View {
   var remainingPercent: Double?
   var tint: Color
@@ -96,7 +109,7 @@ struct WeeklyGaugeView: View {
   var label: String = "7天剩余"
 
   private var normalizedProgress: Double {
-    max(0.008, min(1, (remainingPercent ?? 0) / 100))
+    QuotaRingStyle.progress(for: remainingPercent)
   }
 
   var body: some View {
@@ -104,13 +117,13 @@ struct WeeklyGaugeView: View {
       Circle().stroke(DashboardColors.track, lineWidth: lineWidth)
       Circle()
         .trim(from: 0, to: normalizedProgress)
-        .stroke(tint, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+        .stroke(QuotaRingStyle.color(for: remainingPercent), style: StrokeStyle(lineWidth: lineWidth, lineCap: .butt))
         .rotationEffect(.degrees(-90))
         .animation(.smooth(duration: 0.42), value: normalizedProgress)
       VStack(spacing: 2) {
         Text(remainingPercent.map { "\(Int($0.rounded()))%" } ?? "--")
           .font(.system(size: size * 0.25, weight: .heavy, design: .rounded))
-          .foregroundStyle(tint)
+          .foregroundStyle(QuotaRingStyle.color(for: remainingPercent))
           .monospacedDigit()
           .contentTransition(.numericText())
         Text(label)
@@ -136,7 +149,7 @@ struct ConcentricQuotaGaugeView: View {
   var resetsAt: Date? = nil
 
   private func progress(_ value: Double?) -> Double {
-    max(0.008, min(1, (value ?? 0) / 100))
+    QuotaRingStyle.progress(for: value)
   }
 
   private func percentText(_ value: Double?) -> String {
@@ -146,14 +159,16 @@ struct ConcentricQuotaGaugeView: View {
   var body: some View {
     let displaysBoth = showsWeekly && showsFiveHour
     let primaryValue = showsWeekly ? weeklyRemainingPercent : fiveHourRemainingPercent
-    let primaryTint = showsWeekly ? weeklyTint : fiveHourTint
+    let weeklyColor = QuotaRingStyle.color(for: weeklyRemainingPercent)
+    let fiveHourColor = QuotaRingStyle.color(for: fiveHourRemainingPercent)
+    let primaryTint = showsWeekly ? weeklyColor : fiveHourColor
     let primaryLabel = showsWeekly ? "7天剩余" : "5小时剩余"
 
     ZStack {
       if showsWeekly {
         quotaCircle(
           value: weeklyRemainingPercent,
-          tint: weeklyTint,
+          tint: weeklyColor,
           diameter: size,
           width: lineWidth
         )
@@ -161,7 +176,7 @@ struct ConcentricQuotaGaugeView: View {
       if showsFiveHour {
         quotaCircle(
           value: fiveHourRemainingPercent,
-          tint: fiveHourTint,
+          tint: fiveHourColor,
           diameter: displaysBoth ? size * 0.72 : size,
           width: displaysBoth ? lineWidth * 0.72 : lineWidth
         )
@@ -169,8 +184,8 @@ struct ConcentricQuotaGaugeView: View {
 
       VStack(spacing: displaysBoth ? max(2, size * 0.025) : 2) {
         if displaysBoth {
-          quotaValue(label: "7天", value: weeklyRemainingPercent, tint: weeklyTint)
-          quotaValue(label: "5h", value: fiveHourRemainingPercent, tint: fiveHourTint)
+          quotaValue(label: "7天", value: weeklyRemainingPercent, tint: weeklyColor)
+          quotaValue(label: "5h", value: fiveHourRemainingPercent, tint: fiveHourColor)
         } else {
           Text(percentText(primaryValue))
             .font(.system(size: size * 0.25, weight: .heavy, design: .rounded))
@@ -204,7 +219,7 @@ struct ConcentricQuotaGaugeView: View {
     guard let resetsAt else { return "重置时间待更新" }
     guard resetsAt > now else { return "等待重置更新" }
     let hours = Int(resetsAt.timeIntervalSince(now) / 3600)
-    return "距重置 \(hours / 24)天 \(hours % 24)小时"
+    return "距重置 \(hours / 24)天\(hours % 24)时"
   }
 
   private func quotaCircle(value: Double?, tint: Color, diameter: CGFloat, width: CGFloat) -> some View {
@@ -212,7 +227,7 @@ struct ConcentricQuotaGaugeView: View {
       Circle().stroke(DashboardColors.track, lineWidth: width)
       Circle()
         .trim(from: 0, to: progress(value))
-        .stroke(tint, style: StrokeStyle(lineWidth: width, lineCap: .round))
+        .stroke(tint, style: StrokeStyle(lineWidth: width, lineCap: .butt))
         .rotationEffect(.degrees(-90))
     }
     .frame(width: diameter, height: diameter)

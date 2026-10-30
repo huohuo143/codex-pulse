@@ -10,18 +10,26 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-2.12.41-8b7cff">
+  <img alt="Version" src="https://img.shields.io/badge/version-2.12.46-8b7cff">
   <img alt="macOS" src="https://img.shields.io/badge/macOS-14%2B-111827?logo=apple">
   <img alt="Mac architectures" src="https://img.shields.io/badge/Mac-arm64-111827">
   <img alt="Swift" src="https://img.shields.io/badge/Swift-6.0-f05138?logo=swift&logoColor=white">
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-22c55e"></a>
 </p>
 
-`Codex 脉动` 将 Codex 的额度、Token 消耗、重置节奏和 Full reset 权益集中到一套原生 macOS 界面中。它既可以作为常驻悬浮框，也可以完全隐藏悬浮框，仅使用主窗口或 8 款桌面小组件。
+`Codex 脉动` 将 Codex 的额度、Token 消耗、重置节奏和 Full reset 权益集中到一套原生 macOS 界面中。它既可以作为常驻悬浮框，也可以完全隐藏悬浮框，仅使用主窗口或 9 款桌面小组件。
 
-> macOS 版本：`2.12.41` build 2169，提供 Apple Silicon（arm64）安装包。主应用兼容 macOS 13；桌面小组件要求 macOS 14 或更高版本；安装包为 ad-hoc 签名、未公证版本。Windows x64 仍为 [2.12.29 build 2157](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.29)，本轮 macOS 新功能尚未移植至 Windows。
+> macOS 版本：`2.12.46` build 2174，提供 Apple Silicon（arm64）安装包，安装器要求 macOS 14 或更高版本。安装包为 ad-hoc 签名、未公证版本。Windows x64 仍为 [2.12.29 build 2157](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.29)，本轮 macOS 新功能尚未移植至 Windows。
 
 公共重置历史为随包分发的公共事件记录；最近三个完整月份（2026 年 7—9 月）提供 20 条可定位日期的记录及原始月度总数，未声称完整覆盖。安装后的新预告继续读取 Tibo 在 X 上的发帖与回复。个人灵活额度、Full reset 数量/到期时间和实际到账以当前账号本机数据为准。详见 [历史依据及缺口](docs/RESET_HISTORY_SOURCES.md)。
+
+## 2.12.46：侧栏整合与 API 赠额到期提醒
+
+将 Codex 侧栏整合进脉动，七天额度、Tibo、Codex Credits、Full reset 与 API 用量均可独立显示或隐藏。新增 API 组织消费与手动确认的赠额到期时间，在主界面、悬浮框、侧栏和小组件显示；可选在到期前 3 天、1 天及到期时提醒。赠额金额、余额与到期时间以实际账单为准，未知时显示待确认。
+
+使用发布包中的“安装或更新”工具，可检查侧栏兼容性并保留设置及旧版回滚入口。应用内直接覆盖或拖拽替换不会经过这一检查。
+
+[下载 macOS 版](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.46) · [安装与升级](docs/INSTALL_UPGRADE_2.12.46.md) · [验证范围](docs/VALIDATION_2.12.46.md)
 
 ## 2.12.41：Tibo 分时段检查
 
@@ -156,7 +164,7 @@ Tibo 动态列表保留公开源收录的最新 Posts / Replies，并读取页�
 | 自动化 | 定时巡检、每日关键数据备份、可选每日聚合摘要和 7 天备份保留 |
 | 版本更新 | 启动自动检查 GitHub Releases，语义化版本比较、24 小时节流和手动查看下载入口 |
 | 金额估算 | 按 OpenAI 官方模型价格估算 API 等价金额，并通过 Frankfurter 换算 USD/CNY |
-| 显示载体 | 主窗口、菜单栏状态面板、可配置悬浮框、Touch Bar、8 款 WidgetKit 桌面小组件 |
+| 显示载体 | 主窗口、菜单栏状态面板、可配置悬浮框、Touch Bar、9 款 WidgetKit 桌面小组件 |
 | 外观 | 极光、玻璃、石墨三套视觉方案，六套主题色，以及跟随系统、白天、夜晚背景模式 |
 
 金额是 API 等价预估，不是 ChatGPT/Codex 订阅账单。reasoning token 已包含在 output 中，不重复计费。
@@ -228,7 +236,7 @@ flowchart LR
   E --> F["主窗口"]
   E --> G["悬浮框 / Touch Bar"]
   E --> H["脱敏 Widget 快照"]
-  H --> I["8 款桌面小组件"]
+  H --> I["9 款桌面小组件"]
 ```
 
 - 本地用量从 `~/.codex/sessions` 增量读取，聚合 input、cached input、output、model、项目和工作类型。
@@ -246,29 +254,29 @@ flowchart LR
 
 - Codex 会话日志只在本机只读解析，不上传原始消息。
 - Full reset 凭据和原始响应只在内存中短暂使用；缓存不保存 token、完整账户 ID、后台权益 ID 或原始响应。
-- Widget 快照只包含额度、公开雷达、权益到期时间和聚合 Token，不包含会话内容、项目路径、账户凭据、API Key 或兑换 ID。
+- Widget 快照只包含额度、公开雷达、权益到期时间、聚合 Token 及 API 消费与手动确认的赠额摘要，不包含会话内容、项目路径、账户凭据、API Key 或兑换 ID。
 - 用户开启分析后，雷达仅把公开帖子及线程文本交给既有登录的 Codex CLI 做模型分析，不传入会话日志或账户详情。失败或过期时显示状态，不展示旧预告为正常结果；不提取其他浏览器的 X Cookie，内嵌 X 登录态仅由本机 WebKit 保存。
 - 会话解析缓存位于独立 Application Support 目录，只保存增量聚合所需结果。
 - 额度历史按本机匿名账户标识分开保存在 `~/Library/Application Support/CodexSuanliMeter/quota-history-<匿名标识>.json`（旧文件保留），不包含对话、项目路径或账户凭据。
 - 项目预算只保存项目识别名/本地路径和用户设定的 Token 上限，不上传、不写入 iCloud 或 Widget 快照。
 - 自动化备份仅复制额度历史、项目预算、额度到期记录和重置日历；每日摘要不包含对话正文或项目路径。
 - 脱敏诊断报告不包含账号、对话、项目路径、凭据或 API Key。
-- 原生提醒默认关闭；只有用户主动开启后才申请 macOS 通知权限。
+- 额度等原生提醒默认关闭。API 赠额到期提醒开关默认开启，但只有用户确认并保存到期时间、且系统通知获准后才安排提醒。
 - 版本检测不读取 GitHub Token 或账号，不上传本地数据，也不会自动下载或安装。
 
 ## 安装
 
-在 [v2.12.41 发布页](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.41) 下载 Apple Silicon Mac 安装包。完整步骤见 [安装与升级](docs/INSTALL_UPGRADE_2.12.41.md)，测试范围见 [验证说明](docs/VALIDATION_2.12.41.md)。Windows x64 安装版、免安装版与源码包现已同步提供于 [v2.12.29 发布页](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.29)。Windows 升级与验证范围见 [Windows 说明](windows/README.md) 和 [验收文档](windows/docs/VALIDATION_2.12.29.md)。
+在 [v2.12.46 发布页](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.46) 下载 Apple Silicon Mac 安装包。完整步骤见 [安装与升级](docs/INSTALL_UPGRADE_2.12.46.md)，测试范围见 [验证说明](docs/VALIDATION_2.12.46.md)。Windows x64 安装版、免安装版与源码包现已同步提供于 [v2.12.29 发布页](https://github.com/huohuo143/codex-pulse/releases/tag/v2.12.29)。Windows 升级与验证范围见 [Windows 说明](windows/README.md) 和 [验收文档](windows/docs/VALIDATION_2.12.29.md)。
 
 在 [Releases](https://github.com/huohuo143/codex-pulse/releases) 下载：
 
 ```text
-Codex-Pulse-v2.12.41-build2169-20261028-arm64.dmg
-Codex-Pulse-v2.12.41-build2169-20261028-arm64.dmg.sha256
+Codex-Pulse-v2.12.46-build2174-20261030-arm64.dmg
+Codex-Pulse-v2.12.46-build2174-20261030-arm64.dmg.sha256
 ```
 
 1. 打开 DMG。
-2. 运行 DMG 内的“安装或更新（保留设置）.command”，保留配置并创建回滚备份。
+2. 运行 DMG 内的“安装或更新.command”，保留配置并创建回滚备份。
 3. 首次打开若被 Gatekeeper 拦截，在“系统设置 → 隐私与安全性”中选择“仍要打开”。
 4. 打开一次 App，等待首次历史数据解析完成。
 
@@ -331,7 +339,7 @@ ARCH=arm64 ./script/create_transfer_package.sh
 | --- | --- |
 | `Sources/CodexBalance` | App 生命周期、状态管理、主窗口、悬浮框和设置界面 |
 | `Sources/CodexBalanceCore` | Codex 状态读取、Token 聚合、雷达、汇率、权益和 Widget 快照 |
-| `Sources/CodexSuanliWidgets` | 8 款 WidgetKit 组件 |
+| `Sources/CodexSuanliWidgets` | 9 款 WidgetKit 组件 |
 | `Tests/CodexBalanceCoreTests` | 核心逻辑测试 |
 | `script` | 图标生成、构建、验证、打包与迁移脚本 |
 | `config` / `xcode` | Widget 扩展配置、entitlements 和 Xcode target |

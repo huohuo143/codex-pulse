@@ -8,6 +8,19 @@ import CodexBalanceCore
 @Suite("Widget visual acceptance", .serialized)
 struct WidgetVisualAcceptanceTests {
   @Test(.enabled(if: ProcessInfo.processInfo.environment["CODEX_PULSE_RENDER_DIR"] != nil))
+  @MainActor func renderPinkQuotaRing() throws {
+    let folder = URL(fileURLWithPath: ProcessInfo.processInfo.environment["CODEX_PULSE_RENDER_DIR"]!)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    var snapshot = CodexWidgetSnapshot.preview
+    snapshot.remainingPercent = 13
+    let entry = CodexWidgetEntry(date: Date(), snapshot: snapshot, hasLiveData: true)
+    for scheme in [ColorScheme.light, .dark] {
+      try render(view(.quota, entry), family: .systemSmall, scheme: scheme,
+        file: folder.appendingPathComponent("widget-quota-pink-\(scheme).png"))
+    }
+  }
+
+  @Test(.enabled(if: ProcessInfo.processInfo.environment["CODEX_PULSE_RENDER_DIR"] != nil))
   @MainActor func renderAllKindsWithFreshAndExpiredData() throws {
     let folder = URL(fileURLWithPath: ProcessInfo.processInfo.environment["CODEX_PULSE_RENDER_DIR"]!)
     try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)

@@ -7,6 +7,7 @@ public enum FloatingPanelMetric: String, CaseIterable, Identifiable, Hashable, S
   case rolling24Tokens
   case resetRadar
   case resetCredits
+  case apiUsage
 
   /// 新增的 5 小时额度保持可选且默认关闭，避免升级后改变现有悬浮框布局。
   public static let defaults: Set<FloatingPanelMetric> = [
@@ -26,6 +27,7 @@ public enum FloatingPanelMetric: String, CaseIterable, Identifiable, Hashable, S
     case .rolling24Tokens: "滚动 24h Token"
     case .resetRadar: "重置雷达"
     case .resetCredits: "Full reset 权益"
+    case .apiUsage: "API 用量"
     }
   }
 
@@ -36,6 +38,7 @@ public enum FloatingPanelMetric: String, CaseIterable, Identifiable, Hashable, S
     case .rolling24Tokens: "最近 24 小时 Token 与金额预估"
     case .resetRadar: "Tibo 重置预告状态"
     case .resetCredits: "可用次数与最近到期信息"
+    case .apiUsage: "API 组织本月消费与已确认赠额"
     }
   }
 
@@ -46,6 +49,7 @@ public enum FloatingPanelMetric: String, CaseIterable, Identifiable, Hashable, S
     case .rolling24Tokens: "clock.arrow.circlepath"
     case .resetRadar: "scope"
     case .resetCredits: "arrow.counterclockwise.circle.fill"
+    case .apiUsage: "point.3.connected.trianglepath.dotted"
     }
   }
 

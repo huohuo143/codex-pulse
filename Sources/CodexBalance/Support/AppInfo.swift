@@ -3,7 +3,7 @@ import Foundation
 /// 项目元信息（开源署名与主页）
 enum AppInfo {
   static let appName = "Codex 脉动"
-  static let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.12.41"
+  static let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "2.12.32"
   static let author = "ZhangS"
   static let license = "MIT"
   static let originalAuthor = "waytosea-oss"

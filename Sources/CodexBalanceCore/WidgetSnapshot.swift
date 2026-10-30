@@ -466,3 +466,168 @@ public extension CodexWidgetSnapshot {
     return kinds
   }
 }
+
+public enum OpenAIAPIAmountFormat {
+  public static func money(_ amount: Double) -> String {
+    guard amount.isFinite else { return "—" }
+    if amount > 0 && amount < 0.0001 { return "<$0.0001" }
+    if amount < 0 && amount > -0.0001 { return ">−$0.0001" }
+    if amount != 0 && abs(amount) < 0.01 { return String(format: "$%.4f", amount) }
+    return String(format: "$%.2f", amount)
+  }
+}
+
+/// Only an expiry explicitly confirmed against the user's billing page.
+public struct OpenAIAPIGrantExpiry: Codable, Equatable, Sendable {
+  public let expiresAt: Date
+  public let confirmedAt: Date
+
+  public init(expiresAt: Date, confirmedAt: Date) {
+    self.expiresAt = expiresAt
+    self.confirmedAt = confirmedAt
+  }
+
+  public func hasExpired(at now: Date) -> Bool { expiresAt <= now }
+
+  public func countdown(at now: Date) -> String {
+    let seconds = expiresAt.timeIntervalSince(now)
+    guard seconds > 0 else { return "已到期" }
+    let minutes = max(1, Int(ceil(min(seconds, 31_536_000_000) / 60)))
+    let days = minutes / 1440
+    let hours = (minutes % 1440) / 60
+    if days > 0 { return "\(days)天\(hours)小时" }
+    if hours > 0 { return "\(hours)小时\(minutes % 60)分" }
+    return "\(minutes)分钟"
+  }
+
+  public func compactCountdown(at now: Date) -> String {
+    let seconds = expiresAt.timeIntervalSince(now)
+    guard seconds > 0 else { return "已到期" }
+    let minutes = max(1, Int(ceil(min(seconds, 31_536_000_000) / 60)))
+    let days = minutes / 1440
+    let hours = (minutes % 1440) / 60
+    if days > 0 { return hours == 0 ? "余\(days)天" : "余\(days)天\(hours)时" }
+    if hours > 0 { return "余\(hours)时\(minutes % 60)分" }
+    return "余\(minutes)分"
+  }
+
+  public var shortDate: String {
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: "zh_CN")
+    formatter.timeZone = .current
+    formatter.dateFormat = "M/d HH:mm"
+    return formatter.string(from: expiresAt)
+  }
+
+  public var longDate: String {
+    expiresAt.formatted(date: .abbreviated, time: .shortened)
+  }
+}
+
+public enum OpenAIAPIExpiryReminderPlan {
+  public struct Event: Equatable, Sendable {
+    public let identifier: String
+    public let fireAt: Date
+    public let title: String
+  }
+
+  public static let identifiers = ["api-grant-expiry-3days", "api-grant-expiry-1day", "api-grant-expiry-at"]
+
+  public static func events(expiry: Date, after now: Date) -> [Event] {
+    let candidates = [
+      Event(identifier: identifiers[0], fireAt: expiry.addingTimeInterval(-3 * 86400), title: "API 赠额到期提醒"),
+      Event(identifier: identifiers[1], fireAt: expiry.addingTimeInterval(-86400), title: "API 赠额到期提醒"),
+      Event(identifier: identifiers[2], fireAt: expiry, title: "API 赠额到期提醒")
+    ]
+    return candidates.filter { $0.fireAt > now.addingTimeInterval(1) }
+  }
+}
+
+/// Sanitized API usage summary. No API key, organization ID, or raw response
+/// is written into the Widget extension container.
+public struct OpenAIAPIWidgetSnapshot: Codable, Equatable, Sendable {
+  public var publishedAt: Date
+  public var isConnected: Bool
+  public var monthlyCostUSD: Double?
+  public var periodStart: Date?
+  public var costSampledAt: Date?
+  public var status: String
+  public var grantTotalUSD: Double?
+  public var grantRemainingUSD: Double?
+  public var grantCheckedAt: Date?
+  public var grantExpiresAt: Date?
+  public var grantExpiryConfirmedAt: Date?
+
+  public init(publishedAt: Date, isConnected: Bool, monthlyCostUSD: Double?, periodStart: Date?,
+              costSampledAt: Date?, status: String, grantTotalUSD: Double?, grantRemainingUSD: Double?,
+              grantCheckedAt: Date?, grantExpiresAt: Date?, grantExpiryConfirmedAt: Date? = nil) {
+    self.publishedAt = publishedAt
+    self.isConnected = isConnected
+    self.monthlyCostUSD = monthlyCostUSD
+    self.periodStart = periodStart
+    self.costSampledAt = costSampledAt
+    self.status = status
+    self.grantTotalUSD = grantTotalUSD
+    self.grantRemainingUSD = grantRemainingUSD
+    self.grantCheckedAt = grantCheckedAt
+    self.grantExpiresAt = grantExpiresAt
+    self.grantExpiryConfirmedAt = grantExpiryConfirmedAt
+  }
+
+  public static var empty: OpenAIAPIWidgetSnapshot {
+    OpenAIAPIWidgetSnapshot(publishedAt: .distantPast, isConnected: false, monthlyCostUSD: nil,
+                            periodStart: nil, costSampledAt: nil, status: "未连接",
+                            grantTotalUSD: nil, grantRemainingUSD: nil, grantCheckedAt: nil, grantExpiresAt: nil)
+  }
+
+  public func cost(at now: Date) -> Double? {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    guard isConnected, let periodStart, let current = calendar.date(from: calendar.dateComponents([.year, .month], from: now)),
+          periodStart == current, let amount = monthlyCostUSD, amount.isFinite,
+          let sampled = costSampledAt, sampled <= now.addingTimeInterval(5) else { return nil }
+    return amount
+  }
+
+  public func grantRemaining(at now: Date) -> Double? {
+    guard let total = grantTotalUSD, let remaining = grantRemainingUSD,
+          total.isFinite, total > 0, remaining.isFinite, (0...total).contains(remaining),
+          grantCheckedAt != nil, grantExpiresAt.map({ $0 > now }) ?? true else { return nil }
+    return remaining
+  }
+
+  public var confirmedExpiry: OpenAIAPIGrantExpiry? {
+    guard let expiresAt = grantExpiresAt, let confirmedAt = grantExpiryConfirmedAt ?? grantCheckedAt else { return nil }
+    return OpenAIAPIGrantExpiry(expiresAt: expiresAt, confirmedAt: confirmedAt)
+  }
+
+  public func timelineDates(after now: Date) -> [Date] {
+    guard let expiry = confirmedExpiry else { return [now] }
+    return [now] + OpenAIAPIExpiryReminderPlan.events(expiry: expiry.expiresAt, after: now).map(\.fireAt)
+  }
+}
+
+public enum OpenAIAPIWidgetSnapshotStore {
+  public static let widgetKind = "dev.codex.balance-dashboard.codex.api-usage"
+  private static let fileName = "api-usage-snapshot.json"
+
+  public static func save(_ snapshot: OpenAIAPIWidgetSnapshot) throws {
+    let destinations = [CodexWidgetSnapshotStore.defaultURL(), CodexWidgetSnapshotStore.widgetContainerURL()]
+      .map { $0.deletingLastPathComponent().appendingPathComponent(fileName) }
+    let encoder = JSONEncoder()
+    encoder.dateEncodingStrategy = .secondsSince1970
+    encoder.outputFormatting = [.sortedKeys]
+    let data = try encoder.encode(snapshot)
+    for url in destinations {
+      try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+      try data.write(to: url, options: .atomic)
+    }
+  }
+
+  public static func load() throws -> OpenAIAPIWidgetSnapshot {
+    let url = CodexWidgetSnapshotStore.sandboxedWidgetURL().deletingLastPathComponent().appendingPathComponent(fileName)
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .secondsSince1970
+    return try decoder.decode(OpenAIAPIWidgetSnapshot.self, from: Data(contentsOf: url))
+  }
+}

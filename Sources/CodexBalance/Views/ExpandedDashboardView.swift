@@ -164,6 +164,7 @@ struct ExpandedDashboardView: View {
         expiryBatches: store.creditExpiry.confirmedBatches(for: store.status?.accountScope),
         metadata: store.status?.flexibleCreditRead
       )
+      OpenAIAPIUsageCard()
       QuotaForecastCard(forecast: store.quotaForecast, tint: store.palette.weekly,
         storageMessage: store.quotaHistoryStorageMessage)
       CodexRadarView(snapshot: store.codexRadarSnapshot, palette: store.palette, isLoading: store.codexRadarIsLoading, nextSyncAt: store.codexRadarNextSyncAt, statusMessage: store.codexRadarStatusMessage, refresh: { store.refreshCodexRadar(force: true) })

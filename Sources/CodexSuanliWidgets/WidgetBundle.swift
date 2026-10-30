@@ -1,3 +1,6 @@
+#if !XCODE_WIDGET_BUILD
+import CodexBalanceCore
+#endif
 import SwiftUI
 import WidgetKit
 
@@ -13,6 +16,21 @@ struct CodexSuanliWidgetBundle: WidgetBundle {
     TokenSummaryWidget()
     TokenTrendWidget()
     WorkloadWidget()
+    OpenAIAPIUsageWidget()
+  }
+}
+
+private struct OpenAIAPIUsageWidget: Widget {
+  let kind = OpenAIAPIWidgetSnapshotStore.widgetKind
+
+  var body: some WidgetConfiguration {
+    StaticConfiguration(kind: kind, provider: OpenAIAPIWidgetProvider()) { entry in
+      OpenAIAPIWidgetView(entry: entry)
+    }
+    .configurationDisplayName("OpenAI API 用量")
+    .description("查看 API 组织本月消费和手动确认的赠额余额。")
+    .supportedFamilies([.systemSmall, .systemMedium])
+    .contentMarginsDisabled()
   }
 }
 

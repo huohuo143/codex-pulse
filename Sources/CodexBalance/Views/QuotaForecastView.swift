@@ -174,6 +174,7 @@ struct QuotaForecastCard: View {
 
 struct MenuBarStatusView: View {
   @EnvironmentObject private var store: DashboardStore
+  @ObservedObject private var sidebar = CodexSidebarController.shared.model
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
@@ -221,6 +222,23 @@ struct MenuBarStatusView: View {
           .background(store.palette.weekly.opacity(0.10), in: RoundedRectangle(cornerRadius: 8))
         }
         .buttonStyle(.plain)
+      }
+
+      Divider()
+
+      HStack {
+        Label("Codex 侧栏状态", systemImage: "sidebar.left")
+          .font(.system(size: 10.5, weight: .medium))
+          .foregroundStyle(.secondary)
+        Spacer()
+        Menu("显示设置") {
+          Toggle("启用侧栏状态", isOn: $sidebar.enabled)
+          Divider()
+          SidebarVisibilityToggles(model: sidebar)
+          Divider()
+          Button("查看布局预览") { CodexSidebarController.shared.showPreview() }
+        }
+        .controlSize(.small)
       }
 
       Divider()

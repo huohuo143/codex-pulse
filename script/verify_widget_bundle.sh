@@ -50,6 +50,9 @@ assert_equal "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$APP_IN
 assert_equal "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP_INFO")" "$VERSION" "App version"
 assert_equal "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$APP_INFO")" "$BUILD_NUMBER" "App build"
 assert_equal "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP_INFO")" "$BUNDLE_ID" "App bundle ID"
+if [[ "${CODEX_PULSE_S3_CANDIDATE:-0}" != "1" ]]; then
+  assert_equal "$(/usr/libexec/PlistBuddy -c 'Print :CodexSidebarIntegrationVersion' "$APP_INFO")" "3" "Sidebar integration"
+fi
 assert_equal "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$WIDGET_INFO")" "Codex 脉动" "Widget display name"
 assert_equal "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$WIDGET_INFO")" "$VERSION" "Widget version"
 assert_equal "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$WIDGET_INFO")" "$BUILD_NUMBER" "Widget build"
@@ -61,7 +64,7 @@ assert_equal "$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$APP
 assert_equal "$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$WIDGET_INFO")" "14.0" "Widget minimum OS"
 
 WIDGET_COUNT="$(/usr/bin/grep -c 'configurationDisplayName' "$WIDGET_SOURCE")"
-assert_equal "$WIDGET_COUNT" "8" "Widget configuration count"
+assert_equal "$WIDGET_COUNT" "9" "Widget configuration count"
 
 LINKED_FRAMEWORKS="$(/usr/bin/otool -L "$WIDGET_BINARY")"
 [[ "$LINKED_FRAMEWORKS" == *"WidgetKit.framework"* ]] || fail "WidgetKit.framework is not linked"
@@ -80,4 +83,4 @@ assert_equal "$(/usr/bin/lipo -archs "$WIDGET_BINARY")" "$ARCH" "Widget architec
 
 echo "Verified App: $APP_BUNDLE"
 echo "Verified Widget: $WIDGET_BUNDLE"
-echo "Verified $ARCH architecture, 8 widget configurations, icons, standard sandbox, frameworks and signatures."
+echo "Verified $ARCH architecture, 9 widget configurations, icons, standard sandbox, frameworks and signatures."

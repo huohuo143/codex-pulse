@@ -32,14 +32,15 @@ let package = Package(
   targets: [
     .target(name: "CodexMobileCore", path: "mobile/shared"),
     .target(name: "CZstd"),
+    .target(name: "SidebarCore"),
     .target(name: "CodexBalanceCore", dependencies: ["CZstd", "CodexMobileCore"], resources: [.process("Resources")]),
     .executableTarget(
       name: "CodexBalance",
-      dependencies: ["CodexBalanceCore"]
+      dependencies: ["CodexBalanceCore", "SidebarCore"]
     ),
     .executableTarget(
       name: "CodexSuanliWidgets",
-      dependencies: ["CodexBalanceCore"],
+      dependencies: ["CodexBalanceCore", "SidebarCore"],
       swiftSettings: [
         .unsafeFlags(["-application-extension"], .when(platforms: [.macOS]))
       ]
@@ -56,6 +57,7 @@ let package = Package(
       swiftSettings: testingFlags,
       linkerSettings: testingLinkerFlags
     ),
+    .testTarget(name: "SidebarCoreTests", dependencies: ["SidebarCore"]),
     .testTarget(
       name: "CodexBalanceWidgetViewTests",
       dependencies: ["CodexSuanliWidgets"],

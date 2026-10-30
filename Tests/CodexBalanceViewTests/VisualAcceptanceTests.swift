@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 import Testing
 import CodexBalanceCore
+import SidebarCore
 @testable import CodexBalance
 
 @Suite("App visual acceptance", .serialized)
@@ -39,6 +40,10 @@ struct VisualAcceptanceTests {
     try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
     let store = DashboardStore(startServices: false)
     let now = Date()
+    // Render the confirmed-date state with isolated fixture data only.
+    #expect(PulsePreferences.isIsolated)
+    #expect(OpenAIAPIUsageStore.shared.confirmExpiry(now.addingTimeInterval(2 * 86400 + 5 * 3600), requestPermission: false))
+    defer { OpenAIAPIUsageStore.shared.clearExpiry() }
     let event = RateLimitEvent(timestamp: now, sourceName: "验收示例", sourcePath: "fixture", limitID: "codex", limitName: "Codex",
       primary: .init(usedPercent: 16, remainingPercent: 84, windowMinutes: 300, resetsAt: now.addingTimeInterval(7200)),
       secondary: .init(usedPercent: 32, remainingPercent: 68, windowMinutes: 10080, resetsAt: now.addingTimeInterval(86400)))
@@ -75,6 +80,11 @@ struct VisualAcceptanceTests {
         try render(ExpandedDashboardView().environmentObject(store).environment(\.colorScheme, scheme).defaultAppStorage(PulsePreferences.shared),
           size: .init(width: 640, height: 760), file: folder.appendingPathComponent("app-\(section.rawValue)-\(tone).png"))
       }
+      let sidebar = SidebarModel(defaults: PulsePreferences.shared)
+      sidebar.account = AccountSample(ok: true, remaining: 13, balance: 12345,
+                                      sampledAt: now.timeIntervalSince1970, resetCount: 3)
+      try render(CodexSidebarPreviewView(model: sidebar).environment(\.colorScheme, scheme),
+        size: .init(width: 650, height: 430), file: folder.appendingPathComponent("sidebar-expiry-\(tone).png"))
     }
     print("VISUAL_APP rendered=42 output=\(folder.path)")
   }

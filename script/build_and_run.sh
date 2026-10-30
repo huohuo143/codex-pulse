@@ -7,8 +7,8 @@ EXECUTABLE_NAME="CodexSuanliMeter"
 WIDGET_EXECUTABLE_NAME="CodexSuanliWidgets"
 BUNDLE_ID="${CODEX_PULSE_BUNDLE_ID:-dev.codex.balance-dashboard.codex}"
 WIDGET_BUNDLE_ID="$BUNDLE_ID.widgets"
-VERSION="${VERSION:-2.12.41}"
-BUILD_NUMBER="${BUILD_NUMBER:-2169}"
+VERSION="${VERSION:-2.12.46}"
+BUILD_NUMBER="${BUILD_NUMBER:-2174}"
 ARCH="${ARCH:-$(uname -m)}"
 # macOS 13 可运行主应用；桌面小组件只在 macOS 14 及以后提供。发布完整
 # 小组件扩展的独立部署目标保持 macOS 14，不抬高主应用要求。
@@ -77,6 +77,8 @@ fi
 
 cd "$ROOT_DIR"
 "$ROOT_DIR/script/verify_reset_behavior.sh" mac
+swift test --build-system "$SWIFT_BUILD_SYSTEM" -j 2 --disable-index-store \
+  --scratch-path "$SWIFT_SCRATCH_PATH" --filter 'SidebarCoreTests|OpenAIAPIUsage|SidebarUpgradePreferences'
 swift build --build-system "$SWIFT_BUILD_SYSTEM" -j 1 --disable-index-store -c "$CONFIGURATION" --arch "$ARCH" --scratch-path "$SWIFT_SCRATCH_PATH" --product "$EXECUTABLE_NAME"
 BUILD_DIR="$(swift build --build-system "$SWIFT_BUILD_SYSTEM" -c "$CONFIGURATION" --arch "$ARCH" --scratch-path "$SWIFT_SCRATCH_PATH" --show-bin-path)"
 BUILD_BINARY="$BUILD_DIR/$EXECUTABLE_NAME"
@@ -179,6 +181,8 @@ PLIST
 
 if [[ "${CODEX_PULSE_S3_CANDIDATE:-0}" == "1" ]]; then
   /usr/libexec/PlistBuddy -c "Add :CodexS3SandboxCandidate bool true" "$INFO_PLIST"
+else
+  /usr/libexec/PlistBuddy -c "Add :CodexSidebarIntegrationVersion integer 3" "$INFO_PLIST"
 fi
 
 if [[ "$INCLUDE_WIDGETS" == "1" ]]; then
@@ -223,6 +227,9 @@ else
   [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$INFO_PLIST")" == "$BUNDLE_ID" ]]
   [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$INFO_PLIST")" == "$VERSION" ]]
   [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$INFO_PLIST")" == "$BUILD_NUMBER" ]]
+  if [[ "${CODEX_PULSE_S3_CANDIDATE:-0}" != "1" ]]; then
+    [[ "$(/usr/libexec/PlistBuddy -c 'Print :CodexSidebarIntegrationVersion' "$INFO_PLIST")" == 3 ]]
+  fi
   [[ "$(/usr/bin/lipo -archs "$APP_BINARY")" == "$ARCH" ]]
   [[ -f "$APP_CONTENTS/Resources/AppIcon.icns" && -f "$APP_CONTENTS/Resources/Zstandard-LICENSE.txt" ]]
   [[ ! -d "$APP_CONTENTS/PlugIns/CodexSuanliWidgets.appex" ]]

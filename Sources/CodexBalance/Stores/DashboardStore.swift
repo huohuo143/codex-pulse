@@ -335,10 +335,16 @@ final class DashboardStore: ObservableObject {
       launchedInBackground: launchedInBackground
     )
 
-    floatingPanelMetrics = FloatingPanelMetric.resolvedSelection(
+    var initialMetrics = FloatingPanelMetric.resolvedSelection(
       rawValues: defaults.stringArray(forKey: FloatingPanelMetric.userDefaultsKey),
       legacyShowsResetCredits: defaults.object(forKey: "compactShowsResetCredits") as? Bool
     )
+    if startServices && defaults.object(forKey: "apiUsageFloatingMetricInitialized") == nil {
+      initialMetrics.insert(.apiUsage)
+      defaults.set(FloatingPanelMetric.persistedRawValues(initialMetrics), forKey: FloatingPanelMetric.userDefaultsKey)
+      defaults.set(true, forKey: "apiUsageFloatingMetricInitialized")
+    }
+    floatingPanelMetrics = initialMetrics
     widgetShowsFiveHourQuota = defaults.object(forKey: "widgetShowsFiveHourQuota") as? Bool ?? false
 
     compactSizeMode = defaults.string(forKey: "compactSizeMode").flatMap(CompactSizeMode.init) ?? .standard
@@ -398,6 +404,11 @@ final class DashboardStore: ObservableObject {
       object: nil,
       queue: .main
     ) { [weak self] _ in Task { @MainActor in self?.showDashboard() } }
+    NotificationCenter.default.addObserver(
+      forName: .openAIAPIUsageChanged,
+      object: nil,
+      queue: .main
+    ) { [weak self] _ in Task { @MainActor in self?.writeWidgetSnapshotFile() } }
     installCodexRadarLifecycleObservers()
     #if DEBUG
     if let fixturePath = ProcessInfo.processInfo.environment["CODEX_RADAR_FIXTURE_PATH"],
@@ -418,6 +429,7 @@ final class DashboardStore: ObservableObject {
   }
 
   func startAutoRefresh() {
+    guard servicesEnabled else { return }
     installCodexRadarNetworkMonitor()
     if refreshTimer == nil {
       recordRuntimeEvent("started")
